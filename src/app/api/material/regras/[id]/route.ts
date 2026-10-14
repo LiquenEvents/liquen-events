@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "@/lib/admin-auth";
-import { updateRule, deleteRule } from "@/lib/material-rules-store";
+import { enviarParaAReciclagem, quemApagou } from "@/lib/reciclagem";
+import { updateRule } from "@/lib/material-rules-store";
 import type { MaterialRule } from "@/lib/material-rules";
 import { log } from "@/lib/logger";
 
@@ -44,8 +45,8 @@ export async function DELETE(
   if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   const { id } = await params;
   try {
-    await deleteRule(id);
-    return NextResponse.json({ ok: true });
+    const reciclagem = await enviarParaAReciclagem("regra", id, quemApagou(request));
+    return NextResponse.json({ ok: true, reciclagem });
   } catch (err) {
     log.error("material regra DELETE falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });

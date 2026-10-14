@@ -1,3 +1,4 @@
+import { tipoDoEventoDoPedido } from "./proposal-evento";
 import {
   DEFAULT_VAT_RATE,
   detectVatMode,
@@ -193,6 +194,15 @@ export function copiarParaPedido(origem: ProposalDoc, quote: Quote): ResultadoDa
   substituir("eventDate", dataPorExtenso(quote.date));
   substituir("location", quote.location ?? "");
   substituir("guests", quote.guests ? `${quote.guests} pax` : "");
+
+  // O tipo de evento também é do pedido novo: copiar um casamento para um
+  // restaurante no Halloween deixava «Casamento» — e com ele os «Noivos» e os
+  // capítulos de Cerimónia e Cocktail no PDF. Se o pedido não sabe o tipo,
+  // fica o da origem, mas MARCADO para ela confirmar (e o estúdio avisa quando
+  // diz casamento num pedido que não parece sê-lo).
+  const tipo = tipoDoEventoDoPedido(quote);
+  if (tipo) substituir("eventType", tipo);
+  else if ((doc.eventType ?? "").trim()) camposAMudar.push("eventType");
 
   // Cerimónia e hora são do dia de outra pessoa e o pedido não os traz. Ficam
   // vazios e marcados: melhor uma caixa por preencher do que "Civil, simbólica"

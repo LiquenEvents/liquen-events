@@ -106,7 +106,11 @@ interface Escrita {
 }
 
 /** Desenha e devolve tudo o que foi escrito e quantas imagens cada página leva. */
-async function desenhar(doc: ProposalDoc, idioma: "pt" | "en" = "pt") {
+async function desenhar(
+  doc: ProposalDoc,
+  idioma: "pt" | "en" = "pt",
+  opcoes: { rascunho?: boolean } = {},
+) {
   const paginas: PDFPage[] = [];
   const escritas: Escrita[] = [];
   const imagens: number[] = [];
@@ -138,7 +142,7 @@ async function desenhar(doc: ProposalDoc, idioma: "pt" | "en" = "pt") {
     return drawImage.apply(this, a);
   };
   try {
-    const r = await renderEditorialPdf(doc, idioma);
+    const r = await renderEditorialPdf(doc, idioma, opcoes);
     return { ...r, escritas, imagens, paginas: paginas.length };
   } finally {
     PDFDocument.prototype.addPage = addPage;
@@ -206,6 +210,88 @@ describe("a sequência do exemplo, pela mesma ordem", () => {
     expect(paginaDe("Inspiração · Jantar")).toBe("11");
     expect(paginaDe("Investimento")).toBe("13");
     expect(paginaDe("Condições")).toBe("16");
+  });
+});
+
+describe("fora dos casamentos, a proposta adapta-se ao que se escreve", () => {
+  /**
+   * O caso dela, a 13/10: um restaurante no Halloween. Escolheu os grupos e os
+   * mood boards que queria, e o PDF continuava a dizer «Noivos», «Cerimónia» e
+   * «Cocktail». Cada mood board passa a ser o seu capítulo, com o título dela.
+   */
+  const restaurante = () =>
+    docDeTeste({
+      clientNames: "TESTE Restaurante Lua",
+      eventType: "Halloween",
+      ceremony: "",
+      serviceGroups: [
+        {
+          letter: "a)",
+          title: "Decoração Halloween",
+          items: [{ label: "Decoração do bar" }, { label: "Arco de abóboras" }],
+        },
+      ],
+      moodBoards: [
+        { title: "Bar", images: fotos(3) },
+        { title: "Arco de abóboras", images: fotos(4) },
+        { title: "Mesas", images: fotos(5), annotation: "TESTE nota das mesas." },
+      ],
+      budgetItems: ["Decoração Bar", "Arco de abóboras", "Mesas"],
+    });
+
+  it("nada de casamento: nem Noivos, nem Cerimónia, nem Cocktail, nem «o vosso dia»", async () => {
+    const { escritas } = await desenhar(restaurante());
+    const texto = tudo(escritas);
+    for (const palavra of [
+      "Noivos",
+      "NOIVOS",
+      "Cerimónia",
+      "CERIMÓNIA",
+      "Cocktail",
+      "Jantar",
+      "Complementos",
+      "vosso dia",
+      "dia de",
+    ])
+      expect(texto, palavra).not.toContain(palavra);
+    expect(texto).toContain("Uma decoração pensada para TESTE Restaurante Lua");
+    expect(texto).toContain("Halloween");
+  });
+
+  it("cada mood board abre o seu capítulo, com o título que ela lhe deu e pela ordem dela", async () => {
+    const { escritas } = await desenhar(restaurante());
+    const indice = escritas.filter((e) => e.pagina === 2).map((e) => e.texto);
+    const capitulos = indice.filter((t) => t.startsWith("Inspiração · "));
+    expect(capitulos).toEqual([
+      "Inspiração · Bar",
+      "Inspiração · Arco de abóboras",
+      "Inspiração · Mesas",
+    ]);
+    const texto = tudo(escritas);
+    expect(texto).toMatch(/INSPIRAÇÃO Bar/);
+    expect(texto).toMatch(/INSPIRAÇÃO Arco de abóboras/);
+  });
+
+  it("em inglês também: «Client», «your event», e nada de «Bridal»", async () => {
+    const { escritas } = await desenhar(restaurante(), "en");
+    const texto = tudo(escritas);
+    for (const palavra of ["Couple", "COUPLE", "Ceremony", "CEREMONY", "Bridal", "’s day"])
+      expect(texto, palavra).not.toContain(palavra);
+  });
+
+  it("uma cerimónia que ela escreveu sai, mesmo fora de um casamento (a regra do estúdio)", async () => {
+    const { escritas } = await desenhar(
+      docDeTeste({ eventType: "Batizado", ceremony: "Religiosa", moodBoards: [] }),
+    );
+    expect(tudo(escritas)).toMatch(/CERIMÓNIA Religiosa/);
+    expect(tudo(escritas)).toMatch(/CLIENTE/);
+  });
+
+  it("sem nome do cliente: «para o vosso evento»", async () => {
+    const { escritas } = await desenhar(
+      docDeTeste({ clientNames: "", eventType: "Festa", moodBoards: [] }),
+    );
+    expect(tudo(escritas)).toContain("Uma decoração pensada para o vosso evento");
   });
 });
 
@@ -426,5 +512,37 @@ describe("a capa ao alto", () => {
     expect(r1 - g1, "a regra trocou-a por uma deitada dos temas").toBeLessThan(20);
     const [r2, g2] = await corDaCapa(docDeTeste({ ...base, capaMesmoAssim: true }));
     expect(r2 - g2, "a dela, que é vermelha").toBeGreaterThan(50);
+  });
+});
+
+/**
+ * B1 — o PDF descarregado com erros por resolver sai marcado. Nada mais muda
+ * no desenho: as mesmas páginas, o mesmo texto, e a marca à frente do rodapé.
+ */
+describe("o rascunho", () => {
+  it("leva «RASCUNHO» à frente do rodapé e no título, e o resto fica igual", async () => {
+    const normal = await desenhar(docDeTeste());
+    const rascunho = await desenhar(docDeTeste(), "pt", { rascunho: true });
+    expect(rascunho.paginas).toBe(normal.paginas);
+    expect(tudo(normal.escritas)).not.toContain("RASCUNHO");
+    const rodapesNormais = normal.escritas.filter((e) =>
+      e.texto.startsWith("Proposta de decoração"),
+    );
+    const comMarca = rascunho.escritas.filter((e) => e.texto.startsWith("RASCUNHO · "));
+    expect(comMarca.length, "uma marca por cada rodapé").toBe(rodapesNormais.length);
+    expect(comMarca.map((e) => e.pagina)).toEqual(rodapesNormais.map((e) => e.pagina));
+    // Fora do rodapé, o texto é exactamente o do PDF normal. No rodapé, a marca
+    // vai À FRENTE: num rodapé estreito (ao lado de uma fotografia) o que
+    // encolhe com «…» é o fim — a data —, e a marca fica sempre.
+    const semRodape = (e: Escrita[]) =>
+      tudo(e.filter((x) => !/^(RASCUNHO · )?Proposta de decoração/.test(x.texto)));
+    expect(semRodape(rascunho.escritas)).toBe(semRodape(normal.escritas));
+    const titulo = (await PDFDocument.load(rascunho.bytes)).getTitle();
+    expect(titulo).toMatch(/^RASCUNHO · /);
+  });
+
+  it("em inglês diz «DRAFT»", async () => {
+    const { escritas } = await desenhar(docDeTeste(), "en", { rascunho: true });
+    expect(escritas.some((e) => e.texto.startsWith("DRAFT · "))).toBe(true);
   });
 });

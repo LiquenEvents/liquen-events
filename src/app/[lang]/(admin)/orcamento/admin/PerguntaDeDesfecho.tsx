@@ -15,6 +15,7 @@ import {
 } from "@/lib/orcamento/desfecho";
 import { eur, randomId } from "./util";
 import { ESTADO, PRESSAO } from "./ui/movimento";
+import { reporEstadoDoPedido } from "./anular-estado";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -95,6 +96,15 @@ interface Props {
 
 export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = "cartao" }: Props) {
   const [fase, setFase] = useState<Fase>({ tipo: "pergunta" });
+  /**
+   * O pedido como estava ANTES da marcação — para o «Anular» do recibo.
+   * Palavras dela: «tem que haver no site todo, em tudo aquilo que se faz,
+   * uma forma de voltar atrás».
+   */
+  const [antes, setAntes] = useState<{ status: Quote["status"]; quotedPrice?: number } | null>(
+    null,
+  );
+  const [aAnular, setAAnular] = useState(false);
   const [escrito, setEscrito] = useState(() => textoDoValor(quote));
   const [aviso, setAviso] = useState<string | null>(null);
   const [notaMotivo, setNotaMotivo] = useState("");
@@ -172,6 +182,7 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
         return;
       }
       const actualizado = (await res.json()) as Quote;
+      setAntes({ status: quote.status, quotedPrice: quote.quotedPrice });
       setFase({ tipo: "marcado", desfecho, valor });
       onGravado(actualizado);
     } catch {
@@ -245,11 +256,46 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
            deste, tem `autoFocus` no campo — uma entrada ali arrastava o campo
            quatro píxeis debaixo do cursor que já lá está. */
         <div className="bo-entrada flex flex-col gap-2">
-          <p className={`text-sage-600 ${compacto ? "text-[11px]" : "text-sm"} font-medium`}>
-            {fase.desfecho === "ganho"
-              ? `Marcado como ganho${fase.valor != null ? ` — ${eur(fase.valor)}` : ""}.`
-              : "Marcado como perdido."}
-          </p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <p className={`text-sage-600 ${compacto ? "text-[11px]" : "text-sm"} font-medium`}>
+              {fase.desfecho === "ganho"
+                ? `Marcado como ganho${fase.valor != null ? ` — ${eur(fase.valor)}` : ""}.`
+                : "Marcado como perdido."}
+            </p>
+            {/* A volta atrás fica ao lado do recibo enquanto ele está à vista:
+                repõe o estado e o valor de antes, e — se foi «Ganho» — leva a
+                proposta aceite e o contrato pendente que isso criou. */}
+            {antes && (
+              <button
+                type="button"
+                disabled={aAnular}
+                onClick={() => {
+                  setAAnular(true);
+                  setAviso(null);
+                  reporEstadoDoPedido({
+                    quoteId: quote.id,
+                    de: antes.status,
+                    para: fase.desfecho === "ganho" ? "aceite" : "rejeitado",
+                    actor: quem,
+                    extra:
+                      fase.desfecho === "ganho" ? { quotedPrice: antes.quotedPrice ?? null } : {},
+                  })
+                    .then((reposto) => {
+                      setAntes(null);
+                      setFase({ tipo: "pergunta" });
+                      if (reposto) onGravado(reposto);
+                    })
+                    .catch((e: unknown) =>
+                      setAviso(e instanceof Error ? e.message : "Não foi possível anular."),
+                    )
+                    .finally(() => setAAnular(false));
+                }}
+                className={`alvo-toque text-[11px] font-medium text-[var(--bo-text-muted)] underline underline-offset-2 hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
+              >
+                {aAnular ? "A anular…" : "Anular"}
+              </button>
+            )}
+          </div>
           {/* ── «PERDIDO» NÃO INTERROGA ─────────────────────────────────────
               O negócio já está marcado; o motivo vem DEPOIS, é opcional, e
               nunca trava nada. Quem não quiser escrever fecha o pedido e o
@@ -391,7 +437,10 @@ export default function PerguntaDeDesfecho({ quote, quem, onGravado, variante = 
           entrada no painel: o aviso monta sozinho, depois de o campo estar
           parado e focado, e nunca mexe no que está por cima dele. */}
       {aviso && (
-        <p role="alert" className="bo-entrada mt-2 text-[var(--bo-perigo)] text-[11px] leading-snug">
+        <p
+          role="alert"
+          className="bo-entrada mt-2 text-[var(--bo-perigo)] text-[11px] leading-snug"
+        >
           {aviso}
         </p>
       )}

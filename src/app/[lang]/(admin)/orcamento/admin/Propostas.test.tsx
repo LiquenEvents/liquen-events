@@ -304,6 +304,23 @@ describe("Propostas — aceitar move o pedido do lado do servidor", () => {
     expect(patch.body).not.toHaveProperty("activityLog");
     expect(patch.body).not.toHaveProperty("activityLogAppend");
   });
+
+  /**
+   * «Anular» a seguir ao «Aceitar» (`docs/TUDO-REVERSIVEL.md`). As propostas
+   * chegam DEPOIS do primeiro desenho, e o «Aceitar» vive num callback estável:
+   * lida pelo fecho, a proposta «antes» não existia e o «Anular» não aparecia.
+   * Foi assim que se deu por isto, no browser.
+   */
+  it("depois de aceitar há «Anular», e ele põe a proposta como estava", async () => {
+    await aceitar();
+    await userEvent.click(await screen.findByRole("button", { name: "Anular" }));
+    await waitFor(() =>
+      expect(enviados.filter((e) => e.url.startsWith("/api/propostas/"))).toHaveLength(2),
+    );
+    const reposta = enviados.filter((e) => e.url.startsWith("/api/propostas/"))[1];
+    expect(reposta.body.status).toBe("enviada");
+    expect(reposta.body.respondedAt).toBe("");
+  });
 });
 
 /**

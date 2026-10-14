@@ -54,10 +54,11 @@ describe("o que dizer sobre o destinatário", () => {
   });
 
   it("sem email, diz o que vai acontecer em vez de ficar calado", () => {
-    // «Guardada mas não enviada» é o desfecho, e tem de se saber ANTES.
+    // Por email não sai (B1: o botão trava), e diz-se o remédio ANTES.
     const d = destinatarioDoEnvio("");
     expect(d.valido).toBe(false);
     expect(d.aviso).toContain("não sai");
+    expect(d.aviso).toContain("WhatsApp");
   });
 
   it("um email estragado cita-o, para se ver o que está lá escrito", () => {

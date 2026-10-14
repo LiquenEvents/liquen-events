@@ -1439,3 +1439,26 @@ describe("o que sobe no documento, e o que fica quieto", () => {
     ).toEqual([]);
   });
 });
+
+describe("fora de um casamento, a página fala do evento certo — como o PDF", () => {
+  it("um restaurante é «Cliente», sem «Cerimónia» nem o título «de Casamento»", () => {
+    desenhar({
+      clientNames: "TESTE Restaurante Lua",
+      eventType: "Halloween no restaurante",
+      ceremony: "",
+      template: "organizacao",
+      headerTitle: "Proposta de orçamento para Organização de Casamento",
+    } as Partial<ProposalDoc>);
+    expect(screen.queryByText("Noivos")).toBeNull();
+    // (Um mood board chamado «Cerimónia» é conteúdo dela e sai na mesma; o que
+    // não pode haver é o RÓTULO da apresentação.)
+    expect(screen.queryAllByText("Cerimónia").filter((e) => e.tagName !== "H3")).toHaveLength(0);
+    expect(screen.queryByText(/Organização de Casamento/)).toBeNull();
+    expect(screen.getByText("Cliente")).toBeTruthy();
+  });
+
+  it("um casamento continua com «Noivos»", () => {
+    desenhar();
+    expect(screen.getByText("Noivos")).toBeTruthy();
+  });
+});

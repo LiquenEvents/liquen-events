@@ -24,7 +24,12 @@ export interface TextosEditoriais {
   /** A entrada do índice para a página «A proposta» (o sobretítulo é da casa). */
   aProposta: string;
   /** O título da página «A proposta», com os primeiros nomes do casal. */
-  tituloDaProposta: (nomes: string | null, organizacao: boolean) => string;
+  /**
+   * O título da página «A proposta». Num casamento, «para o dia de A e B»; fora
+   * dele (um restaurante, uma empresa, uma festa) não há «dia» de ninguém —
+   * «para o Restaurante X», ou «para o vosso evento».
+   */
+  tituloDaProposta: (nomes: string | null, organizacao: boolean, casamento?: boolean) => string;
   factos: {
     evento: string;
     data: string;
@@ -42,6 +47,8 @@ export interface TextosEditoriais {
   grupos: Readonly<Record<Grupo, string>>;
   /** A linha do rodapé depois da marca: «Proposta de decoração». */
   rodapeModelo: (organizacao: boolean) => string;
+  /** A marca de um PDF descarregado com erros por resolver — à frente do rodapé. */
+  rascunho: string;
 
   // ── O que propomos ──
   /** «Seis serviços de decoração floral e decoração» — `grupo` é o título do
@@ -124,8 +131,9 @@ const PT: TextosEditoriais = {
   indice: "Índice",
   tituloIndice: "Conteúdo da proposta",
   aProposta: "A proposta",
-  tituloDaProposta: (nomes, org) => {
+  tituloDaProposta: (nomes, org, casamento = true) => {
     const oQue = org ? "Uma organização pensada" : "Uma decoração pensada";
+    if (!casamento) return nomes ? `${oQue} para ${nomes}` : `${oQue} para o vosso evento`;
     return nomes ? `${oQue} para o dia de ${nomes}` : `${oQue} para o vosso dia`;
   },
   factos: {
@@ -149,6 +157,7 @@ const PT: TextosEditoriais = {
     ambiente: "Ambiente",
   },
   rodapeModelo: (org) => (org ? "Proposta de organização" : "Proposta de decoração"),
+  rascunho: "RASCUNHO",
 
   tituloServicos: (n, grupo) => {
     // «Um serviço», no singular; e «um» e não «uma»: «serviço» é masculino.
@@ -176,7 +185,11 @@ const EN: TextosEditoriais = {
   indice: "Contents",
   tituloIndice: "In this proposal",
   aProposta: "The proposal",
-  tituloDaProposta: (nomes, org) => {
+  tituloDaProposta: (nomes, org, casamento = true) => {
+    if (!casamento) {
+      const oQue = org ? "An event planned" : "A decoration designed";
+      return nomes ? `${oQue} for ${nomes}` : `${oQue} for your event`;
+    }
     const oQue = org ? "A celebration planned" : "A decoration designed";
     return nomes ? `${oQue} for ${nomes}’s day` : `${oQue} for your day`;
   },
@@ -201,13 +214,14 @@ const EN: TextosEditoriais = {
     ambiente: "Atmosphere",
   },
   rodapeModelo: (org) => (org ? "Planning proposal" : "Decoration proposal"),
+  rascunho: "DRAFT",
 
   // O nome do grupo é dela e fica em português; em inglês o título diz só
   // quantos são, que é o que se lê sem tradução.
   tituloServicos: (n) => (n === 1 ? "One service" : `${porExtenso(n, EXTENSO_EN)} services`),
 
   sobretituloAmbiente: "Atmosphere",
-  tituloAmbiente: "The palette and mood of the day",
+  tituloAmbiente: "The palette and mood of the event",
   subtituloAmbiente: "Colours taken from the inspiration photographs in this proposal",
 
   investimento: "Investment",

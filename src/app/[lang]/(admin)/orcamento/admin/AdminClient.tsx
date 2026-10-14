@@ -70,6 +70,7 @@ import PasskeysDialog from "./PasskeysDialog";
 import SessaoExpirada from "./SessaoExpirada";
 import NotificationBell from "./NotificationBell";
 import NotaDaProposta from "./NotaDaProposta";
+import PropostasDoPedido from "./PropostasDoPedido";
 import {
   downloadCsv,
   quotesToCsvRows,
@@ -92,6 +93,9 @@ import BotaoGuardarTudo from "./GuardarTudo";
 import { onIdle } from "@/lib/onIdle";
 import { marcarSaidaDeProposito } from "./entrada-destino";
 import { diasDesde, eventCountdown, parseMoney, randomId, eur, todayKey } from "./util";
+import { useAnular } from "./ui/anular";
+import { useDepoisDeApagar, useDepoisDeApagarVarios } from "./ui/depois-de-apagar";
+import { reporEstadoDoPedido } from "./anular-estado";
 import { useFocusTrap } from "./useFocusTrap";
 import { useCamadaDeHistoria } from "./useCamadaDeHistoria";
 import { useTrincoDeScroll } from "./useTrincoDeScroll";
@@ -157,6 +161,7 @@ import {
   Acompanhamento,
   DefinicoesProposta,
   Servicos,
+  Reciclagem,
   Tarefas,
   Fornecedores,
   StatsDashboard,
@@ -1399,6 +1404,9 @@ export default function AdminClient({
   /** Quando foi a última revalidação, para não a repetir a cada piscar de olhos. */
   const ultimaRevalidacao = useRef(0);
   const [view, setView] = useState<View>(vistaInicial ?? "overview");
+  /** A procura com que «Propostas» abre quando se chega lá a partir de outra
+   *  vista («Ver em Propostas» do Fazer proposta). */
+  const [procuraEmPropostas, setProcuraEmPropostas] = useState("");
   const [navOpen, setNavOpen] = useState(false);
   // A gaveta é modal: com ela aberta, o Tab passeava pelo fundo desfocado
   // (Ajuda → Tudo guardado → Pesquisar → Novo) e o foco ficava no botão que a
@@ -1812,6 +1820,10 @@ export default function AdminClient({
    */
   const barraDeDestinosRef = useRef<HTMLElement | null>(null);
   const { toast } = useToast();
+  const anular = useAnular();
+  // Apagar um pedido deixa-o 30 dias na Reciclagem (R3b), com «Anular».
+  const depoisDeApagar = useDepoisDeApagar();
+  const depoisDeApagarVarios = useDepoisDeApagarVarios();
   const searchRef = useRef<HTMLInputElement>(null);
   /**
    * Focus trap for the mobile detail drawer — active only while it's the overlay.
@@ -3480,6 +3492,33 @@ export default function AdminClient({
    * com o nome de cada um. Dois recados ao mesmo tempo sobre a mesma gravação
    * seriam ruído, e o recado que sobra é sempre o menos exacto dos dois.
    */
+  /**
+   * Põe no ecrã o pedido que o «Anular» repôs: a lista, a gaveta, cada campo de
+   * edição e a linha de base da gravação automática — como o «Guardar» faz com o
+   * que acabou de gravar. Sem isto, os campos ficavam com o valor anulado e o
+   * botão voltava a gravá-lo.
+   */
+  function refletirPedidoReposto(q: Quote) {
+    setQuotes((prev) => prev.map((x) => (x.id === q.id ? q : x)));
+    setSelected((prev) => (prev?.id === q.id ? q : prev));
+    setEditStatus(q.status);
+    setEditPrice(textoDoPreco(q));
+    setEditNotes(q.adminNotes ?? "");
+    setEditAssigned(q.assignedTo ?? "");
+    setEditLostReason(q.lostReason ?? "");
+    setEditDate(q.date ?? "");
+    setEditGuests(String(q.guests ?? ""));
+    setEditLocation(q.location ?? "");
+    setEditNome(q.name ?? "");
+    setEditEmail(q.email ?? "");
+    setEditTelefone(q.phone ?? "");
+    escritoNoServidor.current = {
+      id: q.id,
+      adminNotes: q.adminNotes ?? "",
+      lostReason: q.lostReason ?? "",
+    };
+  }
+
   async function saveChanges(
     opcoes: { silencioso?: boolean } = {},
   ): Promise<{ ok: boolean; porque?: string }> {
@@ -3768,7 +3807,67 @@ export default function AdminClient({
         dizer(porque, "error");
         return { ok: false, porque };
       }
-      dizer("Pedido atualizado", "success");
+      /**
+       * ── «ANULAR» DE TUDO O QUE ESTE «GUARDAR» MUDOU ────────────────────────
+       *
+       * `selected` aqui ainda é o pedido de ANTES desta gravação (o fecho do
+       * clique). Para cada campo que foi no corpo, volta o valor que lá estava
+       * — com a mesma regra de `null`/`""` do envio, para apagar mesmo. Se o
+       * estado também mudou, vai tudo no mesmo gesto do `reporEstadoDoPedido`
+       * (que desfaz a cadeia do «Ganho»); senão, um PATCH com a linha no
+       * histórico.
+       */
+      const antes = selected;
+      const inverso: Record<string, unknown> = {};
+      if ("quotedPrice" in body) inverso.quotedPrice = antes.quotedPrice ?? null;
+      if ("adminNotes" in body) inverso.adminNotes = antes.adminNotes ?? "";
+      if ("assignedTo" in body) inverso.assignedTo = antes.assignedTo ?? null;
+      if ("lostReason" in body) inverso.lostReason = antes.lostReason ?? null;
+      if ("date" in body) inverso.date = antes.date ?? "";
+      if ("guests" in body) inverso.guests = antes.guests;
+      if ("location" in body) inverso.location = antes.location ?? "";
+      if ("name" in body) inverso.name = antes.name ?? "";
+      if ("email" in body) inverso.email = antes.email ?? "";
+      if ("phone" in body) inverso.phone = antes.phone ?? "";
+      const mudouEstado = updated.status !== antes.status;
+      if (opcoes.silencioso || (!mudouEstado && Object.keys(inverso).length === 0)) {
+        dizer("Pedido atualizado", "success");
+        return { ok: true };
+      }
+      anular("Pedido atualizado", async () => {
+        let reposto: Quote | null;
+        if (mudouEstado) {
+          reposto = await reporEstadoDoPedido({
+            quoteId: updated.id,
+            de: antes.status,
+            para: updated.status,
+            actor: userName,
+            extra: inverso,
+          });
+        } else {
+          const res = await fetch(`/api/orcamento/${encodeURIComponent(updated.id)}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ...inverso,
+              activityLogAppend: [
+                {
+                  id: randomId(),
+                  at: new Date().toISOString(),
+                  kind: "note_added",
+                  actor: userName,
+                  summary: "Alterações anuladas",
+                },
+              ],
+            }),
+          });
+          const corpo = (await res.json().catch(() => null)) as (Quote & { error?: string }) | null;
+          if (!res.ok) throw new Error(corpo?.error || `Não foi possível anular (${res.status}).`);
+          reposto = corpo;
+        }
+        if (!reposto) return;
+        refletirPedidoReposto(reposto);
+      });
       return { ok: true };
     } catch {
       const porque = "Não foi possível guardar as alterações";
@@ -3835,6 +3934,8 @@ export default function AdminClient({
   async function applyBulkStatus(status: QuoteStatus, ids: string[]) {
     if (ids.length === 0 || bulkBusy) return;
     setLote({ titulo: "A marcar os pedidos…", feito: 0, total: ids.length });
+    // O estado de cada um ANTES — é para onde o «Anular» os leva de volta.
+    const antes = new Map(quotes.filter((q) => ids.includes(q.id)).map((q) => [q.id, q.status]));
     try {
       const results = await Promise.all(
         ids.map((id) =>
@@ -3863,12 +3964,26 @@ export default function AdminClient({
       }
       const ok = updated.size;
       const failed = ids.length - ok;
-      toast(
-        failed === 0
-          ? `${ok} pedido${ok !== 1 ? "s" : ""} atualizado${ok !== 1 ? "s" : ""}`
-          : `${ok} atualizado(s), ${failed} falhou(ram)`,
-        failed === 0 ? "success" : "error",
-      );
+      if (failed === 0) {
+        // «Anular» repõe cada um no estado em que estava (e desfaz o Ganho dos
+        // que lá foram por este gesto). Ver `anular-estado.ts`.
+        anular(`${ok} pedido${ok !== 1 ? "s" : ""} atualizado${ok !== 1 ? "s" : ""}`, async () => {
+          const repostos = await Promise.all(
+            [...updated.keys()].map((id) => {
+              const de = antes.get(id);
+              if (!de || de === status) return Promise.resolve(null);
+              return reporEstadoDoPedido({ quoteId: id, de, para: status, actor: userName });
+            }),
+          );
+          const porId = new Map(
+            repostos.filter((q): q is Quote => !!q).map((q) => [q.id, q] as const),
+          );
+          setQuotes((prev) => prev.map((q) => porId.get(q.id) ?? q));
+          setSelected((prev) => (prev && porId.has(prev.id) ? porId.get(prev.id)! : prev));
+        });
+      } else {
+        toast(`${ok} atualizado(s), ${failed} falhou(ram)`, "error");
+      }
       esquecerDaSeleccao(ids);
     } finally {
       setLote(null);
@@ -3882,10 +3997,11 @@ export default function AdminClient({
     setSelectedIds((prev) => new Set([...prev].filter((id) => !feitos.has(id))));
   }
 
-  // Permanently delete every selected pedido (hard delete, not archive). One
-  // confirm covers the whole batch; each id is DELETEd, then the successful
-  // ones are dropped from local state and the selection is cleared. Os `ids`
-  // são os que estão À VISTA — ver `applyBulkStatus`.
+  // Apaga cada pedido seleccionado — vão 30 dias para a Reciclagem, com um só
+  // «Anular» para todos (R3b). One confirm covers the whole batch; each id is
+  // DELETEd, then the successful ones are dropped from local state and the
+  // selection is cleared. Os `ids` são os que estão À VISTA — ver
+  // `applyBulkStatus`.
   function deleteSelected(ids: string[]) {
     if (ids.length === 0 || bulkBusy) return;
     // A pergunta NOMEIA-OS. «Apagar 12 pedidos?» é um número que não se
@@ -3910,7 +4026,7 @@ export default function AdminClient({
       const results = await Promise.all(
         ids.map((id) =>
           fetch(`/api/orcamento/${id}`, { method: "DELETE" })
-            .then((r) => (r.ok ? id : null))
+            .then(async (r) => (r.ok ? { id, corpo: await r.json().catch(() => null) } : null))
             .catch(() => null)
             // Ver `applyBulkStatus`: conta à passagem, sem serializar nada.
             .then((v) => {
@@ -3919,19 +4035,23 @@ export default function AdminClient({
             }),
         ),
       );
-      const removed = new Set(results.filter((x): x is string => x !== null));
+      const apagados = results.filter((x): x is { id: string; corpo: unknown } => x !== null);
+      const removed = new Set(apagados.map((x) => x.id));
       if (removed.size > 0) {
         setQuotes((prev) => prev.filter((q) => !removed.has(q.id)));
         setSelected((prev) => (prev && removed.has(prev.id) ? null : prev));
       }
       const ok = removed.size;
       const failed = ids.length - ok;
-      toast(
-        failed === 0
-          ? `${ok} pedido${ok !== 1 ? "s" : ""} apagado${ok !== 1 ? "s" : ""}`
-          : `${ok} apagado(s), ${failed} falhou(ram)`,
-        failed === 0 ? "success" : "error",
-      );
+      if (failed === 0) {
+        depoisDeApagarVarios(
+          apagados.map((x) => x.corpo),
+          `${ok} pedido${ok !== 1 ? "s" : ""} apagado${ok !== 1 ? "s" : ""}.`,
+          () => void revalidarPedidos(true),
+        );
+      } else {
+        toast(`${ok} apagado(s), ${failed} falhou(ram)`, "error");
+      }
       esquecerDaSeleccao(ids);
     } finally {
       setLote(null);
@@ -4314,6 +4434,7 @@ export default function AdminClient({
     acompanhamento: "Acompanhamento",
     definicoes: "Definições",
     servicos: "Biblioteca de serviços",
+    reciclagem: "Reciclagem",
     "fazer-proposta": "Fazer proposta",
     guioes: "Timelines",
     tarefas: "Tarefas",
@@ -4359,6 +4480,7 @@ export default function AdminClient({
     acompanhamento: "O que está à espera de resposta, por ordem de urgência",
     definicoes: "Os números com que o estúdio faz contas",
     servicos: "As palavras que vão nas propostas, escritas com tempo",
+    reciclagem: "O que se apagou nos últimos 30 dias, e pode voltar",
     "fazer-proposta": "Escolhe o cliente e escreve a proposta",
     /* ── A DESCRIÇÃO DAS TIMELINES SAIU, COMO A DAS TAREFAS ────────────
        «A hierarquia do cabeçalho está invertida.» [APPLE] É a mesma regra dos
@@ -5777,7 +5899,7 @@ export default function AdminClient({
             onFechar={() => setAApagar(null)}
             titulo={`Apagar o pedido de ${aApagar?.name ?? ""}?`}
             oQueSePerde={oQueSePerdeComOPedido(aApagar)}
-            aviso="Não pode ser anulado. Para o tirar da lista sem o apagar, usa «Arquivar»."
+            aviso="Fica 30 dias na Reciclagem, de onde pode voltar. Para o tirar da lista sem o apagar, usa «Arquivar»."
             rotuloConfirmar="Apagar o pedido"
             onConfirmar={async () => {
               const alvo = aApagar;
@@ -5790,15 +5912,19 @@ export default function AdminClient({
                 toast(porqueRebentou(oQue).mensagem, "error");
                 return;
               }
+              const corpo = await res.json().catch(() => null);
               if (!res.ok) {
-                const corpo = await res.json().catch(() => null);
                 toast(porqueFalhou(oQue, res, corpo).mensagem, "error");
                 return;
               }
               setQuotes((prev) => prev.filter((q) => q.id !== alvo.id));
               setSelected(null);
               setAApagar(null);
-              toast(`Pedido de ${alvo.name} apagado`, "success");
+              depoisDeApagar(
+                corpo,
+                `Pedido de ${alvo.name} apagado.`,
+                () => void revalidarPedidos(true),
+              );
             }}
           />
 
@@ -5812,7 +5938,7 @@ export default function AdminClient({
                saber se a selecção é a que pensa que é — e a única maneira de
                confirmar era cancelar e contar à mão. */
             oQueSePerde={nomesDoLote(aApagarLote)}
-            aviso="Não pode ser anulado."
+            aviso="Ficam 30 dias na Reciclagem, de onde podem voltar."
             rotuloConfirmar={`Apagar ${aApagarLote?.length ?? 0} pedido${
               (aApagarLote?.length ?? 0) === 1 ? "" : "s"
             }`}
@@ -5935,7 +6061,10 @@ export default function AdminClient({
                 // Pedidos e trata da espera com nome.
                 onAbrirPedido={openQuote}
                 // As propostas já feitas não estão nesta lista — estão lá.
-                onIrParaPropostas={() => setView("propostas")}
+                onIrParaPropostas={(procura) => {
+                  setProcuraEmPropostas(procura ?? "");
+                  setView("propostas");
+                }}
                 onNovoPedido={() => setNewQuoteOpen(true)}
                 onQuoteUpdated={(q) => {
                   setQuotes((prev) => prev.map((x) => (x.id === q.id ? q : x)));
@@ -5962,6 +6091,7 @@ export default function AdminClient({
               <Propostas
                 quotes={quotes}
                 userName={userName}
+                procuraInicial={procuraEmPropostas}
                 onOpenQuote={openQuote}
                 onQuoteUpdated={(q) => {
                   setQuotes((prev) => prev.map((x) => (x.id === q.id ? q : x)));
@@ -5981,7 +6111,14 @@ export default function AdminClient({
           {/* ── Definições: combustível, custo por km, margem mínima ── */}
           {view === "definicoes" && (
             <div className={`${VIEW_WRAP} view-in`}>
-              <DefinicoesProposta />
+              <DefinicoesProposta onAbrirReciclagem={() => setView("reciclagem")} />
+            </div>
+          )}
+
+          {/* ── Reciclagem: o que se apagou, 30 dias (fase R3) ── */}
+          {view === "reciclagem" && (
+            <div className={`${VIEW_WRAP} view-in`}>
+              <Reciclagem />
             </div>
           )}
 
@@ -6083,7 +6220,7 @@ export default function AdminClient({
           {/* ── Contratos ── */}
           {view === "contratos" && (
             <div className={`${VIEW_WRAP} view-in`}>
-              <Contratos />
+              <Contratos quotes={quotes} onOpenQuote={openQuote} />
             </div>
           )}
 
@@ -7011,7 +7148,7 @@ export default function AdminClient({
                                   : []),
                                 {
                                   label: "Apagar pedido",
-                                  hint: "Ação definitiva — não pode ser anulada",
+                                  hint: "Fica 30 dias na Reciclagem",
                                   // A pergunta nomeia o pedido e enumera o que
                                   // vai atrás dele. Ver `PerguntaDestrutiva`.
                                   onClick: () => setAApagar(selected),
@@ -7210,6 +7347,10 @@ export default function AdminClient({
                             </div>
                           );
                         })()}
+
+                        {/* ── As propostas que seguiram — o PDF, o link do casal e o
+                          email, aqui no pedido. Sem nenhuma, não aparece. ── */}
+                        <PropostasDoPedido key={selected.id} quoteId={selected.id} />
 
                         {/* ── Gestão do pedido — o formulário de trabalho, SEMPRE
                           visível (nada escondido atrás de "Mostrar mais"). ── */}

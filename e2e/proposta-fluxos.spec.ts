@@ -159,6 +159,8 @@ test.describe("Fazer uma proposta @propostas", () => {
 
     // Escrever o valor faz o aviso desaparecer. Se isto falhar, ou o aviso
     // mente ou a conta está errada — as duas hipóteses são graves.
+    // O aviso leva ao passo onde o valor se escreve — o do Orçamento (A2).
+    await falta.click();
     await page.getByLabel(/^Valor \(sem IVA\)$/).fill("4200");
     await expect(falta).toBeHidden({ timeout: 10_000 });
   });

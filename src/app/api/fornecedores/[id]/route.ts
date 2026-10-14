@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Supplier } from "@/lib/orcamento/types";
 import { isAuthed } from "@/lib/admin-auth";
-import { updateSupplier, deleteSupplier } from "@/lib/suppliers-store";
+import { enviarParaAReciclagem, quemApagou } from "@/lib/reciclagem";
+import { updateSupplier } from "@/lib/suppliers-store";
 import { supplierUpdateSchema, firstError } from "@/lib/validation";
 import { respostaDeConflito, respostaDeMigracaoEmFalta } from "@/lib/resposta-de-conflito";
 import { log } from "@/lib/logger";
@@ -62,8 +63,8 @@ export async function DELETE(
   if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   const { id } = await params;
   try {
-    await deleteSupplier(id);
-    return NextResponse.json({ ok: true });
+    const reciclagem = await enviarParaAReciclagem("fornecedor", id, quemApagou(request));
+    return NextResponse.json({ ok: true, reciclagem });
   } catch (err) {
     log.error("fornecedores DELETE falhou", err);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });

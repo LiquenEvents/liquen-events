@@ -5,6 +5,8 @@ import type { Quote, QuoteStatus } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { useToast } from "./Toast";
 import { diasDesde, eventCountdown, randomId, todayKey } from "./util";
+import { useAnular } from "./ui/anular";
+import { reporEstadoDoPedido } from "./anular-estado";
 import { eur0 as eur } from "@/lib/money";
 import type { ActivityEntry } from "@/lib/orcamento/types";
 import { contractedAmounts } from "@/lib/orcamento/dossier";
@@ -348,6 +350,7 @@ export default function Kanban({
   onVerArquivados,
 }: Props) {
   const { toast } = useToast();
+  const anular = useAnular();
   const [dragId, setDragId] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<QuoteStatus | null>(null);
 
@@ -500,9 +503,15 @@ export default function Kanban({
       // We reuse onStatusChange only for status; for the full updated quote we
       // call it once and the parent syncs state (activityLog will be on next open).
       onStatusChange(q.id, (corpo as { status?: QuoteStatus } | null)?.status ?? status);
-      toast(`${q.name} → ${toLabel}`, "success");
+      // Com volta atrás: «Anular» repõe a coluna de onde veio (e, se foi para
+      // Ganho, o contrato e a proposta que isso arrastou). Ver `anular-estado.ts`.
+      anular(`${q.name} → ${toLabel}`, async () => {
+        await reporEstadoDoPedido({ quoteId: q.id, de: q.status, para: status, actor: userName });
+        latest.current.onStatusChange(q.id, q.status);
+        setAterrouId(q.id);
+      });
     },
-    [toast],
+    [toast, anular],
   );
 
   // O id arrastado vive também numa ref: `drop` é chamado a partir da coluna e

@@ -9,7 +9,6 @@ import type { Label } from "./photos-data";
 import { collectionFor } from "./collections";
 import { type Photo, interleaveByCollection } from "./interleave";
 import type { Dict } from "@/lib/i18n";
-import { ViewTransition } from "@/components/vt";
 import GalleryImage from "./GalleryImage";
 import { galleryImageLoader } from "./gallery-image-loader";
 import {
@@ -23,41 +22,21 @@ import { snapGalleryWidth } from "./gallery-image-loader";
 import { useAntecipacao } from "./useAntecipacao";
 import { useBlurTardio } from "./useBlurTardio";
 import { fraccaoDaBarra } from "@/lib/fraccao-da-barra";
-
-/**
- * Morph thumbnail→lightbox (View Transitions API). Cada miniatura e a foto do
- * lightbox partilham um `view-transition-name` (`g-<índice do pool>`): abrir e
- * fechar animam a MESMA foto a crescer/encolher fisicamente entre os dois
- * lugares. A miniatura ativa fica sem nome enquanto o lightbox está aberto —
- * nunca há dois elementos com o mesmo nome no snapshot. Sem suporte da API
- * (React/browser), tudo funciona como antes.
- */
-function VTWrap({
-  name,
-  exit,
-  children,
-}: {
-  name?: string;
-  exit?: string;
-  children: React.ReactNode;
-}) {
-  if (!ViewTransition) return <>{children}</>;
-  return (
-    <ViewTransition name={name} share="gallery-morph" exit={exit} default="none">
-      {children}
-    </ViewTransition>
-  );
-}
+import { DUR_ELEMENTO_MS, DUR_VISTA_MS, EASE_IN, EASE_OUT } from "@/lib/motion/tokens";
+import {
+  type Caixa,
+  aVista,
+  caixaContida,
+  dentroDe,
+  janelaDaTira,
+  miniaturasNaTira,
+  POSE_FINAL,
+  poseDaMiniatura,
+  proporcao,
+} from "./voo";
 
 const CATS = ["Todos", "Casamento", "Corporativo", "Conferência", "Aéreo", "Evento"] as const;
 
-// next/image throws if placeholder="blur" is set without a blurDataURL. The
-// gallery only ships blur data for the first-paint photos (payload trim in
-// page.tsx); the rest fall back to the default placeholder over the gallery's
-// near-black background.
-function blurProps(p: Photo) {
-  return p.blurDataURL ? ({ placeholder: "blur", blurDataURL: p.blurDataURL } as const) : {};
-}
 type Cat = (typeof CATS)[number];
 const PAGE = 24;
 // Fewer tiles on the FIRST paint than each subsequent page: React hydrating the
@@ -190,7 +169,6 @@ function collectionSlug(name: string): string {
 function collectionFromSlug(slug: string, names: string[]): string | null {
   return names.find((n) => collectionSlug(n) === slug) ?? null;
 }
-const STRIP = 7;
 
 // Corre trabalho NÃO crítico quando a main thread está livre, para que a
 // hidratação e a primeira interação não fiquem bloqueadas por observers /
@@ -209,10 +187,6 @@ function onIdle(cb: () => void): () => void {
   const id = window.setTimeout(cb, 1);
   return () => window.clearTimeout(id);
 }
-
-// Nome View-Transition estável de uma foto (puro → nível de módulo, partilhado
-// pela grelha e pelo lightbox).
-const vtId = (src: string) => `g-${src.replace(/[^a-zA-Z0-9_-]/g, "")}`;
 
 // Rede lenta? Em Save-Data ou effectiveType 2g/3g não vale a pena pré-carregar
 // especulativamente os vizinhos full-screen do lightbox (imagens grandes que o
@@ -332,8 +306,9 @@ function HoverOverlay({ caption, sub }: { caption: string; sub?: string }) {
 // across an append for existing tiles (the photo object comes from the memoised
 // pool; strings/flags/idx don't change; onOpen and registerTile are useCallback-
 // stable), so memo lets existing tiles bail out — only the new page's tiles
-// render. (No VTWrap / open-index gate anymore: the open morph was replaced by a
-// composited CSS zoom, so a tile no longer depends on which photo is open.)
+// render. A tile never depends on which photo is open: the lightbox measures
+// it on open/close (see `openAt` and the flight in `Lightbox`) and leaves it
+// mounted.
 const Tile = memo(function Tile({
   photo,
   idx,
@@ -440,7 +415,7 @@ const Tile = memo(function Tile({
 /**
  * Um dos 4 satélites do mosaico-herói. Componente próprio só por causa do ref:
  * o `anchorRef` de cada satélite tem de ser o SEU botão (é ele que o observer
- * vigia e é ele que o `<ViewTransition>` do morph nomeia).
+ * vigia).
  */
 function SatelliteTile({
   photo,
@@ -448,8 +423,6 @@ function SatelliteTile({
   alt,
   label,
   cap,
-  hidden,
-  vtName,
   tabbable,
   zoomClass,
   unavailableLabel,
@@ -462,8 +435,6 @@ function SatelliteTile({
   alt: string;
   label: string;
   cap: { caption: string; sub?: string };
-  hidden: boolean;
-  vtName?: string;
   tabbable: boolean;
   zoomClass: string;
   unavailableLabel: string;
@@ -493,20 +464,18 @@ function SatelliteTile({
         { "--hero-delay": `${idx * 40}ms`, backgroundColor: photo.color } as React.CSSProperties
       }
     >
-      {!hidden && (
-        <VTWrap name={vtName}>
-          <GalleryImage
-            src={photo.src}
-            alt={alt}
-            sizes="25vw"
-            className={`object-cover ${zoomClass}`}
-            aspectRatio={photo.aspectRatio}
-            anchorRef={btnRef}
-            unavailableLabel={unavailableLabel}
-            blurDataURL={photo.blurDataURL}
-          />
-        </VTWrap>
-      )}
+      <GalleryImage
+        src={photo.src}
+        alt={alt}
+        sizes="25vw"
+        className={`object-cover ${zoomClass}`}
+        aspectRatio={photo.aspectRatio}
+        // A satélite recorta: pelo ponto de interesse, não pelo centro.
+        foco={photo.foco}
+        anchorRef={btnRef}
+        unavailableLabel={unavailableLabel}
+        blurDataURL={photo.blurDataURL}
+      />
       <HoverOverlay {...cap} />
       <FocusRing />
     </button>
@@ -548,12 +517,18 @@ export default function GaleriaClient({
   const [shown, setShown] = useState(INITIAL_PAGE);
   const [fading, setFading] = useState(false);
   const [lb, setLb] = useState<number | null>(null);
-  // A fechar? Enquanto true o lightbox corre o fade+scale de saída (lb-closing)
-  // e só depois desmonta. Fecho fiável por CSS — ver comentário em close().
+  // A fechar? Enquanto true o lightbox corre a saída (o voo de volta à
+  // miniatura, ou um esbatimento) e só depois desmonta — ver `close()`.
   const [closing, setClosing] = useState(false);
-  // Acabou de abrir via morph? Suprime o lb-photo-in dessa primeira foto para
-  // a entrada ser SÓ o morph (voltam a coexistir ao navegar com ←/→).
+  // Acabou de abrir? A primeira foto entra pelo VOO a partir da miniatura (ver
+  // `origem`); ao navegar com ←/→ volta o `lb-photo-in` entre fotos.
   const [justOpened, setJustOpened] = useState(false);
+  /**
+   * De onde se abriu: a caixa da miniatura em que se tocou, a do `<img>` dela
+   * e o ficheiro que ela está a mostrar. É o ponto de partida do voo (ver
+   * `voo.ts`). `null` quando não há miniatura pintada a partir da qual voar.
+   */
+  const [origem, setOrigem] = useState<OrigemDoVoo | null>(null);
   // Breakpoint sm (as fotos 1-4 vivem no mosaico em sm+ e no masonry em mobile;
   // o CSS esconde uma). `isSm` diz qual é a instância VISÍVEL de cada foto.
   const [isSm, setIsSm] = useState<boolean | null>(null);
@@ -787,15 +762,6 @@ export default function GaleriaClient({
     };
   }, [savePos]);
 
-  // O `<ViewTransition name>` serve UMA coisa: o morph miniatura↔lightbox. Fora
-  // desse morph, nenhuma tile da grelha precisa de nome — e tê-los sempre era o
-  // que gerava os avisos "dois <ViewTransition> com o mesmo nome": ao filtrar ou
-  // cruzar o breakpoint, o nome de uma foto migrava entre a instância do
-  // mosaico e a do masonry (ou entre posições da lista), coexistindo por um
-  // commit. Fix estrutural: a grelha só nomeia a foto que está ATIVAMENTE em
-  // morph (`morphSrc`) e só na sua instância visível (gate `isSm`). Em repouso
-  // — a navegar, filtrar, redimensionar — não há nomes nenhuns, portanto a
-  // colisão é impossível; no morph existe exatamente um par miniatura↔lightbox.
   // prefers-reduced-motion, lido no cliente (false no SSR e na hidratação, por
   // isso não há mismatch). Serve para desligar o zoom de hover das fotos, que
   // escapava ao bloco reduced-motion do globals.css.
@@ -809,12 +775,6 @@ export default function GaleriaClient({
   }, []);
   const zoomClass = reduceMotion ? "" : ZOOM_CLASS;
 
-  const [morphSrc, setMorphSrc] = useState<string | null>(null);
-  /** Nome VT de uma tile: só quando é a foto em morph E é a sua instância
-      visível (mosaico em sm+, masonry em mobile — codificado em `active`). */
-  const tileName = (src: string, active: boolean) =>
-    active && morphSrc === src ? vtId(src) : undefined;
-  const mosaicName = (idx: number) => tileName(visible[idx].src, idx === 0 || isSm === true);
   // O lightbox (portal, listeners de teclado/gesto, trap de foco, slideshow,
   // pré-carga de vizinhos) vive num componente-filho `Lightbox` que só é montado
   // quando `lb !== null`. Assim, nada da sua configuração — refs, efeitos,
@@ -1193,62 +1153,40 @@ export default function GaleriaClient({
   }, [shown, pool.length, margemAntecipacao]);
 
   // Lightbox navigation (through entire pool, not just shown)
-  // Abrir/fechar dentro de startTransition ativa o morph <ViewTransition>;
-  // navegar (←/→) fica fora — usa o lb-photo-in clássico entre fotos.
   const openAt = useCallback((idx: number) => {
-    // Open with a plain state update — NOT a View Transition. The VT morph
-    // snapshotted the whole full-screen lightbox layer and, via flushSync, forced
-    // a synchronous re-render of the entire grid to name the tapped tile — the
-    // two costs that made opening stutter. Now the lightbox just mounts and its
-    // photo eases in with the composited `lb-open-in` zoom (see globals.css):
-    // transform + opacity only, no snapshot, no grid reconcile. `justOpened`
-    // selects that deeper open zoom; ←/→ set it false and use the subtler
-    // lb-photo-in between photos.
+    // Abrir é um estado simples, sem View Transition (essa tirava um retrato
+    // da camada inteira e obrigava a grelha toda a voltar a desenhar-se). O
+    // que liga a miniatura à foto é o VOO: mede-se aqui a miniatura em que se
+    // tocou e o `Lightbox` faz a cópia dela voar até ao sítio da foto.
+    setOrigem(medirMiniatura(idx));
     setJustOpened(true);
     setLb(idx);
   }, []);
-  const close = useCallback(() => {
-    // Fecho FIÁVEL com animação de saída via CSS (não ViewTransition). Com a
-    // camada de motion ativa, o ViewTransition de fecho do React revelou-se
-    // instável (o Escape disparava mas a transição não fazia commit). Aqui
-    // marcamos `closing` → o lightbox faz um fade+scale de saída (classe
-    // lb-closing) e só depois desmonta. O morph de ABERTURA (openAt) mantém-se.
-    setClosing(true);
-    window.setTimeout(() => {
-      setMorphSrc(null);
-      setLb(null);
-      setClosing(false);
-    }, 260);
-  }, []);
-  // Fecho sem morph — para o gesto de arrastar-para-baixo, onde a própria foto
-  // já saiu do ecrã com o dedo (o morph de volta à miniatura ficaria estranho).
-  const dismiss = useCallback(() => {
-    setMorphSrc(null);
+  /**
+   * Pede para fechar. Quem anima a saída é o `Lightbox` — o voo de volta à
+   * miniatura quando ela está à vista, um esbatimento quando não está, nada
+   * com movimento reduzido — e é ele que chama `fechado()` no fim. Pedir duas
+   * vezes (o Escape repetido, o ✕ a seguir ao Escape) é o mesmo que pedir uma.
+   */
+  const close = useCallback(() => setClosing(true), []);
+  const fechado = useCallback(() => {
     setLb(null);
+    setClosing(false);
+    setOrigem(null);
   }, []);
-  // Navegar (←/→): sem morph entre fotos, mas `morphSrc` acompanha a foto
-  // atual para que o FECHO faça o morph de volta à miniatura certa.
+  // Fecho sem voo — para o gesto de arrastar-para-baixo, onde a própria foto
+  // já saiu do ecrã com o dedo.
+  const dismiss = fechado;
   const prev = useCallback(() => {
     if (lb === null) return;
     setJustOpened(false);
-    const n = (lb - 1 + pool.length) % pool.length;
-    setLb(n);
-    setMorphSrc(pool[n].src);
+    setLb((lb - 1 + pool.length) % pool.length);
   }, [lb, pool]);
   const next = useCallback(() => {
     if (lb === null) return;
     setJustOpened(false);
-    const n = (lb + 1) % pool.length;
-    setLb(n);
-    setMorphSrc(pool[n].src);
+    setLb((lb + 1) % pool.length);
   }, [lb, pool]);
-  // Depois de fechar, largar o nome assim que o morph de volta captura — em
-  // repouso a grelha fica sem nomes nenhuns (colisão impossível).
-  useEffect(() => {
-    if (lb !== null || morphSrc === null) return;
-    const id = setTimeout(() => setMorphSrc(null), 400);
-    return () => clearTimeout(id);
-  }, [lb, morphSrc]);
 
   // (Todos os efeitos exclusivos do lightbox — teclado/trap de foco, foco de
   // entrada/saída, slideshow, bloqueio de scroll do body e gestos táteis — vivem
@@ -1277,11 +1215,7 @@ export default function GaleriaClient({
   // Called from inside the (open) lightbox, so the grid fade doesn't apply —
   // it's hidden behind the modal. Deliberately does NOT go through close()
   // first: re-pointing `lb` at the same photo's new index, in the same
-  // commit as the pool swap, means the visible photo never changes (same
-  // src → same view-transition-name), so nothing needs to morph. Closing
-  // first and re-opening after would fire two back-to-back ViewTransitions
-  // on the same names — the exact bug that made resizing across the mobile
-  // breakpoint log duplicate-name errors (see [[galeria-polish-jul-2026]]).
+  // commit as the pool swap, means the visible photo never changes.
   const viewCollection = useCallback(
     (name: string) => {
       const newPool = photos.filter((p) => collectionFor(p.src) === name);
@@ -1376,32 +1310,28 @@ export default function GaleriaClient({
               className={`g-hero g-tile relative col-span-2 row-span-2 h-full w-full overflow-hidden group ${FOCUS_RING}`}
               style={{ backgroundColor: visible[0].color }}
             >
-              {/* Enquanto esta foto está aberta no lightbox, a miniatura
-                  desmonta o seu <ViewTransition>: é o unmount/mount com o
-                  mesmo nome que o React emparelha para o morph (dois montados
-                  em simultâneo não é suportado). Fica escondida atrás do
-                  overlay opaco, por isso nada se vê. */}
-              {lb !== 0 && (
-                <VTWrap name={mosaicName(0)}>
-                  <GalleryImage
-                    src={visible[0].src}
-                    alt={altText(visible[0].src, visible[0].label)}
-                    sizes="(max-width: 640px) 100vw, 50vw"
-                    className={`object-cover ${zoomClass}`}
-                    aspectRatio={visible[0].aspectRatio}
-                    // The 2×2 flagship tile is the largest grid image, the LCP
-                    // candidate on this route, and the lightbox morph source —
-                    // eager so it resolves without a lazy delay / pop-in.
-                    // `priority` aqui também significa: salta a fila e leva
-                    // fetchPriority="high" (era null em TODAS as <img> da
-                    // página, mesmo nesta, que compete com o herói e o logo).
-                    priority
-                    anchorRef={heroRef}
-                    unavailableLabel={dict.photoUnavailable}
-                    blurDataURL={visible[0].blurDataURL}
-                  />
-                </VTWrap>
-              )}
+              {/* Fica SEMPRE montada, também com esta foto aberta. Desmontava
+                  para servir um morph que já não existia, e ao fechar via-se
+                  um buraco cinzento até a fotografia voltar a descodificar —
+                  agora é o sítio para onde o voo de volta aterra. */}
+              <GalleryImage
+                src={visible[0].src}
+                alt={altText(visible[0].src, visible[0].label)}
+                sizes="(max-width: 640px) 100vw, 50vw"
+                className={`object-cover ${zoomClass}`}
+                aspectRatio={visible[0].aspectRatio}
+                // O 2×2 recorta: pelo ponto de interesse, não pelo centro.
+                foco={visible[0].foco}
+                // The 2×2 flagship tile is the largest grid image and the LCP
+                // candidate on this route — eager so it resolves without a lazy
+                // delay / pop-in. `priority` aqui também significa: salta a
+                // fila e leva fetchPriority="high" (era null em TODAS as <img>
+                // da página, mesmo nesta, que compete com o herói e o logo).
+                priority
+                anchorRef={heroRef}
+                unavailableLabel={dict.photoUnavailable}
+                blurDataURL={visible[0].blurDataURL}
+              />
               <HoverOverlay {...caption(visible[0].src, visible[0].label)} />
               <FocusRing />
             </button>
@@ -1421,8 +1351,6 @@ export default function GaleriaClient({
                   alt={altText(visible[idx].src, visible[idx].label)}
                   label={tileLabel(visible[idx].src, visible[idx].label, idx)}
                   cap={caption(visible[idx].src, visible[idx].label)}
-                  hidden={lb === idx}
-                  vtName={mosaicName(idx)}
                   tabbable={roving === idx}
                   zoomClass={zoomClass}
                   unavailableLabel={dict.photoUnavailable}
@@ -1537,7 +1465,9 @@ export default function GaleriaClient({
         <Lightbox
           index={lb}
           pool={pool}
+          origem={origem}
           closing={closing}
+          fechado={fechado}
           justOpened={justOpened}
           setJustOpened={setJustOpened}
           setLb={setLb}
@@ -1587,26 +1517,84 @@ type EstadoDaFoto = {
   formato: "avif" | "webp";
   /** Desistiu-se da derivada: pede-se o ficheiro original tal e qual. */
   cru: boolean;
+  /** Nem o original veio: mostra-se a frase e o «Tentar de novo». */
+  falhou: boolean;
+  /** Quantas vezes se carregou em «Tentar de novo» (muda a chave do `<Image>`). */
+  tentativa: number;
 };
-const estadoDaFotoDoZero = (idx: number): EstadoDaFoto => ({
+const estadoDaFotoDoZero = (idx: number, tentativa = 0): EstadoDaFoto => ({
   idx,
   carregada: false,
   formato: "avif",
   cru: false,
+  falhou: false,
+  tentativa,
 });
+
+/** De onde parte o voo — ver `openAt` e `voo.ts`. */
+type OrigemDoVoo = {
+  /** A caixa da miniatura (o botão, que corta). */
+  recorte: Caixa;
+  /** A caixa do `<img>` dela — maior do que o recorte com o zoom do rato. */
+  imagem: Caixa;
+  /** O `object-position` com que ela corta. */
+  foco: string;
+  /** O ficheiro que ela está a mostrar: já está no browser, não se pede outro. */
+  src: string;
+};
+
+const caixaDe = (r: DOMRect): Caixa => ({ x: r.left, y: r.top, w: r.width, h: r.height });
+
+/**
+ * A miniatura PINTADA da foto `idx`. As fotos 1 a 4 existem duas vezes (no
+ * mosaico em sm+ e no masonry no telemóvel) e o CSS esconde uma: conta a que
+ * tem tamanho.
+ */
+function miniaturaPintada(idx: number): HTMLElement | null {
+  for (const el of document.querySelectorAll<HTMLElement>(`[data-tile-idx="${idx}"]`)) {
+    const r = el.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0) return el;
+  }
+  return null;
+}
+
+/** Mede a miniatura de onde se vai voar; `null` se ainda não tem fotografia. */
+function medirMiniatura(idx: number): OrigemDoVoo | null {
+  if (typeof document === "undefined") return null;
+  const tile = miniaturaPintada(idx);
+  const img = tile?.querySelector("img");
+  if (!tile || !img || !img.complete || !img.naturalWidth || !img.currentSrc) return null;
+  return {
+    recorte: caixaDe(tile.getBoundingClientRect()),
+    imagem: caixaDe(img.getBoundingClientRect()),
+    foco: getComputedStyle(img).objectPosition,
+    src: img.currentSrc,
+  };
+}
+
+/** Põe a cópia que voa exactamente em cima da caixa onde a foto vai ficar. */
+function posicionar(el: HTMLElement, c: Caixa) {
+  el.style.left = `${c.x}px`;
+  el.style.top = `${c.y}px`;
+  el.style.width = `${c.w}px`;
+  el.style.height = `${c.h}px`;
+}
 
 /**
  * O lightbox propriamente dito. É montado SÓ quando aberto (ver `GaleriaClient`),
  * por isso todos os seus refs, efeitos e listeners (teclado, trap de foco, foco
  * de entrada/saída, slideshow, bloqueio de scroll, gestos táteis, pré-carga de
- * vizinhos) só arrancam ao abrir — nunca na primeira pintura da galeria. O
- * comportamento, o morph <ViewTransition> e a UX de fecho são idênticos ao que
- * era quando este código vivia inline no componente-pai.
+ * vizinhos) só arrancam ao abrir — nunca na primeira pintura da galeria.
+ *
+ * Abre com a miniatura a VOAR até ao sítio da foto e fecha com ela a voltar
+ * para a grelha (ver `voo.ts`); o fundo toma a cor da fotografia aberta.
  */
 function Lightbox({
   index,
   pool,
+  origem,
   closing,
+  fechado,
   justOpened,
   setJustOpened,
   setLb,
@@ -1619,7 +1607,10 @@ function Lightbox({
 }: {
   index: number;
   pool: Photo[];
+  origem: OrigemDoVoo | null;
   closing: boolean;
+  /** A saída acabou: desmonta. */
+  fechado: () => void;
   justOpened: boolean;
   setJustOpened: (v: boolean) => void;
   setLb: (v: number | null) => void;
@@ -1638,6 +1629,31 @@ function Lightbox({
   const photoLayerRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   const gestureRef = useRef({ x: 0, y: 0, dx: 0, dy: 0, axis: "" as "" | "x" | "y" });
+  /** A cópia da miniatura que voa — ver `voo.ts`. Gerida à mão, fora do React. */
+  const vooRef = useRef<HTMLImageElement>(null);
+  const vooAnimRef = useRef<Animation | null>(null);
+  const segurancaRef = useRef<number | undefined>(undefined);
+
+  /**
+   * O que se decide UMA vez, ao abrir: movimento reduzido, se o browser sabe
+   * animar, e portanto se há voo. Sem voo (sem miniatura pintada, movimento
+   * reduzido, jsdom), a foto entra com o `lb-photo-in` de sempre — ou, com
+   * movimento reduzido, aparece.
+   */
+  const [arranque] = useState(() => {
+    const reduzido =
+      typeof window !== "undefined" &&
+      !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const anima = typeof Element !== "undefined" && typeof Element.prototype.animate === "function";
+    return {
+      index,
+      origem,
+      reduzido,
+      anima,
+      voa: !!origem && !reduzido && anima,
+      prop: proporcao(pool[index].aspectRatio),
+    };
+  });
 
   /**
    * ══════════════════════════════════════════════════════════════════════════
@@ -1723,12 +1739,35 @@ function Lightbox({
     return c ? `${base}: ${c}` : base;
   };
 
+  /** Salta para uma foto (a tira, o Início, o Fim). */
+  const irPara = useCallback(
+    (i: number) => {
+      setJustOpened(false);
+      setLb(i);
+    },
+    [setJustOpened, setLb],
+  );
+
   useEffect(() => {
     const fn = (e: KeyboardEvent) => {
+      // A sair, as teclas já não mexem em nada: só o Tab continua preso.
+      if (closing && e.key !== "Tab") return;
       if (e.key === "Escape") close();
       else if (e.key === "ArrowLeft") prev();
       else if (e.key === "ArrowRight") next();
-      else if (e.key === "Tab" && dialogRef.current) {
+      else if (e.key === "Home") {
+        e.preventDefault();
+        irPara(0);
+      } else if (e.key === "End") {
+        e.preventDefault();
+        irPara(pool.length - 1);
+      } else if ((e.key === "f" || e.key === "F") && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        // «f» põe o visualizador em ecrã inteiro, e tira-o. O Esc do browser
+        // também o tira (e esse Esc não chega aqui: o browser fica com ele).
+        const d = dialogRef.current;
+        if (document.fullscreenElement) void document.exitFullscreen?.().catch(() => {});
+        else if (d?.requestFullscreen) void d.requestFullscreen().catch(() => {});
+      } else if (e.key === "Tab" && dialogRef.current) {
         // Trap focus inside the lightbox dialog.
         const f = dialogRef.current.querySelectorAll<HTMLElement>(
           'button, a[href], [tabindex]:not([tabindex="-1"])',
@@ -1751,7 +1790,7 @@ function Lightbox({
     };
     window.addEventListener("keydown", fn);
     return () => window.removeEventListener("keydown", fn);
-  }, [close, prev, next]);
+  }, [close, prev, next, irPara, closing, pool.length]);
 
   // Move focus into the dialog on open; restore it to the trigger on close
   // (mount = abrir, unmount = fechar, já que este componente só vive aberto).
@@ -1771,12 +1810,18 @@ function Lightbox({
       // de origem já foi desmontado e focá-lo mandava o foco para o <body>
       // (medido: focusOnBody true, activeElement BODY). Confirmar `isConnected`
       // e, se falhar, cair no mosaico da foto que estava aberta.
+      //
+      // `preventScroll`: devolver o foco não pode mexer na página. Sem ele, o
+      // browser rolava a miniatura para dentro da `scroll-padding-top` do
+      // cabeçalho, e a grelha saltava por baixo de quem acabou de fechar.
       if (origin?.isConnected) {
-        origin.focus?.();
+        origin.focus?.({ preventScroll: true });
         return;
       }
       const tile = document.querySelector<HTMLElement>(`[data-tile-idx="${indexRef.current}"]`);
-      (tile ?? document.querySelector<HTMLElement>("[data-tile-idx]"))?.focus();
+      (tile ?? document.querySelector<HTMLElement>("[data-tile-idx]"))?.focus({
+        preventScroll: true,
+      });
     };
   }, []);
 
@@ -1784,11 +1829,151 @@ function Lightbox({
   // progresso) saiu a pedido dela, com a captura do botão: «retira isto do
   // site da galeria». Navega-se com ←/→, com as miniaturas e com o gesto.
 
+  // A página por baixo não rola, e o aviso de cookies recolhe-se enquanto o
+  // visualizador está aberto: era `z-[70]`, por cima dele (`z-[60]`), e tapava
+  // a tira de miniaturas no telemóvel. Volta ao fechar — a escolha continua por
+  // fazer. Ver `html.lightbox-aberta` no globals.css.
   useEffect(() => {
     document.body.style.overflow = "hidden";
+    document.documentElement.classList.add("lightbox-aberta");
     return () => {
       document.body.style.overflow = "";
+      document.documentElement.classList.remove("lightbox-aberta");
+      if (document.fullscreenElement) void document.exitFullscreen?.().catch(() => {});
+      window.clearTimeout(segurancaRef.current);
     };
+  }, []);
+
+  /**
+   * ── O VOO DE IDA ────────────────────────────────────────────────────────
+   *
+   * Num efeito de LAYOUT, antes da primeira pintura: o primeiro fotograma
+   * que se vê já tem a cópia em cima da miniatura. A foto do visualizador
+   * fica escondida (`data-voo`) enquanto a cópia voa, e aparece no mesmo
+   * instante em que a cópia sai — no mesmo sítio, com o mesmo ficheiro.
+   */
+  useIsomorphicLayoutEffect(() => {
+    const copia = vooRef.current;
+    const camada = photoLayerRef.current;
+    const de = arranque.origem;
+    if (!arranque.voa || !de || !copia || !camada) return;
+    const destino = caixaContida(caixaDe(camada.getBoundingClientRect()), arranque.prop);
+    if (!destino.w) return;
+    posicionar(copia, destino);
+    copia.src = de.src;
+    copia.dataset.aVoar = "";
+    camada.dataset.voo = "";
+    const anim = copia.animate(
+      [poseDaMiniatura(destino, de.recorte, de.imagem, de.foco), POSE_FINAL],
+      { duration: DUR_VISTA_MS, easing: EASE_OUT, fill: "both" },
+    );
+    vooAnimRef.current = anim;
+    const pousar = () => {
+      delete camada.dataset.voo;
+      delete copia.dataset.aVoar;
+      anim.cancel();
+      vooAnimRef.current = null;
+    };
+    anim.onfinish = pousar;
+    return () => {
+      anim.onfinish = null;
+      pousar();
+    };
+  }, [arranque]);
+
+  // Mudar de foto a meio do voo: a cópia aterra já, para a seguinte aparecer.
+  useEffect(() => {
+    if (index !== arranque.index) vooAnimRef.current?.finish();
+  }, [index, arranque.index]);
+
+  /**
+   * ── A SAÍDA ─────────────────────────────────────────────────────────────
+   *
+   * Com a miniatura à vista, a fotografia volta para ela pelo mesmo caminho e
+   * o fundo esbate-se por baixo. Se ela navegou para uma foto cuja miniatura
+   * não está à vista, esbate-se tudo. Com movimento reduzido, fecha logo —
+   * eram 260 ms de espera sem animação nenhuma.
+   *
+   * Há uma rede: se o fim da animação não chegar (separador escondido a
+   * meio), fecha na mesma pouco depois.
+   */
+  const saidaRef = useRef(false);
+  useEffect(() => {
+    if (!closing || saidaRef.current) return;
+    saidaRef.current = true;
+    let feito = false;
+    const fim = () => {
+      if (feito) return;
+      feito = true;
+      fechado();
+    };
+    const dialog = dialogRef.current;
+    if (arranque.reduzido || !arranque.anima || !dialog) {
+      fim();
+      return;
+    }
+    vooAnimRef.current?.finish();
+    segurancaRef.current = window.setTimeout(fim, DUR_VISTA_MS + 400);
+    const copia = vooRef.current;
+    const camada = photoLayerRef.current;
+    const tile = miniaturaPintada(index);
+    const imgTile = tile?.querySelector("img");
+    const caixaTile = tile ? caixaDe(tile.getBoundingClientRect()) : null;
+    const grande =
+      camada?.querySelector<HTMLImageElement>("img.lb-grande[data-carregada]") ??
+      camada?.querySelector<HTMLImageElement>("picture img");
+    if (
+      copia &&
+      camada &&
+      imgTile &&
+      caixaTile &&
+      grande?.currentSrc &&
+      aVista(caixaTile, window.innerWidth, window.innerHeight)
+    ) {
+      const destino = caixaContida(
+        caixaDe(camada.getBoundingClientRect()),
+        proporcao(pool[index].aspectRatio),
+      );
+      posicionar(copia, destino);
+      copia.src = grande.currentSrc;
+      copia.dataset.aVoar = "";
+      camada.dataset.voo = "";
+      dialog.dataset.sair = "";
+      copia
+        .animate(
+          [
+            POSE_FINAL,
+            poseDaMiniatura(
+              destino,
+              caixaTile,
+              caixaDe(imgTile.getBoundingClientRect()),
+              getComputedStyle(imgTile).objectPosition,
+            ),
+          ],
+          { duration: DUR_VISTA_MS, easing: EASE_OUT, fill: "forwards" },
+        )
+        .finished.then(fim, fim);
+    } else {
+      dialog
+        .animate(
+          [
+            { opacity: 1, transform: "scale(1)" },
+            { opacity: 0, transform: "scale(0.965)" },
+          ],
+          { duration: DUR_ELEMENTO_MS, easing: EASE_IN, fill: "forwards" },
+        )
+        .finished.then(fim, fim);
+    }
+  }, [closing, fechado, arranque, index, pool]);
+
+  // Quantas miniaturas cabem na tira (ver `miniaturasNaTira`).
+  const [nTira, setNTira] = useState(() =>
+    miniaturasNaTira(typeof window === "undefined" ? 1024 : window.innerWidth),
+  );
+  useEffect(() => {
+    const medir = () => setNTira(miniaturasNaTira(window.innerWidth));
+    window.addEventListener("resize", medir);
+    return () => window.removeEventListener("resize", medir);
   }, []);
 
   // Touch gestures on the open lightbox: horizontal swipe = prev/next,
@@ -1862,9 +2047,7 @@ function Lightbox({
   if (typeof document === "undefined") return null;
 
   // Thumbnail strip around current photo
-  const half = Math.floor(STRIP / 2);
-  const stripStart = Math.max(0, Math.min(index - half, pool.length - STRIP));
-  const stripIdx = Array.from({ length: Math.min(STRIP, pool.length) }, (_, k) => stripStart + k);
+  const stripIdx = janelaDaTira(index, pool.length, nTira);
   // Em rede lenta / Save-Data não pré-carregamos os vizinhos full-screen.
   const preloadNeighbours = shouldPreloadNeighbours();
 
@@ -1875,13 +2058,27 @@ function Lightbox({
       aria-modal="true"
       aria-label={`${dict.lbGallery}: ${labelText(pool[index].label)}, ${dict.lbPhoto} ${index + 1} ${dict.lbOf} ${pool.length}`}
       tabIndex={-1}
-      className={`fixed inset-0 z-[60] flex flex-col select-none focus:outline-none${closing ? " lb-closing" : ""}`}
+      className="fixed inset-0 z-[60] flex flex-col select-none focus:outline-none"
       onClick={close}
     >
-      {/* Fundo preto — camada própria que só anima opacidade, para o morph
-          da foto poder crescer por cima sem brigar com o <ViewTransition>.
-          É também o que o gesto de arrastar-para-baixo desvanece. */}
-      <div ref={backdropRef} className="lb-backdrop absolute inset-0 bg-black" />
+      {/* O fundo — camada própria, que é o que o gesto de arrastar-para-baixo
+          desvanece. Toma a cor da fotografia aberta (GAL-3): um degradé que
+          nasce dela, misturada com preto, e cai para preto nas margens. A cor
+          passa por uma propriedade registada (`@property --lb-cor`) porque é a
+          única forma de um degradé TRANSITAR para a cor da foto seguinte; o
+          `background` sozinho troca de repente. */}
+      <div
+        ref={backdropRef}
+        className="lb-backdrop absolute inset-0"
+        style={{ "--lb-cor": pool[index].color ?? "#000" } as React.CSSProperties}
+      />
+
+      {/* A cópia da miniatura que voa ao abrir e ao fechar (ver `voo.ts`).
+          Escondida em repouso; quem a mostra e a move é o código do voo. É um
+          `<img>` cru de propósito: recebe o ficheiro que a miniatura JÁ está a
+          mostrar (`currentSrc`), e um `<Image>` pediria outro. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img ref={vooRef} alt="" aria-hidden className="lb-voo" decoding="sync" />
 
       {/* Região viva. Medido: `liveRegionsInDialog: 0` — navegar com ←/→ (ou
           pelas miniaturas, ou pelo slideshow) era completamente silencioso.
@@ -1933,7 +2130,10 @@ function Lightbox({
         </div>
         <div className="flex items-center gap-1">
           <button
-            onClick={close}
+            onClick={(e) => {
+              e.stopPropagation();
+              close();
+            }}
             aria-label={dict.lbClose}
             // /60 (era /40): icone em repouso media 3.66:1, no limite de WCAG 1.4.11.
             className="p-3 text-white/60 hover:text-white transition-colors rounded-full hover:bg-white/8"
@@ -1959,7 +2159,7 @@ function Lightbox({
             prev();
           }}
           aria-label={dict.lbPrev}
-          className="absolute left-3 md:left-6 z-10 grid place-items-center w-11 h-11 md:w-12 md:h-12 rounded-full bg-black/40 text-white/75 ring-1 ring-white/10 hover:bg-black/60 hover:text-white hover:scale-105 active:scale-95 transition-all duration-200"
+          className="lb-chrome absolute left-3 md:left-6 z-10 grid place-items-center w-11 h-11 md:w-12 md:h-12 rounded-full bg-black/40 text-white/75 ring-1 ring-white/10 hover:bg-black/60 hover:text-white hover:scale-105 active:scale-95 transition-all duration-200"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -1975,9 +2175,30 @@ function Lightbox({
         <div
           ref={photoLayerRef}
           className="lb-photo-layer absolute inset-0 mx-2 md:mx-20 overflow-hidden"
-          onClick={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            // QUALQUER PRETO FECHA. A camada vai de margem a margem, mas a
+            // foto encaixada não: ao lado de uma foto ao alto ficam duas faixas
+            // largas que pareciam fundo e não fechavam. Conta a caixa pintada,
+            // pela proporção da foto; um clique na fotografia não fecha.
+            e.stopPropagation();
+            const camada = photoLayerRef.current;
+            if (!camada) return;
+            const foto = caixaContida(
+              caixaDe(camada.getBoundingClientRect()),
+              proporcao(pool[index].aspectRatio),
+            );
+            if (!dentroDe(foto, e.clientX, e.clientY)) close();
+          }}
         >
-          {/*
+          {/* Uma chave por fotografia: a pré-visualização e a foto grande da
+              anterior saem de vez quando se muda. Sem ela o `<picture>` era o
+              MESMO elemento e a foto anterior ficava por baixo da nova até esta
+              chegar — via-se uma dupla exposição a cada seta. */}
+          <div
+            key={index}
+            className={`absolute inset-0${justOpened && arranque.voa ? "" : " lb-photo-in"}`}
+          >
+            {/*
             ABRE COM A MINIATURA QUE JÁ ESTÁ EM CACHE, e só depois troca.
 
             O que se abria era directamente a fotografia em resolução inteira,
@@ -1995,27 +2216,27 @@ function Lightbox({
             descarregou. Com `90vw` escolheria outro ficheiro e isto passaria a
             ser um segundo download em vez de um acerto na cache.
           */}
-          {/*
+            {/*
             Fica montada mesmo depois de a grande carregar. Tirá-la no `onLoad`
             parece a limpeza óbvia e é um erro: o `onLoad` dispara quando a
             fotografia grande está pronta, não quando ela está VISÍVEL — ela
-            entra com um esbatimento de 0,42 s (`lb-open-in`). Desmontar a
-            miniatura nesse instante deixava preto por baixo durante todo o
-            esbatimento, que é exactamente o buraco que isto veio tapar.
+            entra com um esbatimento (`lb-grande`). Desmontar a miniatura nesse
+            instante deixava o fundo à vista durante todo o esbatimento, que é
+            exactamente o buraco que isto veio tapar.
           */}
-          <picture>
-            <source
-              media={CORTE_TELEMOVEL}
-              type="image/avif"
-              srcSet={srcsetDaGaleria(pool[index].src, ESCADA_TELEMOVEL, "avif")}
-              sizes={SIZES_DA_GRELHA}
-            />
-            <source
-              type="image/avif"
-              srcSet={srcsetDaGaleria(pool[index].src, ESCADA_ECRA_GRANDE, "avif")}
-              sizes={SIZES_DA_GRELHA}
-            />
-            {/*
+            <picture>
+              <source
+                media={CORTE_TELEMOVEL}
+                type="image/avif"
+                srcSet={srcsetDaGaleria(pool[index].src, ESCADA_TELEMOVEL, "avif")}
+                sizes={SIZES_DA_GRELHA}
+              />
+              <source
+                type="image/avif"
+                srcSet={srcsetDaGaleria(pool[index].src, ESCADA_ECRA_GRANDE, "avif")}
+                sizes={SIZES_DA_GRELHA}
+              />
+              {/*
               AS DUAS LINHAS DE WebP, QUE FALTAVAM.
 
               Esta pré-visualização existe para ser um acerto de cache: as
@@ -2027,72 +2248,101 @@ function Lightbox({
               descarregados no instante em que se prometeu "instantâneo".
               São ~5 % das visitas, e para essas isto era ruído puro.
             */}
-            <source
-              media={CORTE_TELEMOVEL}
-              type="image/webp"
-              srcSet={srcsetDaGaleria(pool[index].src, ESCADA_TELEMOVEL, "webp")}
-              sizes={SIZES_DA_GRELHA}
-            />
-            <source
-              type="image/webp"
-              srcSet={srcsetDaGaleria(pool[index].src, ESCADA_ECRA_GRANDE, "webp")}
-              sizes={SIZES_DA_GRELHA}
-            />
-            <img
-              src={ficheiroDaGaleria(pool[index].src, 768, "webp")}
-              alt=""
-              aria-hidden
-              className="absolute inset-0 h-full w-full object-contain"
-              decoding="async"
-            />
-          </picture>
-          <VTWrap key={index} name={vtId(pool[index].src)} exit="vt-lb">
-            <Image
-              key={`${index}-${lbRaw ? "raw" : lbFormato}`}
-              src={pool[index].src}
-              alt={altText(pool[index].src, pool[index].label)}
-              fill
-              // "90vw", não "min(90vw, 1920px)". O tecto que o min() queria pôr
-              // já é o do next.config (deviceSizes acaba em 1920), e a forma
-              // com parênteses não casa com a regex que o Next usa para ler o
-              // `sizes` — node_modules/next/dist/shared/lib/get-img-props.js:53,
-              // `/(^|\s)(1?\d?\d)vw/g`, exige início-de-string ou espaço antes
-              // do número. Com "min(90vw, …)" o 90vw vem precedido de "(", a
-              // lista de percentagens fica vazia e o Next cai no ramo que emite
-              // TODAS as 16 larguras do srcset — incluindo candidatos absurdos
-              // de 16, 32 e 64 px. Com "90vw" são 10, e a largura que o browser
-              // escolhe é a mesma (medido nos 8 perfis de dispositivo).
-              sizes="90vw"
-              quality={72}
-              // A escada de formato, e depois o ficheiro original tal e qual
-              // (ver `lbFormato` e `lbRaw`).
-              {...(lbRaw
-                ? { loader: ({ src }: { src: string }) => src }
-                : {
-                    loader: ({ src, width }: { src: string; width: number }) =>
-                      ficheiroDaGaleria(src, snapGalleryWidth(width), lbFormato),
-                  })}
-              onError={() => {
-                // avif → webp → original. Nunca salta um degrau: o WebP é o que
-                // salva quem não sabe ler AVIF, e o original é o que salva quem
-                // não tem a derivada.
-                anotar((a) =>
-                  !a.cru && a.formato === "avif" ? { ...a, formato: "webp" } : { ...a, cru: true },
-                );
-              }}
-              // priority: the full-res lightbox photo is a DIFFERENT srcset
-              // candidate than the tile thumbnail, so opening starts a cold fetch.
-              // Fetching it high-priority (instead of default) shortens the
-              // "black → pop" gap so the photo is ready as the open animation runs.
-              // Next 16 deprecou `priority` a favor de `preload`; para uma
-              // foto que ja esta no DOM a propria doc recomenda antes
-              // fetchPriority="high", que e exactamente o efeito que se quer.
-              fetchPriority="high"
-              onLoad={() => anotar((a) => ({ ...a, carregada: true }))}
-              className={`object-contain ${justOpened ? "lb-open-in" : "lb-photo-in"}`}
-              {...blurProps(pool[index])}
-            />
-          </VTWrap>
+              <source
+                media={CORTE_TELEMOVEL}
+                type="image/webp"
+                srcSet={srcsetDaGaleria(pool[index].src, ESCADA_TELEMOVEL, "webp")}
+                sizes={SIZES_DA_GRELHA}
+              />
+              <source
+                type="image/webp"
+                srcSet={srcsetDaGaleria(pool[index].src, ESCADA_ECRA_GRANDE, "webp")}
+                sizes={SIZES_DA_GRELHA}
+              />
+              <img
+                src={ficheiroDaGaleria(pool[index].src, 768, "webp")}
+                alt=""
+                aria-hidden
+                className="absolute inset-0 h-full w-full object-contain"
+                decoding="async"
+              />
+            </picture>
+            {!foto.falhou && (
+              <Image
+                key={`${index}-${foto.tentativa}-${lbRaw ? "raw" : lbFormato}`}
+                src={pool[index].src}
+                alt={altText(pool[index].src, pool[index].label)}
+                fill
+                // "90vw", não "min(90vw, 1920px)". O tecto que o min() queria pôr
+                // já é o do next.config (deviceSizes acaba em 1920), e a forma
+                // com parênteses não casa com a regex que o Next usa para ler o
+                // `sizes` — node_modules/next/dist/shared/lib/get-img-props.js:53,
+                // `/(^|\s)(1?\d?\d)vw/g`, exige início-de-string ou espaço antes
+                // do número. Com "min(90vw, …)" o 90vw vem precedido de "(", a
+                // lista de percentagens fica vazia e o Next cai no ramo que emite
+                // TODAS as 16 larguras do srcset — incluindo candidatos absurdos
+                // de 16, 32 e 64 px. Com "90vw" são 10, e a largura que o browser
+                // escolhe é a mesma (medido nos 8 perfis de dispositivo).
+                sizes="90vw"
+                quality={72}
+                // A escada de formato, e depois o ficheiro original tal e qual
+                // (ver `lbFormato` e `lbRaw`).
+                {...(lbRaw
+                  ? { loader: ({ src }: { src: string }) => src }
+                  : {
+                      loader: ({ src, width }: { src: string; width: number }) =>
+                        ficheiroDaGaleria(src, snapGalleryWidth(width), lbFormato),
+                    })}
+                onError={() => {
+                  // avif → webp → original → a frase. Nunca salta um degrau: o
+                  // WebP é o que salva quem não sabe ler AVIF, e o original é o
+                  // que salva quem não tem a derivada. Quando nem o original vem,
+                  // mostra-se o que aconteceu, e não a imagem partida do browser.
+                  anotar((a) =>
+                    a.cru
+                      ? { ...a, falhou: true }
+                      : a.formato === "avif"
+                        ? { ...a, formato: "webp" }
+                        : { ...a, cru: true },
+                  );
+                }}
+                // priority: the full-res lightbox photo is a DIFFERENT srcset
+                // candidate than the tile thumbnail, so opening starts a cold fetch.
+                // Fetching it high-priority (instead of default) shortens the
+                // "black → pop" gap so the photo is ready as the open animation runs.
+                // Next 16 deprecou `priority` a favor de `preload`; para uma
+                // foto que ja esta no DOM a propria doc recomenda antes
+                // fetchPriority="high", que e exactamente o efeito que se quer.
+                fetchPriority="high"
+                onLoad={() => anotar((a) => ({ ...a, carregada: true }))}
+                // SEM o desfocado (`blurProps`). Pintava a área inteira em modo
+                // cover, POR CIMA da pré-visualização nítida que já estava pronta
+                // aos 140 ms, e só saía aos ~770 ms: abrir uma foto mostrava uma
+                // mancha meio segundo. Agora a grande fica transparente até
+                // chegar e entra por cima da pré-visualização (`lb-grande`).
+                className="object-contain lb-grande"
+                data-carregada={heroLoaded ? "" : undefined}
+              />
+            )}
+            {foto.falhou && (
+              <div className="pointer-events-none absolute inset-0 grid place-items-center p-6">
+                <div
+                  role="alert"
+                  className="pointer-events-auto flex flex-col items-center gap-3 rounded-2xl bg-black/70 px-6 py-5 text-center ring-1 ring-white/10"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <p className="text-sm text-white/85">{dict.lbErro}</p>
+                  <button
+                    type="button"
+                    onClick={() => setGuardado(estadoDaFotoDoZero(index, foto.tentativa + 1))}
+                    className="min-h-[44px] rounded-full px-5 text-sm text-white ring-1 ring-white/30 transition-colors duration-elemento hover:bg-white/10"
+                  >
+                    {dict.lbTentar}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Pré-carrega só o vizinho SEGUINTE (o sentido de navegação dominante)
@@ -2152,7 +2402,7 @@ function Lightbox({
             next();
           }}
           aria-label={dict.lbNext}
-          className="absolute right-3 md:right-6 z-10 grid place-items-center w-11 h-11 md:w-12 md:h-12 rounded-full bg-black/40 text-white/75 ring-1 ring-white/10 hover:bg-black/60 hover:text-white hover:scale-105 active:scale-95 transition-all duration-200"
+          className="lb-chrome absolute right-3 md:right-6 z-10 grid place-items-center w-11 h-11 md:w-12 md:h-12 rounded-full bg-black/40 text-white/75 ring-1 ring-white/10 hover:bg-black/60 hover:text-white hover:scale-105 active:scale-95 transition-all duration-200"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5l7 7-7 7" />
@@ -2162,18 +2412,18 @@ function Lightbox({
 
       {/* Strip de thumbnails — deferido para o frame seguinte à abertura para
           não pesar no commit de abertura (ver chromeReady). */}
+      {/* A altura fica reservada desde o primeiro fotograma (a activa tem
+          52 px, mais 12 de cada lado). Sem isto a tira chegava um fotograma
+          depois e encolhia a área da foto por baixo do voo. */}
       <div
-        className="lb-chrome flex items-center justify-center gap-1 px-4 py-3 flex-shrink-0"
+        className="lb-chrome flex min-h-[76px] items-center justify-center gap-1 px-4 py-3 flex-shrink-0"
         onClick={(e) => e.stopPropagation()}
       >
         {chromeReady &&
           stripIdx.map((idx) => (
             <button
               key={idx}
-              onClick={() => {
-                setJustOpened(false);
-                setLb(idx);
-              }}
+              onClick={() => irPara(idx)}
               aria-label={`${dict.lbPhoto} ${idx + 1} ${dict.lbOf} ${pool.length}`}
               aria-current={idx === index ? "true" : undefined}
               className={`group relative flex-shrink-0 overflow-hidden transition-all duration-200 ${FOCUS_RING} ${
@@ -2193,14 +2443,18 @@ function Lightbox({
                 sizes="72px"
                 loader={galleryImageLoader}
                 className="object-cover"
+                // Um quadrado de 72 px corta muito: pelo ponto de interesse,
+                // e não pelo centro (gallery-meta.json).
+                style={pool[idx].foco ? { objectPosition: pool[idx].foco } : undefined}
               />
               <FocusRing />
             </button>
           ))}
       </div>
 
-      {/* Dicas teclado */}
-      <p className="text-center text-white/60 text-[10px] tracking-widest pb-2 flex-shrink-0 hidden md:block">
+      {/* Dicas teclado — só com rato (ver `.lb-dica`): num tablet com 768 px
+          ou mais aparecia «esc fechar» a quem não tem tecla Esc. */}
+      <p className="lb-dica text-center text-white/60 text-[10px] tracking-widest pb-2 flex-shrink-0">
         {dict.keyboardHint}
       </p>
     </div>,

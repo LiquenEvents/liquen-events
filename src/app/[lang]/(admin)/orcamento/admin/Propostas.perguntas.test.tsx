@@ -81,14 +81,15 @@ describe("a pergunta de apagar uma proposta", () => {
     ).not.toHaveBeenCalled();
   });
 
-  it("pergunta na janela da casa, diz de quem é e avisa que não se desfaz", async () => {
+  it("pergunta na janela da casa, diz de quem é e para onde vai", async () => {
     const user = userEvent.setup();
     await pedirParaApagar(user);
     const caixa = await screen.findByRole("dialog");
     // Numa lista de dezenas de propostas, o nome é a única coisa que diz em
     // qual linha ela tocou.
     expect(within(caixa).getByText(/Ana e Rui/)).toBeTruthy();
-    expect(within(caixa).getByText(/não pode ser anulada/i)).toBeTruthy();
+    // Já não é definitivo (R3b): fica 30 dias na Reciclagem.
+    expect(within(caixa).getByText(/30 dias na Reciclagem/i)).toBeTruthy();
     // O verbo repetido, e não «Confirmar».
     expect(within(caixa).getByRole("button", { name: /^Apagar a proposta$/ })).toBeTruthy();
     expect(within(caixa).getByRole("button", { name: /^Cancelar$/ })).toBeTruthy();

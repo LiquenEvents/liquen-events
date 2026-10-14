@@ -1,8 +1,14 @@
-import { depositPercentOf, type MoodBoard, type ProposalDoc } from "@/lib/proposal-doc";
+import {
+  depositPercentOf,
+  withProposalDefaults,
+  type MoodBoard,
+  type ProposalDoc,
+} from "@/lib/proposal-doc";
 import { blocosFixosNaLingua, textosDaProposta } from "@/lib/proposal-doc-textos";
 import { totaisDaProposta } from "@/lib/proposal-budget";
 import { chaveDeRubrica, ordemDeSaida } from "@/lib/proposal-ordem";
-import { agrupar, grupoDoTema, type Grupo } from "./grupos";
+import { capitulos as capitulosDaInspiracao, grupoDoTema } from "./grupos";
+import { eCasamento } from "../proposal-evento";
 import { MAXIMO_POR_PAGINA, repartir as repartirFotos } from "./mosaico";
 import { textosEditoriais } from "./textos";
 
@@ -49,14 +55,20 @@ export type PaginaDoPlano =
   | { tipo: "ambiente" }
   | { tipo: "cronograma"; continuacao: boolean }
   /** O separador de um capítulo de inspiração, ou o do investimento. */
-  | { tipo: "separador"; titulo: string; grupo: Grupo | null; numero: number }
+  /**
+   * O separador de um capítulo de inspiração, ou o do investimento (`grupo`
+   * a `null`). O `grupo` é a CHAVE do capítulo — o grupo do dia num casamento
+   * («cocktail»), `tema-<n>` fora dele (ver `capitulos`, em `grupos.ts`).
+   */
+  | { tipo: "separador"; titulo: string; grupo: string | null; numero: number }
   | {
       tipo: "tema";
       /** O índice REAL em `doc.moodBoards`. */
       bi: number;
       /** A vez do tema na proposta (1.º, 2.º…): decide o lado do mosaico. */
       vez: number;
-      grupo: Grupo;
+      /** A chave do capítulo do tema (a mesma do separador que o abre). */
+      grupo: string;
       titulo: string;
       /** Que página deste tema é (0 = a primeira), e quantas leva. */
       parte: number;
@@ -306,19 +318,19 @@ export function planoDaProposta(doc: ProposalDoc): EntradaDoPlano[] {
   }
 
   // ── Os capítulos de inspiração ──
-  const capitulos = agrupar(comPagina, (bi) =>
-    grupoDoTema(boards[bi].title ?? "", boards[bi].subtitulo ?? ""),
-  );
+  const capitulos = capitulosDaInspiracao(comPagina, (bi) => boards[bi], eCasamento(doc.eventType));
   const meio = Math.ceil(capitulos.length / 2);
   let vez = 0;
   let separadores = 0;
   capitulos.forEach((c, ci) => {
-    const nome = te.grupos[c.grupo];
+    const nome = c.grupo
+      ? te.grupos[c.grupo]
+      : (boards[c.itens[0]].title ?? "").trim() || te.inspiracao;
     separadores++;
     paginas.push({
       tipo: "separador",
       titulo: nome,
-      grupo: c.grupo,
+      grupo: c.chave,
       numero: separadores,
       nome: `${te.inspiracao} · ${nome}`,
       seccao: "moodboards",
@@ -334,7 +346,7 @@ export function planoDaProposta(doc: ProposalDoc): EntradaDoPlano[] {
           tipo: "tema",
           bi,
           vez,
-          grupo: c.grupo,
+          grupo: c.chave,
           titulo: (b.title ?? "").trim(),
           parte,
           partes: porPagina.length,
@@ -452,14 +464,18 @@ export function planoDaProposta(doc: ProposalDoc): EntradaDoPlano[] {
  * sem conteúdo: a folha não sai. O que pode faltar é o TEXTO, e é isso que a
  * conferência passa a dizer.
  */
-export function listasQueNaoSaem(doc: ProposalDoc): { nome: string; seccao: string }[] {
-  const fixos = blocosFixosNaLingua(doc, "pt");
+export function listasQueNaoSaem(
+  doc: ProposalDoc,
+): { id: "condicoes" | "observacoes"; nome: string; seccao: string }[] {
+  // Com os textos da casa por omissão, como o PDF os lê: uma lista AUSENTE no
+  // rascunho quer dizer «as da casa», e sai — só uma lista vazia não sai.
+  const fixos = blocosFixosNaLingua(withProposalDefaults(doc), "pt");
   const t = textosDaProposta("pt");
-  const faltam: { nome: string; seccao: string }[] = [];
+  const faltam: { id: "condicoes" | "observacoes"; nome: string; seccao: string }[] = [];
   if (!(fixos.condicoesGerais ?? []).some((l) => temTexto(l)))
-    faltam.push({ nome: t.tituloCondicoes, seccao: "total" });
+    faltam.push({ id: "condicoes", nome: t.tituloCondicoes, seccao: "total" });
   if (!(fixos.observacoesGerais ?? []).some((l) => temTexto(l)))
-    faltam.push({ nome: t.observacoesGerais, seccao: "total" });
+    faltam.push({ id: "observacoes", nome: t.observacoesGerais, seccao: "total" });
   return faltam;
 }
 
@@ -483,9 +499,18 @@ export function composicaoEmPalavras(n: number): string {
     : "Mosaico de ponta a ponta";
 }
 
-/** O capítulo de inspiração de um tema («Jantar»), pelo nome — `grupos.ts`. */
-export function capituloDoTema(b: Pick<MoodBoard, "title" | "subtitulo">): string {
-  return textosEditoriais("pt").grupos[grupoDoTema(b.title ?? "", b.subtitulo ?? "")];
+/**
+ * O capítulo de inspiração de um tema. Num casamento, o do dia («Jantar»),
+ * pelo nome — `grupos.ts`; fora dele, cada mood board é o seu capítulo, e o
+ * nome é o título dele.
+ */
+export function capituloDoTema(
+  b: Pick<MoodBoard, "title" | "subtitulo">,
+  casamento = true,
+): string {
+  const te = textosEditoriais("pt");
+  if (!casamento) return (b.title ?? "").trim() || te.inspiracao;
+  return te.grupos[grupoDoTema(b.title ?? "", b.subtitulo ?? "")];
 }
 
 /** Quantas páginas um tema ocupa no PDF (0 fotos é uma página de texto). */

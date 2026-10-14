@@ -10,6 +10,15 @@ const store = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/admin-auth", () => ({ isAuthed: () => authed.ok }));
+// Apagar passa pela Reciclagem (R3, `src/lib/reciclagem.ts`, com testes
+// próprios). Aqui interessa a rota: a guarda e o apagar que chega ao store.
+vi.mock("@/lib/reciclagem", () => ({
+  quemApagou: () => undefined,
+  enviarParaAReciclagem: async (_tipo: string, id: string) => {
+    await store.remove(id);
+    return { id: "r1" };
+  },
+}));
 vi.mock("@/lib/logger", () => ({ log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 vi.mock("@/lib/inventory-store", () => ({
   updateItem: store.update,
@@ -131,7 +140,7 @@ describe("DELETE /api/inventario/[id]", () => {
     authed.ok = true;
     const res = await del("it1");
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true });
+    expect(await res.json()).toMatchObject({ ok: true });
     expect(store.remove).toHaveBeenCalledWith("it1");
   });
 
@@ -139,7 +148,7 @@ describe("DELETE /api/inventario/[id]", () => {
     authed.ok = true;
     const res = await del("missing");
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true });
+    expect(await res.json()).toMatchObject({ ok: true });
   });
 
   it("returns a handled 500 (not a raw throw) when the store fails", async () => {

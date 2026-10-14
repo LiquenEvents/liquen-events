@@ -413,7 +413,7 @@ export default function EmailDoEnvio({
           <span>
             Ficou por preencher, e vai sair assim:{" "}
             <strong className="font-medium">{porPreencher.map((v) => v.rotulo).join(", ")}</strong>.
-            Corrige o texto acima antes de enviar — ou preenche o dado no passo «Conteúdo».
+            Corrige o texto acima antes de enviar — ou preenche o dado no passo «Evento».
           </span>
         </p>
       )}

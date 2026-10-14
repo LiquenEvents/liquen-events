@@ -37,7 +37,13 @@ describe("pickServiceGallery", () => {
   it("cobre todo o conjunto ao longo do tempo, não só o início da lista", () => {
     // Um Fisher-Yates parcial mal escrito tende a devolver sempre as primeiras
     // posições; isto obriga o sorteio a alcançar o fim da lista.
-    const pool = [...srcOf(["Casamento"])];
+    // O fim da lista das que o sorteio PODE escolher — deitadas e grandes, como
+    // o `serve()` pede. Medido sobre todas, as 900 px ao alto vindas do
+    // Instagram enchiam a metade de trás e o teste deixava de medir o sorteio.
+    const pool = [...srcOf(["Casamento"])].filter((src) => {
+      const d = DIMENSOES[src];
+      return !!d && d[0] / d[1] >= 1.4 && d[0] >= 2000;
+    });
     const tail = new Set(pool.slice(Math.floor(pool.length / 2)));
     const hits = new Set<string>();
     for (let i = 0; i < 60; i++) {

@@ -2372,6 +2372,15 @@ body:has([data-cream-page]) [data-public-nav] {
   box-shadow: none;
 }
 
+/* «Eu não quero estes quadrados à volta do menu» e «se há anéis desses pelo
+   site, retira» (10/10). Depois de um toque ou clique, o que recebe o foco
+   leva `data-foco-do-rato` (`AnelSoDoTeclado.tsx`) e não mostra o anel; o Tab
+   devolve o modo do teclado e o anel volta. O `forced-colors` aqui em baixo
+   repõe-no sempre. */
+[data-foco-do-rato]:focus-visible {
+  outline: none;
+}
+
 /* Windows High Contrast / forced-colors mode strips box-shadows, so the ring
    above disappears and keyboard focus becomes invisible. Restore a real system
    outline there (CanvasText adapts to the user's chosen contrast theme). */
@@ -3100,25 +3109,20 @@ body::before {
   }
 }
 .lb-photo-in {
-  animation: lb-photo-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: lb-photo-in var(--transition-duration-vista) var(--ease-out) both;
 }
 
-/* Opening a photo: a slightly deeper zoom-in than the between-photos lb-photo-in,
-   so the photo visibly "grows" as it opens. Transform + opacity only → fully
-   GPU-composited, no snapshot (this replaced the View Transition morph, which
-   snapshotted the whole full-screen layer and stuttered). */
-@keyframes lb-open-in {
-  from {
-    opacity: 0;
-    transform: scale(0.9);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+/* A fotografia grande do visualizador: transparente até chegar, e depois
+   entra por cima da pré-visualização que já lá está. Substituiu o desfocado
+   (`placeholder="blur"`), que tapava a pré-visualização nítida durante meio
+   segundo. O `lb-open-in` que aqui estava saiu com ele: quem abre a foto
+   agora é o voo a partir da miniatura (`voo.ts`). */
+.lb-grande {
+  opacity: 0;
+  transition: opacity var(--transition-duration-foto-chega) var(--ease-out);
 }
-.lb-open-in {
-  animation: lb-open-in 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+.lb-grande[data-carregada] {
+  opacity: 1;
 }
 
 /* ── Hero CSS animations (no JS — always in viewport on load) ── */
@@ -3664,8 +3668,7 @@ body[data-menu-open] .whatsapp-fixed {
 
 /* ── View Transitions (rotas + morph da galeria) ──
    .vt-page / .vt-page-fwd / .vt-page-bwd  todas as navegações usam UM cross-fade
-                  curto só de opacidade — ver nota de fluidez abaixo.
-   .gallery-morph  par thumbnail→lightbox (blur a meio esconde interpolação) */
+                  curto só de opacidade — ver nota de fluidez abaixo. */
 
 /* Fluidez da entrada de página: a API de View Transitions tira um "snapshot" da
    página inteira (no /sobre, um herói full-bleed de 100svh) e anima-o. Animar
@@ -3699,26 +3702,10 @@ body[data-menu-open] .whatsapp-fixed {
   }
 }
 
-/* Saída do lightbox sem par (a miniatura destino não está renderizada):
-   desvanece em vez de desaparecer de repente. */
-::view-transition-old(.vt-lb) {
-  animation: 200ms ease-out both vt-fade-out;
-}
 @keyframes vt-fade-out {
   to {
     opacity: 0;
   }
-}
-
-::view-transition-group(.gallery-morph) {
-  /* Only the group animates — a composited transform of the thumbnail→fullscreen
-     box (position + size), plus the default GPU cross-fade of the image pair.
-     The previous `vt-morph-blur` animated filter: blur(2px) on the image pair,
-     which forced a full-frame REPAINT of a large photo every frame — the reason
-     opening a photo stuttered. Dropping it keeps the expand-morph but makes it
-     60fps. Slightly shorter, too, so it feels snappier. */
-  animation-duration: 340ms;
-  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -4688,9 +4675,11 @@ body:has([data-orcamento-mode]) .eyebrow {
     animation: none;
     transform: scale(1.06);
   }
-  .lb-photo-in,
-  .lb-open-in {
+  .lb-photo-in {
     animation: none;
+  }
+  .lb-grande {
+    transition: none;
   }
 }
 
@@ -4794,6 +4783,13 @@ body:has([data-orcamento-mode]) .eyebrow {
    pode ser candidata a LCP para quem já respondeu. Segundos depois o React
    tira-a mesmo do DOM. */
 html.consentimento-decidido .barra-consentimento {
+  display: none;
+}
+
+/* E recolhe-se enquanto o visualizador da galeria está aberto: a barra é
+   `z-[70]`, por cima dele, e no telemóvel tapava a tira de miniaturas e o
+   gesto de arrastar. Volta ao fechar, com a escolha ainda por fazer. */
+html.lightbox-aberta .barra-consentimento {
   display: none;
 }
 
@@ -5191,9 +5187,22 @@ body:has(.barra-consentimento) footer {
   animation: g-hero-in 0.9s cubic-bezier(0.16, 1, 0.3, 1) var(--hero-delay, 0ms) both;
 }
 
-/* Lightbox: o fundo escurece suavemente à entrada. A foto faz morph por cima,
-   por isso o preto é uma camada própria que só anima opacidade (nunca briga
-   com o <ViewTransition> da foto). */
+/* Lightbox: o fundo escurece à entrada, ao mesmo tempo que a miniatura voa
+   (a mesma duração e a mesma curva do voo, `DUR_VISTA_MS` e `EASE_OUT`).
+
+   E toma a COR DA FOTOGRAFIA (GAL-3): no centro, a cor média da foto (de
+   `tile-colors.json`) com 65% de preto; nas margens, quase preto. O caso mais
+   claro possível — uma foto branca — dá #595959 no centro, e o branco dos
+   controlos fica acima de 7:1; a barra de cima tem ainda o seu degradé.
+
+   `--lb-cor` é uma propriedade REGISTADA porque só assim o degradé transita
+   para a cor da foto seguinte; uma variável comum troca de repente. Não
+   herda: é escrita no próprio fundo (ver o `style` no `GaleriaClient`). */
+@property --lb-cor {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: black;
+}
 @keyframes lb-backdrop-in {
   from {
     opacity: 0;
@@ -5203,7 +5212,38 @@ body:has(.barra-consentimento) footer {
   }
 }
 .lb-backdrop {
-  animation: lb-backdrop-in 0.4s ease both;
+  /* O PRETO FICA SEMPRE POR BAIXO. A cor da foto é uma camada por cima, numa
+     declaração à parte: um browser que não saiba `color-mix()` (Safari antes
+     do 16.2, Chrome antes do 111) deita fora a declaração inteira em que ela
+     aparece. Com o degradé no `background` e nada mais, isso deixava o fundo
+     TRANSPARENTE e a grelha à vista por trás da foto aberta — ela viu-o assim.
+     Agora, no pior caso, o fundo é o preto de antes. */
+  background-color: black;
+  background-image: radial-gradient(
+    farthest-corner at 50% 45%,
+    color-mix(in oklab, var(--lb-cor) 35%, black) 0%,
+    color-mix(in oklab, var(--lb-cor) 6%, black) 80%
+  );
+  transition: --lb-cor var(--transition-duration-foto-chega) var(--ease-out);
+  animation: lb-backdrop-in var(--transition-duration-vista) var(--ease-out) both;
+}
+
+/* A cópia da miniatura que voa (ver `voo.ts`). Escondida em repouso; o JS
+   põe-lhe `data-a-voar` durante o voo e esconde a foto do visualizador por
+   baixo (`data-voo`), para não haver duas. */
+.lb-voo {
+  display: none;
+  position: fixed;
+  z-index: 1;
+  object-fit: contain;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+.lb-voo[data-a-voar] {
+  display: block;
+}
+.lb-photo-layer[data-voo] > * {
+  visibility: hidden;
 }
 
 /* A cromagem (barra, tira de miniaturas) entra com um leve atraso — deixa a
@@ -5217,35 +5257,46 @@ body:has(.barra-consentimento) footer {
   }
 }
 .lb-chrome {
-  animation: lb-chrome-in 0.5s ease 0.12s both;
+  animation: lb-chrome-in var(--transition-duration-vista) var(--ease-out)
+    var(--transition-duration-micro) both;
 }
 
-/* Fecho gracioso do lightbox. O morph de ABERTURA usa <ViewTransition>, mas o
-   de fecho revelou-se instável com a camada de motion ativa (o Escape disparava
-   e a transição não fazia commit). Aqui o fecho é 100% CSS e fiável: enquanto
-   `closing` está ativo (260ms, ver close()), o diálogo inteiro faz fade + um
-   ligeiro scale-down antes de desmontar. Overshoot subtil para dar peso. */
-@keyframes lb-out {
+/* A saída com voo: a foto volta para a miniatura (no JS) e o fundo e a
+   cromagem esbatem-se por baixo, no mesmo tempo. Sem miniatura à vista, quem
+   esbate é o diálogo inteiro (também no JS, com `EASE_IN`). */
+@keyframes lb-desvanece {
   from {
     opacity: 1;
-    transform: scale(1);
   }
   to {
     opacity: 0;
-    transform: scale(0.965);
   }
 }
-.lb-closing {
-  animation: lb-out 0.26s cubic-bezier(0.4, 0, 0.2, 1) both;
-  transform-origin: center;
+[data-sair] {
   pointer-events: none;
+}
+[data-sair] .lb-backdrop,
+[data-sair] .lb-chrome,
+[data-sair] .lb-dica {
+  animation: lb-desvanece var(--transition-duration-vista) var(--ease-out) both;
+}
+
+/* A dica do teclado só com rato: «esc fechar» a quem tem um tablet não diz
+   nada. */
+.lb-dica {
+  display: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .lb-dica {
+    display: block;
+  }
 }
 
 /* Camada da foto do lightbox — mola de volta ao largar o arrasto (fechar em
    telemóvel). Enquanto o dedo arrasta, o JS põe .lb-dragging para seguir o
    toque sem lag; ao largar, a transição trata do resto. */
 .lb-photo-layer {
-  transition: transform 0.28s var(--ease-out);
+  transition: transform var(--transition-duration-elemento) var(--ease-out);
 }
 .lb-photo-layer.lb-dragging {
   transition: none;
@@ -5294,11 +5345,8 @@ body:has(.barra-consentimento) footer {
   .lb-chrome {
     animation: none;
   }
-  /* Sem fade de saída: fica visível até o setTimeout desmontar (fecho instantâneo). */
-  .lb-closing {
-    animation: none;
-    opacity: 1;
-  }
+  /* A cor do fundo muda de foto para foto sem transitar. */
+  .lb-backdrop,
   .lb-photo-layer {
     transition: none;
   }
@@ -5643,7 +5691,7 @@ body:has(.barra-consentimento) footer {
 .cortina {
   position: fixed;
   inset: 0;
-  /* Acima da barra dos cookies (`z-[70]`) e do aviso de navegação (80).
+  /* Acima da barra dos cookies (`z-[70]`) e da linha de navegação (80).
      A fotografia mostrou o rodapé de consentimento a espreitar por baixo do
      lema, que parece uma página partida a meio e não uma a caminho. */
   z-index: 90;
@@ -5770,18 +5818,19 @@ body:has(.barra-consentimento) footer {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   O AVISO DE QUE UMA PÁGINA ESTÁ A DEMORAR
+   A LINHA DE QUE UMA PÁGINA ESTÁ A DEMORAR
    ══════════════════════════════════════════════════════════════════════════
 
-   O porquê está no `AvisoDeCarregamento.tsx`. A regra desta peça é a OPOSTA
-   da cortina, e é a diferença que importa ao ler isto: a cortina tem um
-   mínimo e vê-se sempre, porque é marca; isto é INFORMAÇÃO, e informação que
-   não é precisa é ruído. Nasce invisível e só aparece se a navegação demorar
-   mais de 400 ms — a receita que os próprios documentos do Next recomendam.
+   O porquê está no `LinhaDeCarregamento.tsx`: ela pediu para tirar o ecrã
+   creme com o logótipo e escolheu «Linha fina no topo». A página onde se está
+   fica à vista; só corre uma linha de 2 px no topo até a próxima chegar.
+
+   É INFORMAÇÃO, não marca: nasce invisível e só aparece se a navegação
+   demorar mais de 150 ms. Uma navegação rápida não pinta um pixel.
 
    Só `transform` e `opacity`. */
 
-@keyframes aviso-a-aparecer {
+@keyframes linha-a-aparecer {
   from {
     opacity: 0;
   }
@@ -5790,61 +5839,79 @@ body:has(.barra-consentimento) footer {
   }
 }
 
-/* A respiração do logótipo, tal como no exemplo dela: `from{opacity:.9;
-   transform:scale(.9)} to{opacity:1;transform:scale(1)}`, em alternado. */
-@keyframes aviso-logo-a-respirar {
+/* Avança depressa ao princípio e cada vez mais devagar, sem nunca chegar ao
+   fim: não se sabe quanto falta, e uma linha que enche e fica parada cheia
+   diz «acabou» quando não acabou. Enche-se só quando a página chega. */
+@keyframes linha-a-avancar {
   from {
-    opacity: 0.9;
-    transform: scale(0.9);
+    transform: scaleX(0);
   }
   to {
-    opacity: 1;
-    transform: scale(1);
+    transform: scaleX(0.85);
   }
 }
 
-.a-caminho {
+.linha-a-caminho {
   position: fixed;
-  inset: 0;
-  /* Acima da barra dos cookies, que é `z-[70]`.
-     MEDIDO numa fotografia: com os dois no mesmo nível, ganhava a barra —
-     desenhada depois — e o aviso saía com um rodapé de consentimento por
-     cima, que parece uma página partida a meio e não uma a caminho. */
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  /* Acima da barra de navegação (50), da linha do scroll (60) e da barra dos
+     cookies (70) — fica na mesma altura da linha do scroll e tapa-a enquanto
+     corre. Abaixo da cortina (90). */
   z-index: 80;
-  display: grid;
-  place-items: center;
-  /* O creme da casa, e NÃO o verde-quase-preto da cortina.
-     A cortina cobre a chegada a uma proposta e pode ser escura — é um
-     momento. Isto acontece ENTRE duas páginas claras do sítio, e um flash
-     preto pelo meio lê-se como uma avaria, não como um cuidado. */
-  background: var(--color-cream);
+  pointer-events: none;
   opacity: 0;
-  animation: aviso-a-aparecer 0.25s ease 0.4s forwards;
+  animation: linha-a-aparecer 0.2s ease 0.15s forwards;
 }
 
-.a-caminho__logo {
-  /* Os 56 px do exemplo dela eram para um SÍMBOLO. Este logótipo traz as nove
-     letras de «LÍQUEN EVENTS» ao lado do emblema — a essa largura, medido numa
-     fotografia a 390 px, as letras não se liam. 150 px é a mesma medida do
-     ecrã de espera da proposta (`loading.tsx`), e é onde o nome se lê. */
-  width: 150px;
-  max-width: 45vw;
-  height: auto;
-  animation: aviso-logo-a-respirar 1.25s cubic-bezier(0.645, 0.045, 0.355, 1) infinite alternate;
+.linha-a-caminho__traco {
+  display: block;
+  height: 100%;
+  background: var(--color-moss);
+  transform-origin: left;
+  transform: scaleX(0);
+  animation: linha-a-avancar 8s cubic-bezier(0.1, 0.7, 0.3, 1) 0.15s forwards;
 }
 
-/* ── AQUI O MOVIMENTO REDUZIDO NÃO APAGA A PEÇA ───────────────────────────
-   A cortina desaparece por completo para quem pediu menos movimento, porque
-   é decoração. Esta não pode: é o que diz que algo está a acontecer, e a
-   regra dela é que isso nunca falta. Fica o logótipo quieto, sem respirar e
-   sem aparição — e continua a só surgir se a página demorar mesmo. */
-@media (prefers-reduced-motion: reduce) {
-  .a-caminho {
-    animation: none;
+/* A página chegou: a linha enche-se e apaga-se. */
+.linha-a-caminho[data-fase="chegou"] {
+  opacity: 1;
+  animation: linha-a-apagar 0.25s ease forwards;
+}
+.linha-a-caminho[data-fase="chegou"] .linha-a-caminho__traco {
+  animation: none;
+  transform: scaleX(1);
+  transition: transform 0.2s ease-out;
+}
+
+@keyframes linha-a-apagar {
+  from {
     opacity: 1;
-    transition-delay: 0.4s;
   }
-  .a-caminho__logo {
+  to {
+    opacity: 0;
+  }
+}
+
+/* ── COM MOVIMENTO REDUZIDO, A LINHA FICA, QUIETA ─────────────────────────
+   É o que diz que algo está a acontecer, e isso não pode faltar a quem pediu
+   calma. Sem correr e sem desvanecer: aparece de uma vez, já cheia, MAS só
+   aos 150 ms — o atraso está numa animação de duração zero, que é o que o
+   aviso antigo não tinha (um `transition-delay` sem `transition` não atrasa
+   nada, e o logótipo aparecia em todos os cliques). */
+@media (prefers-reduced-motion: reduce) {
+  .linha-a-caminho {
+    animation: linha-a-aparecer 0s linear 0.15s forwards;
+  }
+  .linha-a-caminho__traco,
+  .linha-a-caminho[data-fase="chegou"] .linha-a-caminho__traco {
+    animation: none;
+    transition: none;
+    transform: scaleX(1);
+  }
+  .linha-a-caminho[data-fase="chegou"] {
     animation: none;
   }
 }

@@ -60,6 +60,11 @@ setup("aquecer as rotas pesadas do back office", async ({ page }) => {
   await expect(cliente, "o cartão do cliente semeado").toBeVisible({ timeout: 90_000 });
   await expect(async () => {
     await cliente.click();
+    // Os Serviços vivem no 2.º dos cinco passos do estúdio (A2).
+    await page
+      .getByRole("navigation", { name: "Passos da proposta" })
+      .getByRole("button", { name: /^2\s*Serviços/ })
+      .click({ timeout: 8_000 });
     await expect(page.getByLabel(/^Linha 1 do grupo 1$/).first()).toBeVisible({ timeout: 8_000 });
   }).toPass({ timeout: 120_000 });
 

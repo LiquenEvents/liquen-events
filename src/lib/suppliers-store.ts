@@ -81,3 +81,8 @@ export const updateSupplier = (id: string, updates: Partial<Supplier>): Promise<
   repo.update(id, updates);
 
 export const deleteSupplier = (id: string): Promise<void> => repo.remove(id);
+
+/** Para a Reciclagem: ler um, e repô-lo tal e qual — com o MESMO id. */
+export const obterFornecedor = (id: string): Promise<Supplier | null> => repo.get(id);
+export const reporFornecedor = (s: Supplier): Promise<void> =>
+  repo.create(s, { created_at: s.createdAt });

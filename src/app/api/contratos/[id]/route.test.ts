@@ -144,3 +144,52 @@ describe("PATCH /api/contratos/[id] — registar o aceite", () => {
     expect(dados.gravado).toMatchObject({ status: "aceite" });
   });
 });
+
+describe("PATCH /api/contratos/[id] — desfazer o registo («voltar atrás»)", () => {
+  /**
+   * Palavras dela: «tem que haver no site todo, em tudo aquilo que se faz, uma
+   * forma de voltar atrás». Marcar como assinado por engano tinha de ter volta.
+   */
+  const registado = () =>
+    ({
+      ...contratoPendente(),
+      status: "aceite",
+      acceptedAt: "2026-10-10T11:47:00.000Z",
+      registadoPor: "Catarina Gaspar",
+      registadoComo: "assinado em papel",
+    }) as Contract;
+
+  it("volta a pendente e limpa o registo", async () => {
+    dados.contrato = registado();
+    const res = await PATCH(pedido({ desfazer: true }), { params });
+    expect(res.status).toBe(200);
+    expect(dados.gravado).toEqual({
+      status: "pendente",
+      acceptedAt: "",
+      acceptedName: "",
+      registadoPor: "",
+      registadoComo: "",
+    });
+  });
+
+  it("um aceite electrónico do casal (com IP) não se desfaz — é a prova", async () => {
+    dados.contrato = { ...registado(), acceptedIp: "1.2.3.4" } as Contract;
+    const res = await PATCH(pedido({ desfazer: true }), { params });
+    expect(res.status).toBe(409);
+    expect(dados.gravado).toBe(null);
+  });
+
+  it("desfazer um contrato que já está pendente não grava nada", async () => {
+    const res = await PATCH(pedido({ desfazer: true }), { params });
+    expect(res.status).toBe(200);
+    expect(dados.gravado).toBe(null);
+  });
+
+  it("sem sessão, 401", async () => {
+    authed.ok = false;
+    dados.contrato = registado();
+    const res = await PATCH(pedido({ desfazer: true }), { params });
+    expect(res.status).toBe(401);
+    expect(dados.gravado).toBe(null);
+  });
+});

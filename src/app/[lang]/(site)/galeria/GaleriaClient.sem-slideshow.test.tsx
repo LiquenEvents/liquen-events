@@ -64,8 +64,10 @@ function abrir() {
 describe("o lightbox sem slideshow", () => {
   it("não há botão de iniciar o slideshow", () => {
     abrir();
-    expect(screen.queryByRole("button", { name: pt.galeria.lbPlay })).toBeNull();
-    expect(screen.queryByRole("button", { name: pt.galeria.lbPause })).toBeNull();
+    // As chaves `lbPlay`/`lbPause` saíram do dicionário com o botão; procura-
+    // -se pelo texto que elas tinham, em português e em inglês.
+    expect(screen.queryByRole("button", { name: /slideshow/i })).toBeNull();
+    expect(screen.queryByRole("progressbar")).toBeNull();
   });
 
   it("a fotografia não muda sozinha, nem depois da barra de espaço", () => {

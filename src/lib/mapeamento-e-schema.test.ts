@@ -170,6 +170,7 @@ const MAPPERS = [
   "./proposals-store",
   "./proposta-definicoes-store",
   "./quotes-store",
+  "./reciclagem-store",
   "./servicos-catalogo-store",
   "./suppliers-store",
   "./tasks-store",

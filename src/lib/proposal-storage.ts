@@ -13,6 +13,7 @@ import { log } from "./logger";
  * confirmar carregamentos, e nunca chama.
  */
 import {
+  PROPOSAL_AVIF_MID_BUCKET,
   PROPOSAL_BUCKET,
   PROPOSAL_MID_BUCKET,
   PROPOSAL_THUMB_BUCKET,
@@ -592,6 +593,62 @@ export async function listProposalImages(quoteId: string): Promise<UploadedImage
     log.error("proposal-storage: list falhou", e, { quoteId });
     return [];
   }
+}
+
+/**
+ * As fotografias de um pedido que saiu de vez da Reciclagem (fase R3b de
+ * `docs/TUDO-REVERSIVEL.md`): a pasta `<pedido>/` e as mesmas nas derivadas.
+ *
+ * Ao contrário do `listProposalImages`, uma listagem que falha NÃO passa por
+ * pasta vazia: a entrada fica na Reciclagem e tenta-se no dia seguinte, em
+ * vez de a pasta ficar órfã para sempre. `true` quando os originais saíram;
+ * as derivadas são melhor esforço. Sem Storage não há nada guardado.
+ */
+export async function apagarPastaDoPedido(quoteId: string): Promise<boolean> {
+  const sb = getSupabase();
+  if (!sb) return true;
+  const safeId = quoteId.replace(/[^a-zA-Z0-9_-]/g, "");
+  if (!safeId) return false;
+  const paths: string[] = [];
+  try {
+    for (let pagina = 0; pagina < MAX_PAGINAS; pagina++) {
+      const { data, error } = await sb.storage.from(PROPOSAL_BUCKET).list(safeId, {
+        limit: PAGINA_DA_LISTAGEM,
+        offset: pagina * PAGINA_DA_LISTAGEM,
+      });
+      if (error || !data) return false;
+      paths.push(
+        ...data.filter((o) => o.id && !o.name.startsWith(".")).map((o) => `${safeId}/${o.name}`),
+      );
+      if (data.length < PAGINA_DA_LISTAGEM) break;
+    }
+    // Apagar à medida que se lista mexeria nos índices da paginação: primeiro
+    // tudo, depois em lotes do tamanho da página.
+    for (let i = 0; i < paths.length; i += PAGINA_DA_LISTAGEM) {
+      const { error } = await sb.storage
+        .from(PROPOSAL_BUCKET)
+        .remove(paths.slice(i, i + PAGINA_DA_LISTAGEM));
+      if (error) return false;
+    }
+  } catch (e) {
+    log.error("proposal-storage: pasta do pedido não saiu", e, { quoteId });
+    return false;
+  }
+  for (const bucket of [
+    PROPOSAL_THUMB_BUCKET,
+    PROPOSAL_MID_BUCKET,
+    PROPOSAL_AVIF_MID_BUCKET,
+    PROPOSAL_COVER_BUCKET,
+  ]) {
+    for (let i = 0; i < paths.length; i += PAGINA_DA_LISTAGEM) {
+      try {
+        await sb.storage.from(bucket).remove(paths.slice(i, i + PAGINA_DA_LISTAGEM));
+      } catch {
+        /* derivada órfã: lixo invisível, não decide nada */
+      }
+    }
+  }
+  return true;
 }
 
 // Hard cap on a single fetched image, so a hostile/huge URL can't buffer an

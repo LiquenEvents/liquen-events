@@ -75,12 +75,13 @@ describe("a pergunta de remover um fornecedor", () => {
     ).not.toHaveBeenCalled();
   });
 
-  it("pergunta na janela da casa, diz o nome e avisa que não se desfaz", async () => {
+  it("pergunta na janela da casa, diz o nome e diz que fica 30 dias na Reciclagem", async () => {
     const user = userEvent.setup();
     await pedirParaRemover(user);
     const caixa = await screen.findByRole("dialog");
     expect(within(caixa).getByText(/Flores do Alentejo/)).toBeTruthy();
-    expect(within(caixa).getByText(/não pode ser anulada/i)).toBeTruthy();
+    // Fase R3: apagar já não é definitivo — e a pergunta di-lo.
+    expect(within(caixa).getByText(/30 dias na Reciclagem/i)).toBeTruthy();
     expect(within(caixa).getByRole("button", { name: /^Remover$/ })).toBeTruthy();
     expect(within(caixa).getByRole("button", { name: /^Cancelar$/ })).toBeTruthy();
   });

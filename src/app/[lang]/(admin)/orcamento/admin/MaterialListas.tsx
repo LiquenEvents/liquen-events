@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { MaterialItem } from "@/lib/material-types";
 import type { MaterialList, MaterialListItem } from "@/lib/material-list-types";
 import { quantidadePara, porCadaQuantos } from "@/lib/material-list-types";
 import { useToast } from "./Toast";
+import { useAnular } from "./ui/anular";
+import { useDepoisDeApagar } from "./ui/depois-de-apagar";
 import { Button, EmptyState, Field, PerguntaDestrutiva } from "./ui";
 import { useCachedList } from "./useCachedList";
 import { AvisoDeFalha } from "./AvisoDeFalha";
@@ -66,18 +68,6 @@ interface Pergunta {
 }
 
 /** O que se acabou de remover sem perguntar, e ainda dá para repor. */
-interface Anulavel {
-  /** O que aconteceu, para a tira o poder dizer: ««Escadote» saiu da lista.» */
-  texto: string;
-  repor: () => void;
-}
-
-/** Quanto tempo fica o «Anular» no ecrã, em milissegundos.
- *
- *  Oito segundos: dá para reparar que a linha desapareceu, ler qual era e
- *  decidir. Mais do que isto e deixa de ser uma janela para passar a ser um
- *  botão do ecrã, que fica lá a dizer que ainda há alguma coisa por decidir. */
-const MS_PARA_ANULAR = 8000;
 
 /** Gravou-se, mas o ecrã ficou a mostrar a versão anterior. Calar isto é o que
  *  faz alguém repetir a alteração — ou dar uma lista por vazia. */
@@ -97,8 +87,10 @@ export default function MaterialListas() {
   const [abertaId, setAbertaId] = useState<string | null>(null);
   /** A pergunta em curso — ver o comentário grande no topo do ficheiro. */
   const [aPerguntar, setAPerguntar] = useState<Pergunta | null>(null);
-  /** A remoção mais recente, enquanto ainda dá para a anular. */
-  const [anular, setAnular] = useState<Anulavel | null>(null);
+  /** O «Anular» da casa (`ui/anular.ts`, 10 s). Era uma tira própria de 8 s,
+   *  encostada à lista; passou ao aviso comum para ser igual em todo o lado. */
+  const anular = useAnular();
+  const depoisDeApagar = useDepoisDeApagar();
   const [novoNome, setNovoNome] = useState("");
   const [ocupado, setOcupado] = useState(false);
   /** O item escolhido no seletor de "acrescentar linha", por lista. */
@@ -109,15 +101,6 @@ export default function MaterialListas() {
     linhas.filter((l) => l.listId === listId).sort((a, b) => a.position - b.position);
 
   const temEssenciais = listas.some((l) => l.isDefault);
-
-  // O «Anular» some-se sozinho. A dependência é o objecto inteiro de propósito:
-  // cada remoção põe lá um objecto NOVO, portanto a segunda reinicia a contagem em
-  // vez de herdar os dois segundos que sobravam da primeira.
-  useEffect(() => {
-    if (!anular) return;
-    const relogio = setTimeout(() => setAnular(null), MS_PARA_ANULAR);
-    return () => clearTimeout(relogio);
-  }, [anular]);
 
   /**
    * Relê listas e linhas. `false` quando a leitura falhou — e aí não escreve
@@ -257,9 +240,10 @@ export default function MaterialListas() {
       titulo: `Apagar a lista «${lista.name}»?`,
       oQueSePerde: [
         `${quantas} ${quantas === 1 ? "linha" : "linhas"} de material — com as quantidades e o que está marcado como crítico`,
-        "as regras que apontem para ela passam a dizer «(lista apagada)»",
+        "as regras que a acrescentam vão com ela",
       ],
-      aviso: "As checklists já geradas a partir dela não mudam — são cópias. Não pode ser anulado.",
+      aviso:
+        "As checklists já geradas a partir dela não mudam — são cópias. Fica 30 dias na Reciclagem, de onde se repõe tal e qual, com as linhas e as regras.",
       rotulo: "Apagar a lista",
       fazer: () => apagar(lista),
     });
@@ -267,14 +251,16 @@ export default function MaterialListas() {
 
   async function apagar(lista: MaterialList) {
     setOcupado(true);
-    const { ok } = await gravar(
+    const { ok, corpo } = await gravar(
       `apagar a lista «${lista.name}»`,
       `/api/material/listas/${lista.id}`,
       { method: "DELETE" },
     );
     setOcupado(false);
     if (!ok) return;
-    toast("Lista apagada.", "success");
+    // Foi para a Reciclagem, com as linhas e as regras que a acrescentam: o
+    // aviso traz «Anular», que repõe tudo tal e qual.
+    depoisDeApagar(corpo, `Lista «${lista.name}» apagada.`, () => void recarregar());
     if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
   }
 
@@ -344,17 +330,15 @@ export default function MaterialListas() {
     });
     if (!ok) return;
     if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
-    setAnular({
-      texto: `«${nome}» saiu de «${lista.name}».`,
-      repor: () => void reporLinha(lista, linha, nome),
-    });
+    anular(`«${nome}» saiu de «${lista.name}».`, () => reporLinha(lista, linha, nome));
   }
 
   /** O outro lado do «Anular»: mete a linha de volta, com o que ela tinha. */
-  async function reporLinha(lista: MaterialList, linha: MaterialListItem, nome: string) {
-    // Sai do ecrã primeiro: sem isto, dois toques seguidos no «Anular» mandavam
-    // duas linhas iguais para a lista.
-    setAnular(null);
+  async function reporLinha(
+    lista: MaterialList,
+    linha: MaterialListItem,
+    nome: string,
+  ): Promise<boolean> {
     const { ok } = await gravar(
       `repor «${nome}» em «${lista.name}»`,
       `/api/material/listas/${lista.id}`,
@@ -371,8 +355,10 @@ export default function MaterialListas() {
         }),
       },
     );
-    if (!ok) return;
+    // O `gravar` já disse porquê — `false` para o «Anular» não dizer «Anulado.».
+    if (!ok) return false;
     if (!(await recarregar())) toast(AVISO_RELEITURA, "error");
+    return true;
   }
 
   // A falha primeiro: sem isto, uma leitura que rebentou passava por "ainda
@@ -609,24 +595,6 @@ export default function MaterialListas() {
                         })}
                       </ul>
                     )}
-
-                    {/* ── A JANELA PARA ANULAR ────────────────────────────
-                        Encostada à lista de onde a linha saiu, e não num aviso
-                        no canto do ecrã: é aqui que os olhos estão quando a
-                        linha desaparece. `role="status"` para quem não vê o
-                        ecrã ouvir que saiu, e o quê. */}
-                    {anular && (
-                      <div
-                        role="status"
-                        className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-[var(--bo-tinta-6)] px-3 py-2 text-xs text-[var(--bo-tinta-72)]"
-                      >
-                        <span>{anular.texto}</span>
-                        <Button size="sm" variant="ghost" onClick={anular.repor}>
-                          Anular
-                        </Button>
-                      </div>
-                    )}
-
                     <div className="mt-3 flex flex-wrap items-end gap-2">
                       <Field
                         as="select"

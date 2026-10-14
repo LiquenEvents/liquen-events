@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Quote, CalendarEvent, CalendarEventKind } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
 import { useToast } from "./Toast";
+import { useAnular } from "./ui/anular";
+import { useDepoisDeApagar } from "./ui/depois-de-apagar";
 import { isDateKey, todayKey } from "./util";
 import {
   Button,
@@ -591,6 +593,8 @@ function LinhasDoDia({
 
 export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
   const { toast } = useToast();
+  const anular = useAnular();
+  const depoisDeApagar = useDepoisDeApagar();
   const [cursor, setCursor] = useState(() => {
     const d = new Date();
     return new Date(d.getFullYear(), d.getMonth(), 1);
@@ -777,7 +781,18 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
       return false;
     }
     setEvents((prev) => [...prev, ev]);
-    toast("Adicionado ao calendário", "success");
+    // Acrescentar (e duplicar, que passa por aqui) anula-se apagando o que se
+    // criou: nada mais aponta para uma marcação acabada de nascer.
+    anular(`«${ev.title}» adicionado ao calendário.`, async () => {
+      setEvents((prev) => prev.filter((e) => e.id !== ev.id));
+      const { ok: tirou } = await gravar(
+        `tirar «${ev.title}» do calendário`,
+        `/api/calendario/${ev.id}`,
+        { method: "DELETE" },
+      );
+      if (!tirou) setEvents((prev) => (prev.some((e) => e.id === ev.id) ? prev : [...prev, ev]));
+      return tirou;
+    });
     fecharOModal();
     return true;
   }
@@ -807,9 +822,11 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
     const posicao = events.findIndex((e) => e.id === id);
     const removido = posicao < 0 ? null : events[posicao];
     setEvents((prev) => prev.filter((e) => e.id !== id));
-    const { ok } = await gravar(`remover «${title}» do calendário`, `/api/calendario/${id}`, {
-      method: "DELETE",
-    });
+    const { ok, corpo: apagado } = await gravar(
+      `remover «${title}» do calendário`,
+      `/api/calendario/${id}`,
+      { method: "DELETE" },
+    );
     if (!ok && removido) {
       setEvents((prev) => {
         if (prev.some((e) => e.id === id)) return prev;
@@ -817,6 +834,38 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
         return [...prev.slice(0, onde), removido, ...prev.slice(onde)];
       });
     }
+    if (!ok || !removido) return;
+    /* ── «ANULAR»: PELA RECICLAGEM, TAL E QUAL ──────────────────────────────
+       Com a Reciclagem ligada (R3), a marcação volta de lá com o MESMO id. */
+    const naReciclagem = (apagado as { reciclagem?: unknown } | null)?.reciclagem;
+    if (naReciclagem && typeof naReciclagem === "object") {
+      depoisDeApagar(apagado, `«${title}» removido do calendário.`, () => void recarregar());
+      return;
+    }
+    /* Sem ela (a migração ainda não correu), o «Anular» RECRIA a marcação —
+       com um id novo, o que não faz mal a ninguém: nada aponta para o id de
+       uma marcação. A ligação às datas-chave de um «Ganho» vive dentro da
+       NOTA (`calendar-store.ts`), que vai igual. */
+    anular(`«${title}» removido do calendário.`, async () => {
+      const { ok: voltou, corpo } = await gravar(
+        `repor «${title}» no calendário`,
+        "/api/calendario",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: removido.title,
+            kind: removido.kind,
+            time: removido.time ?? "",
+            note: removido.note ?? "",
+            date: removido.date,
+          }),
+        },
+      );
+      const ev = corpo as CalendarEvent | null;
+      if (voltou && ev?.id) setEvents((prev) => [...prev, ev]);
+      return voltou;
+    });
   }
 
   // Open the "add event" modal for a given day (shared by click + keyboard).
@@ -2347,6 +2396,7 @@ export default function Calendario({ quotes, onOpen, onFazerProposta }: Props) {
         aberto={!!aRemover}
         onFechar={() => setARemover(null)}
         titulo={`Remover «${aRemover?.title ?? ""}» do calendário?`}
+        aviso="Fica 30 dias na Reciclagem, de onde se repõe tal e qual."
         rotuloConfirmar="Remover"
         // Fecha primeiro e só depois age: a grelha é optimista — a marcação sai
         // logo e volta se o servidor recusar.

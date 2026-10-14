@@ -16,7 +16,6 @@ import type { Quote } from "@/lib/orcamento/types";
  */
 vi.setConfig({ testTimeout: 20_000 });
 
-
 /**
  * ════════════════════════════════════════════════════════════════════════════
  * «TENS A CERTEZA?» NÃO É UMA PERGUNTA
@@ -163,6 +162,32 @@ describe("AdminClient — apagar um pedido", () => {
 
     await waitFor(() => expect(chamadas.some((c) => c.metodo === "DELETE")).toBe(true));
     await waitFor(() => expect(avisos.ditos.join(" ")).toContain("Ana Marques"));
+  });
+
+  it("a pergunta diz que fica 30 dias na Reciclagem, e o aviso também (R3b)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        const metodo = init?.method ?? "GET";
+        chamadas.push({ metodo, url: String(url) });
+        if (String(url).includes("/api/orcamento/LIQ-7") && metodo === "GET") {
+          return resposta(200, PEDIDO);
+        }
+        if (metodo === "DELETE") return resposta(200, { ok: true, reciclagem: { id: "r7" } });
+        if (metodo === "GET") return resposta(200, []);
+        return resposta(200, { ok: true });
+      }),
+    );
+    await abrirMenuDoPedido();
+    await userEvent.click(await screen.findByText(/^Apagar pedido$/i));
+    const caixa = await screen.findByRole("dialog");
+    expect(within(caixa).getByText(/Fica 30 dias na Reciclagem/)).toBeTruthy();
+    await userEvent.click(within(caixa).getByRole("button", { name: /^Apagar o pedido$/i }));
+    await waitFor(() =>
+      expect(avisos.ditos.join(" ")).toContain(
+        "Pedido de Ana Marques apagado. Fica 30 dias na Reciclagem.",
+      ),
+    );
   });
 
   it("uma falha ao apagar diz porquê e nomeia o pedido", async () => {

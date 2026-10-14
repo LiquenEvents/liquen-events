@@ -23,12 +23,36 @@ export interface Photo extends PhotoSrc {
    * primeira janela, custa 151 bytes cada).
    */
   color?: string;
+  /**
+   * O que a galeria «vê» na fotografia (gallery-meta.json, gerado no build por
+   * scripts/galeria-analise.mjs). Só vem quando há — a maioria das fotos não
+   * tem cena nem é a preto e branco, e não paga um byte por isso.
+   *
+   *  · `cena` — fotos com a mesma cena são o mesmo momento: a ordem afasta-as;
+   *  · `pb` — a preto e branco: nunca duas seguidas;
+   *  · `destaque` — serve para o mosaico grande do topo;
+   *  · `foco` — o ponto de interesse (`"x% y%"`), para onde se recorta.
+   */
+  cena?: string;
+  pb?: boolean;
+  destaque?: boolean;
+  foco?: string;
 }
 
-/** The event/collection bucket a photo belongs to (named couple, else its
-    category). Photos with no bucket match still cluster by category. */
+/**
+ * O evento a que a foto pertence: o casal, quando tem nome (`collections.json`);
+ * senão a PUBLICAÇÃO do Instagram de onde veio (`galeria-instagram-<n>-…`, uma
+ * publicação é um casamento ou um evento); senão a categoria.
+ *
+ * Sem a publicação, as 436 fotos do Instagram caíam todas em «Casamento» ou
+ * «Evento», e nada impedia três fotos do mesmo casamento de ficarem lado a lado.
+ */
+const PUBLICACAO = /\/galeria-instagram-(\d+)-/;
 export function bucketKey(p: Photo): string {
-  return collectionFor(p.src) ?? `cat:${p.label}`;
+  const casal = collectionFor(p.src);
+  if (casal) return casal;
+  const publicacao = PUBLICACAO.exec(p.src);
+  return publicacao ? `ig:${publicacao[1]}` : `cat:${p.label}`;
 }
 
 // Stable per-string hash → [0,1). Deterministic (same on server + client, so
@@ -90,35 +114,98 @@ export function interleaveByCollection(list: Photo[], seed = ""): Photo[] {
     }
   }
   ranked.sort((a, b) => a.rank - b.rank || hashUnit(a.p.src + seed) - hashUnit(b.p.src + seed));
-  return deAdjacent(ranked.map((r) => r.p));
+  return comMosaico(deAdjacent(ranked.map((r) => r.p)));
+}
+
+/** Quantos lugares separam duas fotos do mesmo evento, e da mesma cena. */
+export const JANELA_EVENTO = 3;
+/** ~4 filas de 3 colunas: «mostra todas, afastadas», nas palavras dela. */
+export const JANELA_CENA = 12;
+
+/**
+ * A foto `p` pode ficar logo a seguir a `antes` (as que já estão na lista)?
+ *  · o mesmo evento não se repete nas `JANELA_EVENTO` anteriores;
+ *  · a mesma cena não se repete nas `JANELA_CENA` anteriores;
+ *  · duas fotos a preto e branco nunca ficam seguidas.
+ */
+function cabeAqui(antes: Photo[], i: number, p: Photo): boolean {
+  const evento = bucketKey(p);
+  for (let k = Math.max(0, i - JANELA_EVENTO); k < i; k++) {
+    if (bucketKey(antes[k]) === evento) return false;
+  }
+  if (p.cena) {
+    for (let k = Math.max(0, i - JANELA_CENA); k < i; k++) {
+      if (antes[k].cena === p.cena) return false;
+    }
+  }
+  if (p.pb && i > 0 && antes[i - 1].pb) return false;
+  return true;
 }
 
 /**
- * Final safety pass: keep same-event photos apart. Beyond the immediate
- * neighbour, it enforces a WINDOW — no photo may share its event with any of the
- * `window` photos just before it — so a big shoot never shows two of its frames
- * a tile or two apart (which in a 2–3 column masonry reads as "fotos do mesmo
- * evento juntas"). For each violation it pulls forward the nearest later photo
- * whose event isn't in that window. When no such photo exists (the tail, or a
- * category that is a single shoot) it's left as-is — best effort.
+ * Final safety pass. For each position that breaks a rule (`cabeAqui`), it
+ * pulls forward the nearest later photo that fits there. When none fits (the
+ * tail, or a category that is a single shoot) it's left as-is — best effort.
  */
-function deAdjacent(list: Photo[], window = 3): Photo[] {
+function deAdjacent(list: Photo[], desde = 1): Photo[] {
   const out = [...list];
-  for (let i = 1; i < out.length; i++) {
-    const recent = new Set<string>();
-    for (let k = Math.max(0, i - window); k < i; k++) recent.add(bucketKey(out[k]));
-    if (!recent.has(bucketKey(out[i]))) continue;
-    let swap = -1;
+  for (let i = desde; i < out.length; i++) {
+    if (cabeAqui(out, i, out[i])) continue;
     for (let j = i + 1; j < out.length; j++) {
-      if (!recent.has(bucketKey(out[j]))) {
-        swap = j;
+      if (cabeAqui(out, i, out[j])) {
+        const [moved] = out.splice(j, 1);
+        out.splice(i, 0, moved);
         break;
       }
     }
-    if (swap !== -1) {
-      const [moved] = out.splice(swap, 1);
-      out.splice(i, 0, moved);
-    }
   }
   return out;
+}
+
+/** Até onde se procura a foto do mosaico grande: as primeiras desta ordem,
+ *  para o destaque mudar de visita para visita como o resto. */
+const PROCURA_DESTAQUE = 24;
+
+/**
+ * O MOSAICO DO TOPO ESCOLHE A MELHOR.
+ *
+ * As cinco primeiras da ordem são o mosaico: a 0 é o 2×2, as quatro seguintes
+ * as satélites (`GaleriaClient`). Até aqui calhava lá o que a sorte mandasse —
+ * uma foto ao alto, a preto e branco ou tremida no maior quadrado da página.
+ *
+ *  · para o 2×2 vem a primeira, entre as `PROCURA_DESTAQUE` primeiras, que
+ *    serve de destaque (deitada, a cores, nítida — `serveParaDestaque`);
+ *  · para as satélites, as primeiras que não são da mesma cena nem do mesmo
+ *    evento que o 2×2, e no máximo uma a preto e branco.
+ *
+ * Só reordena o princípio: o resto da lista fica como estava. Sem dados de
+ * análise (`destaque` em nenhuma), devolve a lista tal e qual.
+ */
+function comMosaico(list: Photo[]): Photo[] {
+  const limite = Math.min(list.length, PROCURA_DESTAQUE);
+  const iDestaque = list.slice(0, limite).findIndex((p) => p.destaque);
+  if (iDestaque < 0) return list;
+  const resto = [...list];
+  const [grande] = resto.splice(iDestaque, 1);
+  const satelites: Photo[] = [];
+  const eventos = new Set([bucketKey(grande)]);
+  const cenas = new Set(grande.cena ? [grande.cena] : []);
+  let pb = grande.pb ? 1 : 0;
+  for (let j = 0; j < resto.length && satelites.length < 4; ) {
+    const p = resto[j];
+    const serve =
+      !eventos.has(bucketKey(p)) && !(p.cena && cenas.has(p.cena)) && !(p.pb && pb >= 1);
+    if (!serve) {
+      j++;
+      continue;
+    }
+    resto.splice(j, 1);
+    satelites.push(p);
+    eventos.add(bucketKey(p));
+    if (p.cena) cenas.add(p.cena);
+    if (p.pb) pb++;
+  }
+  // Tirar cinco do princípio mexe nos vizinhos do resto: a mesma passagem de
+  // há pouco, a partir da sexta, volta a pô-los de acordo com as regras.
+  return deAdjacent([grande, ...satelites, ...resto], 1 + satelites.length);
 }

@@ -43,7 +43,13 @@ const st = vi.hoisted(() => ({
   /** O aquecimento dos PDF: o que devolveu, e se rebentou. */
   aquecimentos: [] as number[],
   aquecimentoRebenta: false,
+  /** A limpeza da Reciclagem: quantas tirou, e se rebentou. */
+  reciclagemRebenta: false,
+  reciclagemLimpezas: 0,
   enviados: [] as { subject: string; anexos: string[] }[],
+  /** O `sendMail` devolve `sent: false` (SMTP por configurar, conta bloqueada). */
+  emailNaoSai: false,
+  retencoes: 0,
   carimbos: [] as unknown[],
 }));
 
@@ -78,6 +84,19 @@ vi.mock("@/lib/aquecimento-de-pdf", () => ({
     };
   }),
 }));
+vi.mock("@/lib/retencao", () => ({
+  correrRetencao: vi.fn(async () => {
+    st.retencoes++;
+    return { apagados: 0 };
+  }),
+}));
+vi.mock("@/lib/reciclagem", () => ({
+  limparExpiradas: vi.fn(async () => {
+    if (st.reciclagemRebenta) throw new Error("a base não responde");
+    st.reciclagemLimpezas++;
+    return { apagadas: 2 };
+  }),
+}));
 vi.mock("@/lib/mail", () => ({
   MAIL_TO: "dona@liquen.test",
   sendMail: vi.fn(async (m: { subject: string; attachments?: { filename: string }[] }) => {
@@ -85,7 +104,7 @@ vi.mock("@/lib/mail", () => ({
       subject: m.subject,
       anexos: (m.attachments ?? []).map((a) => a.filename),
     });
-    return { sent: true };
+    return { sent: !st.emailNaoSai };
   }),
 }));
 
@@ -110,6 +129,10 @@ beforeEach(() => {
   st.carimbos = [];
   st.aquecimentos = [];
   st.aquecimentoRebenta = false;
+  st.reciclagemRebenta = false;
+  st.reciclagemLimpezas = 0;
+  st.emailNaoSai = false;
+  st.retencoes = 0;
   vi.stubEnv("CRON_SECRET", "segredo");
   vi.clearAllMocks();
 });
@@ -169,6 +192,30 @@ describe("o carimbo de «esta cópia chegou»", () => {
    * nenhuma é um 401 deixar carimbo: seria o painel a dizer «a cópia está em
    * dia» no exacto dia em que ela deixou de correr.
    */
+  /**
+   * O `sendMail` não lança quando o email não sai — devolve `sent: false`. E a
+   * rota seguia como se a cópia tivesse saído: carimbava, aplicava a retenção
+   * e esvaziava a Reciclagem, num dia SEM cópia nenhuma. É o contrário da
+   * promessa «nada é apagado sem estar dentro da cópia desse mesmo dia».
+   */
+  it("se o email não sai, não carimba, não aplica a retenção e não esvazia a Reciclagem", async () => {
+    st.emailNaoSai = true;
+    const res = await GET(req("Bearer segredo"));
+    expect(res.status).toBe(502);
+    expect(await res.json()).toMatchObject({ ok: false, sent: false });
+    expect(st.carimbos).toHaveLength(0);
+    expect(st.retencoes).toBe(0);
+    expect(st.reciclagemLimpezas).toBe(0);
+    expect(st.aquecimentos).toHaveLength(0);
+  });
+
+  it("com o email a sair, a retenção e a Reciclagem correm como antes", async () => {
+    const res = await GET(req("Bearer segredo"));
+    expect(res.status).toBe(200);
+    expect(st.retencoes).toBe(1);
+    expect(st.reciclagemLimpezas).toBe(1);
+  });
+
   it("um pedido recusado não carimba coisa nenhuma", async () => {
     const res = await GET(req());
     expect(res.status).toBe(401);
@@ -216,6 +263,23 @@ describe("o aquecimento dos PDF viaja com a cópia", () => {
     expect(st.enviados, "a cópia não seguiu por causa do aquecimento").toHaveLength(1);
     expect(st.carimbos, "a cópia deixou de ficar carimbada").toHaveLength(1);
     expect(await res.json()).toMatchObject({ ok: true, aquecimento: null });
+  });
+
+  it("limpa a Reciclagem dos 30 dias, DEPOIS de a cópia seguir", async () => {
+    st.authed = true;
+    const res = await GET(req());
+    expect(st.enviados).toHaveLength(1);
+    expect(st.reciclagemLimpezas).toBe(1);
+    expect(await res.json()).toMatchObject({ reciclagem: { apagadas: 2 } });
+  });
+
+  it("uma limpeza da Reciclagem que rebenta NÃO impede a cópia de seguir", async () => {
+    st.authed = true;
+    st.reciclagemRebenta = true;
+    const res = await GET(req());
+    expect(res.status).toBe(200);
+    expect(st.enviados, "a cópia não seguiu por causa da Reciclagem").toHaveLength(1);
+    expect(await res.json()).toMatchObject({ ok: true, reciclagem: null });
   });
 
   it("um pedido recusado não aquece nada", async () => {

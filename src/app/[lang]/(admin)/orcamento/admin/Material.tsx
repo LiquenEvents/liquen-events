@@ -10,6 +10,8 @@ import {
 } from "@/lib/material-types";
 import type { PlanoCsv } from "@/lib/material-csv";
 import { useToast } from "./Toast";
+import { useAnular } from "./ui/anular";
+import { useDepoisDeApagar } from "./ui/depois-de-apagar";
 import { downloadCsv, dateStamp } from "./export";
 import {
   Button,
@@ -217,6 +219,8 @@ export default function Material() {
 
 function Catalogo() {
   const { toast } = useToast();
+  const anular = useAnular();
+  const depoisDeApagar = useDepoisDeApagar();
   const {
     data: items = [],
     setData: setItems,
@@ -345,12 +349,31 @@ function Catalogo() {
     setItems((prev) => [...prev, corpo].sort((a, b) => a.name.localeCompare(b.name)));
     setForm(EMPTY_FORM);
     setAdding(false);
-    toast("Material adicionado.", "success");
+    // Anula-se apagando o que se criou: um item acabado de nascer ainda não
+    // está em lista base nenhuma.
+    const criado = corpo;
+    anular(`«${criado.name}» adicionado ao catálogo.`, async () => {
+      setItems((prev) => prev.filter((i) => i.id !== criado.id));
+      const { ok: tirou } = await gravar(
+        `tirar «${criado.name}» do catálogo`,
+        `/api/material/${criado.id}`,
+        { method: "DELETE" },
+      );
+      if (!tirou) {
+        setItems((prev) =>
+          prev.some((i) => i.id === criado.id)
+            ? prev
+            : [...prev, criado].sort((a, b) => a.name.localeCompare(b.name)),
+        );
+      }
+      return tirou;
+    });
   }
 
   async function saveEdit(id: string) {
     const payload = toPayload(editForm);
     if (!payload.name) return;
+    const antes = items.find((i) => i.id === id);
     setSaving(true);
     const { ok, corpo } = await gravar(
       `guardar as alterações a «${payload.name}»`,
@@ -371,7 +394,26 @@ function Catalogo() {
     }
     setItems((prev) => prev.map((i) => (i.id === id ? corpo : i)));
     setEditingId(null);
-    toast("Guardado.", "success");
+    if (!antes) {
+      toast("Guardado.", "success");
+      return;
+    }
+    // O «Anular» grava o item como estava, pelo mesmo PATCH.
+    anular(`«${payload.name}» guardado.`, async () => {
+      const { ok: voltou, corpo: reposto } = await gravar(
+        `repor «${antes.name}» como estava`,
+        `/api/material/${id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(toPayload(fromItem(antes))),
+        },
+      );
+      if (voltou && pareceItem(reposto)) {
+        setItems((prev) => prev.map((i) => (i.id === id ? reposto : i)));
+      }
+      return voltou;
+    });
   }
 
   /**
@@ -396,7 +438,8 @@ function Catalogo() {
         }`,
         "nas listas base, a linha dele passa a dizer «(item removido do catálogo)»",
       ],
-      aviso: "As checklists já geradas não mudam — foram copiadas. Não pode ser anulado.",
+      aviso:
+        "As checklists já geradas não mudam — foram copiadas. Fica 30 dias na Reciclagem, de onde se repõe tal e qual.",
       rotulo: "Remover do catálogo",
       fazer: () => remove(i.id),
     });
@@ -406,9 +449,14 @@ function Catalogo() {
     const removido = items.find((i) => i.id === id);
     if (!removido) return;
     setItems((prev) => prev.filter((i) => i.id !== id));
-    const { ok } = await gravar(`remover «${removido.name}» do catálogo`, `/api/material/${id}`, {
-      method: "DELETE",
-    });
+    const { ok, corpo } = await gravar(
+      `remover «${removido.name}» do catálogo`,
+      `/api/material/${id}`,
+      { method: "DELETE" },
+    );
+    // Foi para a Reciclagem (com as regras que apontavam para ele): o aviso
+    // traz «Anular», que repõe tudo tal e qual.
+    if (ok) depoisDeApagar(corpo, `«${removido.name}» saiu do catálogo.`, () => void refresh());
     if (!ok) {
       // Reversão: o catálogo no ecrã não pode divergir do que está gravado.
       //

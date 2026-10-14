@@ -44,6 +44,17 @@ import { promises as fs } from "fs";
 import { createHash } from "crypto";
 import path from "path";
 import os from "os";
+import { spawnSync } from "child_process";
+import { createWriteStream } from "fs";
+import { Readable } from "stream";
+import { pipeline } from "stream/promises";
+import {
+  VERSAO_ANALISE,
+  agruparCenas,
+  analisarFoto,
+  quantil,
+  serveParaDestaque,
+} from "./galeria-analise.mjs";
 
 const ROOT = process.cwd();
 const PUBLIC = path.join(ROOT, "public");
@@ -196,6 +207,94 @@ try {
 }
 
 /**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O PACOTE DO GITHUB — A CACHE QUE NÃO DEPENDE DA VERCEL
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A 13/10 nenhum deploy acabava: a Vercel restaurou uma cache de build ANTIGA,
+ * sem as miniaturas da galeria, e este script pôs-se a codificar as ~1000
+ * fotos (5 larguras × WebP e AVIF). Medido: ~10 s de processador por foto —
+ * numa máquina de 2 núcleos, hora e meia. A Vercel corta aos 45 minutos, e o
+ * registo ficava mudo até lá. Era o mesmo defeito de agosto («meia hora de
+ * build, em cada build»), que a cache da Vercel tinha escondido — até ao dia em
+ * que ela não veio.
+ *
+ * A CI do GitHub tem a SUA cache destas miniaturas (`actions/cache`), sempre
+ * quente, e publica-a como um ficheiro do repositório (a release
+ * `pregen-cache`, ver .github/workflows/ci.yml). Quando aqui faltam muitas,
+ * descarrega-se esse pacote — segundos — e só se codifica o que for mesmo
+ * novo. Sem pacote (rede em baixo, ainda não publicado), segue como antes.
+ *
+ * O pacote só ACRESCENTA: o que já está nesta cache não é tocado, e cada
+ * entrada continua a ser conferida pelo carimbo do CONTEÚDO da fotografia —
+ * um ficheiro do pacote que não corresponda à foto de agora é recodificado.
+ */
+const LIMIAR_DO_PACOTE = 25;
+const URL_DO_PACOTE =
+  process.env.PREGEN_PACOTE_URL ||
+  "https://github.com/LiquenEvents/liquen-events/releases/download/pregen-cache/pregen-gallery.tar";
+{
+  const emFalta = [...byKey.keys()].filter((k) => !index[k]).length;
+  if (emFalta > LIMIAR_DO_PACOTE && !process.env.PREGEN_SEM_PACOTE) {
+    const t = Date.now();
+    console.log(`pregen-gallery: faltam ${emFalta} fotos na cache — a descarregar o pacote…`);
+    try {
+      index = await juntarOPacote(index);
+      const ainda = [...byKey.keys()].filter((k) => !index[k]).length;
+      console.log(
+        `pregen-gallery: pacote junto em ${((Date.now() - t) / 1000).toFixed(1)}s — ` +
+          `faltam agora ${ainda}`,
+      );
+    } catch (err) {
+      console.warn(`pregen-gallery: sem pacote (${err.message}) — segue a codificar tudo`);
+    }
+  }
+}
+
+/** Descarrega o pacote, abre-o ao lado da cache e junta só o que falta. */
+async function juntarOPacote(atual) {
+  const resposta = await fetch(URL_DO_PACOTE, { signal: AbortSignal.timeout(240_000) });
+  if (!resposta.ok || !resposta.body) throw new Error(`HTTP ${resposta.status}`);
+  const pasta = path.join(ROOT, ".next", "cache", "pregen-pacote");
+  await fs.rm(pasta, { recursive: true, force: true });
+  await fs.mkdir(pasta, { recursive: true });
+  const tar = path.join(pasta, "pacote.tar");
+  // Às postas para o disco: são ~600 MB, que não têm de passar pela memória.
+  await pipeline(Readable.fromWeb(resposta.body), createWriteStream(tar));
+  const r = spawnSync("tar", ["-xf", tar, "-C", pasta], { stdio: "inherit" });
+  if (r.status !== 0) throw new Error("tar falhou");
+  await fs.rm(tar, { force: true });
+
+  const doPacote = JSON.parse(await fs.readFile(path.join(pasta, "index.json"), "utf8"));
+  const junto = { ...atual };
+  for (const [chave, entrada] of Object.entries(doPacote)) {
+    if (junto[chave] || !byKey.has(chave)) continue;
+    // Só entra se TODOS os ficheiros da chave vieram no pacote; senão a
+    // entrada fica de fora e a foto é codificada como antes.
+    const nomes = WIDTHS.flatMap((w) => FORMATOS.map((f) => `${chave}-${w}.${f.ext}`));
+    const temTudo = (
+      await Promise.all(
+        nomes.map((n) =>
+          fs.access(path.join(pasta, n)).then(
+            () => true,
+            () => false,
+          ),
+        ),
+      )
+    ).every(Boolean);
+    if (!temTudo) continue;
+    for (const n of nomes) {
+      const destino = path.join(CACHE_DIR, n);
+      await fs.rm(destino, { force: true });
+      await fs.rename(path.join(pasta, n), destino);
+    }
+    junto[chave] = entrada;
+  }
+  await fs.rm(pasta, { recursive: true, force: true });
+  return junto;
+}
+
+/**
  * Carimbo de uma fonte: muda se o CONTEÚDO do ficheiro mudar, ou se as
  * larguras/qualidade mudarem — nesse caso toda a galeria é regenerada.
  *
@@ -242,6 +341,9 @@ const countByWidth = Object.fromEntries(WIDTHS.map((w) => [w, 0]));
 const failures = [];
 /** src -> cor média, escrito em tile-colors.json (ver mais abaixo). */
 const colors = {};
+/** src -> o que a galeria «vê» na foto (galeria-analise.mjs), para
+ *  gallery-meta.json (ver mais abaixo). */
+const analises = {};
 
 async function link(from, to) {
   await fs.rm(to, { force: true });
@@ -253,10 +355,29 @@ async function link(from, to) {
   }
 }
 
+/** A análise de uma foto, com a versão; uma falha não pára o build — a foto
+ *  fica só sem os dados da galeria inteligente (ordem e recorte de antes). */
+async function analisar(buf, src) {
+  try {
+    return { v: VERSAO_ANALISE, ...(await analisarFoto(sharp, buf)) };
+  } catch (err) {
+    console.warn(`  análise de ${src} falhou: ${err.message}`);
+    return undefined;
+  }
+}
+
 async function worker() {
   for (;;) {
     const k = i++;
     if (k >= sources.length) return;
+    // O registo não pode ficar mudo: de 100 em 100, quantas vão e quantas
+    // foram codificadas (as outras vieram da cache).
+    if (k > 0 && k % 100 === 0) {
+      console.log(
+        `pregen-gallery: ${k}/${sources.length} — ${encoded} codificadas, ` +
+          `${((Date.now() - t0) / 1000).toFixed(0)}s`,
+      );
+    }
     const src = sources[k];
     const key = galleryKey(src);
 
@@ -304,6 +425,7 @@ async function worker() {
 
     let want;
     let color;
+    let analise;
     try {
       /**
        * UM read do original, que serve para as duas coisas: o carimbo que
@@ -383,9 +505,20 @@ async function worker() {
         // original.
         const px = await sharp(smallest).resize(1, 1, { fit: "cover" }).raw().toBuffer();
         color = "#" + [px[0], px[1], px[2]].map((v) => v.toString(16).padStart(2, "0")).join("");
+        analise = await analisar(smallest, src);
         encoded++;
       } else {
         reused++;
+        // A análise é da mesma miniatura de 384: quando a cache acerta mas a
+        // análise é de outra versão (ou não existe), refaz-se só ela, a partir
+        // do ficheiro que já lá está — sem voltar a codificar nada.
+        analise = entry.analise?.v === VERSAO_ANALISE ? entry.analise : undefined;
+        if (!analise) {
+          analise = await analisar(
+            await fs.readFile(path.join(CACHE_DIR, `${key}-${WIDTHS[0]}.webp`)),
+            src,
+          );
+        }
       }
     } finally {
       await fh.close();
@@ -406,8 +539,9 @@ async function worker() {
         }
       }
     }
-    nextIndex[key] = { stamp: want, color };
+    nextIndex[key] = { stamp: want, color, ...(analise ? { analise } : {}) };
     colors[src] = color;
+    if (analise) analises[src] = analise;
   }
 }
 
@@ -554,6 +688,58 @@ try {
   colorsChanged = true;
 }
 if (colorsChanged) await fs.writeFile(COLORS_FILE, colorsJson, "utf8");
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * gallery-meta.json — O QUE A GALERIA «VÊ» EM CADA FOTOGRAFIA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Pedido dela («espetacularmente inteligente»; para as quase iguais, «mostra
+ * todas, afastadas»). Por foto da galeria, só o que é preciso, e só quando há:
+ *
+ *  · `c`  — a cena: as fotos com o mesmo `c` são o mesmo momento (ver
+ *           `mesmaCena` em galeria-analise.mjs) e a ordem afasta-as;
+ *  · `pb` — a preto e branco: nunca duas seguidas;
+ *  · `d`  — serve para o mosaico grande do topo (deitada, a cores, nítida);
+ *  · `f`  — o ponto de interesse (`"x,y"` em %), quando não é o centro: é para
+ *           onde se recortam o mosaico e as miniaturas do lightbox.
+ *
+ * A impressão visual e a nitidez ficam no índice da cache, não aqui: o browser
+ * não precisa delas. Versionado e só reescrito quando muda, como o
+ * tile-colors.json, pelas mesmas razões.
+ */
+const META_FILE = path.join(ROOT, "src", "app", "[lang]", "(site)", "galeria", "gallery-meta.json");
+const daGaleria = [...GALLERY_SRCS].filter((src) => analises[src]);
+const cenas = agruparCenas(
+  daGaleria.map((src) => ({ src, h: analises[src].h, cor: colors[src], pb: analises[src].pb })),
+);
+const nitidezMinima = quantil(
+  daGaleria.map((src) => analises[src].n),
+  0.25,
+);
+const meta = {};
+for (const src of daGaleria.sort()) {
+  const a = analises[src];
+  const m = {};
+  if (cenas.has(src)) m.c = cenas.get(src);
+  if (a.pb) m.pb = 1;
+  if (serveParaDestaque(a, a.r, nitidezMinima)) m.d = 1;
+  if (a.f && a.f !== "50,50") m.f = a.f;
+  if (Object.keys(m).length) meta[src] = m;
+}
+const metaJson = JSON.stringify(meta, null, 2) + "\n";
+let metaChanged = false;
+try {
+  metaChanged = (await fs.readFile(META_FILE, "utf8")) !== metaJson;
+} catch {
+  metaChanged = true;
+}
+if (metaChanged) await fs.writeFile(META_FILE, metaJson, "utf8");
+console.log(
+  `  gallery-meta.json: ${daGaleria.length} fotos analisadas · ${new Set(cenas.values()).size} cenas` +
+    ` (${cenas.size} fotos) · ${Object.values(meta).filter((m) => m.pb).length} P&B` +
+    ` · ${Object.values(meta).filter((m) => m.d).length} servem o destaque`,
+);
 
 /**
  * ════════════════════════════════════════════════════════════════════════════

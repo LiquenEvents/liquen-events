@@ -90,13 +90,32 @@ vi.mock("@/lib/proposals-store", () =>
     "updateProposal",
   ]),
 );
+vi.mock("@/lib/reciclagem-store", () =>
+  H.build("reciclagem-store", [
+    "guardarNaReciclagem",
+    "listarReciclagem",
+    "obterDaReciclagem",
+    "tirarDaReciclagem",
+  ]),
+);
 vi.mock("@/lib/tasks-store", () =>
-  H.build("tasks-store", ["createTask", "deleteTask", "listTasks", "updateTask"]),
+  H.build("tasks-store", [
+    "createTask",
+    "deleteTask",
+    "listTasks",
+    "updateTask",
+    "obterTarefa",
+    "reporTarefa",
+  ]),
 );
 vi.mock("@/lib/calendar-store", () =>
-  H.build("calendar-store", ["createCalendarEvent", "deleteCalendarEvent"], {
-    listCalendarEvents: H.afn("calendar-store.listCalendarEvents", async () => []),
-  }),
+  H.build(
+    "calendar-store",
+    ["createCalendarEvent", "deleteCalendarEvent", "obterEvento", "reporEvento"],
+    {
+      listCalendarEvents: H.afn("calendar-store.listCalendarEvents", async () => []),
+    },
+  ),
 );
 vi.mock("@/lib/suppliers-store", () =>
   H.build("suppliers-store", [
@@ -104,30 +123,52 @@ vi.mock("@/lib/suppliers-store", () =>
     "deleteSupplier",
     "listSuppliers",
     "updateSupplier",
+    "obterFornecedor",
+    "reporFornecedor",
   ]),
 );
 vi.mock("@/lib/inventory-store", () =>
-  H.build("inventory-store", ["createItem", "deleteItem", "listItems", "updateItem"], {
-    PROP_CATEGORIES: ["Outro"],
-  }),
+  H.build(
+    "inventory-store",
+    ["createItem", "deleteItem", "listItems", "updateItem", "getItem", "reporItem"],
+    {
+      PROP_CATEGORIES: ["Outro"],
+    },
+  ),
 );
 // Material de logística: catálogo e listas base. Simulados como os outros —
 // sem isto, a auditoria só conseguia afirmar que a rota devolve 401, e não a
 // parte que interessa, que é NENHUMA escrita ter acontecido antes disso.
 vi.mock("@/lib/material-store", () =>
-  H.build("material-store", ["createMaterial", "deleteMaterial", "updateMaterial", "getMaterial"], {
-    listMaterial: H.afn("material-store.listMaterial", async () => []),
-  }),
+  H.build(
+    "material-store",
+    ["createMaterial", "deleteMaterial", "updateMaterial", "getMaterial", "reporMaterial"],
+    {
+      listMaterial: H.afn("material-store.listMaterial", async () => []),
+    },
+  ),
 );
 vi.mock("@/lib/material-rules-store", () =>
-  H.build("material-rules-store", ["createRule", "updateRule", "deleteRule"], {
-    listRules: H.afn("material-rules-store.listRules", async () => []),
-  }),
+  H.build(
+    "material-rules-store",
+    ["createRule", "updateRule", "deleteRule", "obterRegra", "reporRegra"],
+    {
+      listRules: H.afn("material-rules-store.listRules", async () => []),
+    },
+  ),
 );
 vi.mock("@/lib/material-list-items-store", () =>
   H.build(
     "material-list-items-store",
-    ["addListItem", "updateListItem", "removeListItem", "listItemsOf", "removeItemsOf"],
+    [
+      "addListItem",
+      "updateListItem",
+      "removeListItem",
+      "listItemsOf",
+      "removeItemsOf",
+      "obterLinha",
+      "reporLinha",
+    ],
     { listAllListItems: H.afn("material-list-items-store.listAllListItems", async () => []) },
   ),
 );
@@ -170,6 +211,7 @@ vi.mock("@/lib/material-lists-store", () =>
       "updateList",
       "deleteList",
       "getList",
+      "reporList",
       "addListItem",
       "updateListItem",
       "removeListItem",
@@ -457,6 +499,7 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   { path: "./contratos/route", methods: ["GET"] },
   { path: "./contratos/[id]/route", methods: ["PATCH"] },
   { path: "./contratos/[id]/pdf/route", methods: ["GET"] },
+  { path: "./contratos/criar/route", methods: ["POST"] },
   // ── Guiões do dia ─────────────────────────────────────────────────────────
   // O guião de um evento diz a que horas a equipa entra na quinta, quem faz o
   // quê e quando o espaço fica vazio. É logística interna e nomes de clientes:
@@ -552,6 +595,11 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   { path: "./orcamento/[id]/versoes/route", methods: ["GET"] },
   // O recorte automático da capa, para o estúdio o mostrar igual ao PDF.
   { path: "./orcamento/[id]/foco-da-capa/route", methods: ["GET"] },
+  // «Ver as propostas que já mandei»: o PDF que seguiu, o link do casal e as
+  // cópias dos emails — tudo dados de clientes, só com sessão.
+  { path: "./orcamento/[id]/propostas/[pid]/pdf/route", methods: ["GET"] },
+  { path: "./orcamento/[id]/propostas/[pid]/link/route", methods: ["GET"] },
+  { path: "./orcamento/[id]/envios/route", methods: ["GET"] },
   // A memória de preços atravessa TODAS as propostas já enviadas: o que se
   // cobrou a cada cliente, agregado. É o ficheiro comercial da casa numa
   // resposta JSON.
@@ -622,6 +670,11 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   // sessão baptizava o aparelho de outra pessoa para ela apagar o dela.
   { path: "./admin/passkeys/[id]/route", methods: ["DELETE", "PATCH"] },
   { path: "./admin/passkeys/registo/route", methods: ["GET", "POST"] },
+  // A Reciclagem (R3): ler mostra o que se apagou — dados de clientes e de
+  // fornecedores —, e repor e apagar de vez escrevem. Tudo de sessão.
+  { path: "./reciclagem/route", methods: ["GET"] },
+  { path: "./reciclagem/[id]/route", methods: ["DELETE"] },
+  { path: "./reciclagem/[id]/repor/route", methods: ["POST"] },
 ];
 
 describe("ADMIN-SESSION routes reject the unauthenticated before touching the store", () => {

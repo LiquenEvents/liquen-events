@@ -126,6 +126,12 @@ export const getAcceptedContractByQuote = (quoteId: string): Promise<Contract | 
 export const createContract = (c: Contract): Promise<void> => repo.create(c);
 export const updateContract = (id: string, patch: Partial<Contract>): Promise<Contract | null> =>
   repo.update(id, patch);
+/**
+ * Só para desfazer um «Ganho» marcado por engano (`desfazerCadeiaDoGanho`): o
+ * contrato que ESSE gesto criou, ainda pendente e sem registo nenhum. Um
+ * contrato registado ou aceite nunca passa por aqui.
+ */
+export const deleteContract = (id: string): Promise<void> => repo.remove(id);
 
 /**
  * Cria o contrato só se ainda não existir um para a proposta, e devolve se foi

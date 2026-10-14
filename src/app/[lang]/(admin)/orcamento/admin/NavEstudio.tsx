@@ -87,6 +87,15 @@ interface Props {
    * o estúdio, e só com a proposta a sair em inglês.
    */
   porTraduzir?: Record<string, number>;
+  /**
+   * Saltar para uma secção que pode estar noutro passo (A2).
+   *
+   * Com cinco passos, metade das secções deste índice está escondida no passo
+   * em que ela está — um salto para uma secção escondida não ia a lado
+   * nenhum. Quem passa isto (o estúdio) muda primeiro de passo e depois leva a
+   * vista lá; sem ele, o salto é o de sempre.
+   */
+  onIr?: (seccao: string) => void;
 }
 
 /** «1 tradução em falta» / «3 traduções em falta» — escrito uma vez só. */
@@ -94,7 +103,7 @@ function fraseDasTraducoes(n: number): string {
   return n === 1 ? "1 tradução em falta" : `${n} traduções em falta`;
 }
 
-export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzir }: Props) {
+export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzir, onIr }: Props) {
   const [atual, setAtual] = useState<string | null>(null);
   const listaRef = useRef<HTMLUListElement>(null);
 
@@ -179,6 +188,10 @@ export default function NavEstudio({ seccoes, faltas, onSeccaoActual, porTraduzi
   }, [atual, seccoes]);
 
   function saltarPara(id: string) {
+    if (onIr) {
+      onIr(id);
+      return;
+    }
     const el = document.getElementById(`seccao-${id}`);
     if (!el) return;
     // `rolarAteVer` e não um comportamento suave escrito à mão: o rolo de uma
