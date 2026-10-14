@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { Button } from "./ui";
 /* A escala de movimento da casa — ver `ui/movimento.ts`. O `motion-safe:` já
    aqui estava; o que faltava era a DURAÇÃO: uma `transition-*` sem duração cai
@@ -48,9 +48,23 @@ export interface MoreMenuProps {
   icone?: ReactNode;
   /** O peso do botão; `ghost` por omissão, como sempre foi. */
   variante?: "ghost" | "secondary";
+  /**
+   * O menu abre de dentro de uma barra que JÁ é vidro (a barra de cima do mapa
+   * de mesas). Um desfoque dentro de outro só vê o que está dentro da barra —
+   * o painel de baixo passava a ler-se através do menu, letra a letra. É a
+   * regra «uma camada de vidro por ecrã» (`docs/LIQUID-GLASS.md`): aqui o
+   * menu fica opaco, na superfície elevada da casa, com o mesmo fio e raio.
+   */
+  opaco?: boolean;
 }
 
-export function MoreMenu({ items, label = "Mais", icone, variante = "ghost" }: MoreMenuProps) {
+export function MoreMenu({
+  items,
+  label = "Mais",
+  icone,
+  variante = "ghost",
+  opaco = false,
+}: MoreMenuProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -183,7 +197,10 @@ export function MoreMenu({ items, label = "Mais", icone, variante = "ghost" }: M
              número de que o raio da pastilha aqui em baixo é subtraído. */
           className={`${
             aSairAgora ? SAIDA : "bo-entrada"
-          } absolute right-0 z-30 mt-2 w-60 origin-top-right bo-material bo-material-desfoque p-[var(--bo-material-folga)] shadow-[var(--bo-sombra-suspensa)]`}
+          } absolute right-0 z-30 mt-2 w-60 origin-top-right bo-material ${
+            opaco ? "" : "bo-material-desfoque "
+          }p-[var(--bo-material-folga)] shadow-[var(--bo-sombra-suspensa)]`}
+          style={opaco ? ({ "--bo-material": "var(--bo-elevado)" } as CSSProperties) : undefined}
         >
           {items.map((item, idx) => (
             <button

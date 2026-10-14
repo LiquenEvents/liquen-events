@@ -48,6 +48,7 @@ import { ESTADO, PRESSAO } from "../ui/movimento";
 import { MoreMenu, type MoreMenuItem } from "../MoreMenu";
 import { useToast } from "../Toast";
 import Sala, { type Margens, type Seleccao } from "./Sala";
+import { IconePartilhar, usePartilharMapa } from "./PartilharMapa";
 import {
   ICONE_DO_ELEMENTO,
   IconeAnular,
@@ -215,6 +216,7 @@ export default function EditorDoMapa({ pedido, onPedido, resumo, onSair }: Props
   /** Telemóvel: a folha da peça escolhida. */
   const [pecaAberta, setPecaAberta] = useState(false);
   const [realce, setRealce] = useState<string | null>(null);
+  const partilhar = usePartilharMapa({ pedido, antes: () => guardarAgora() });
 
   useEffect(
     () => () => {
@@ -224,7 +226,19 @@ export default function EditorDoMapa({ pedido, onPedido, resumo, onSair }: Props
   );
 
   // ── GRAVAR ────────────────────────────────────────────────────────────────
-  async function gravar() {
+  /** A gravação que está a decorrer — uma de cada vez. */
+  const emCurso = useRef<Promise<void> | null>(null);
+
+  function gravar(): Promise<void> {
+    if (emCurso.current) return emCurso.current;
+    const p = gravarJa().finally(() => {
+      emCurso.current = null;
+    });
+    emCurso.current = p;
+    return p;
+  }
+
+  async function gravarJa(): Promise<void> {
     temporizador.current = null;
     const aEnviar = mapaRef.current;
     const quantos = pendentes.current.length;
@@ -259,8 +273,7 @@ export default function EditorDoMapa({ pedido, onPedido, resumo, onSair }: Props
         "O mapa foi mudado noutro sítio entretanto. Juntei o que fizeste ao que lá estava.",
         "info",
       );
-      void gravar();
-      return;
+      return gravarJa();
     }
     if (!res.ok) {
       setEstado("por-gravar");
@@ -272,6 +285,24 @@ export default function EditorDoMapa({ pedido, onPedido, resumo, onSair }: Props
     if (corpo?.id) onPedido(corpo);
     if (pendentes.current.length > 0) agendar();
     else setEstado("gravado");
+  }
+
+  /**
+   * Grava JÁ o que está por gravar (antes de pedir o PDF: um mapa mandado à
+   * quinta sem a última mesa que ela pôs era pior do que não o mandar).
+   * `true` quando não ficou nada por gravar.
+   */
+  async function guardarAgora(): Promise<boolean> {
+    for (let volta = 0; volta < 3; volta++) {
+      if (emCurso.current) await emCurso.current;
+      if (pendentes.current.length === 0) return true;
+      if (temporizador.current) {
+        clearTimeout(temporizador.current);
+        temporizador.current = null;
+      }
+      await gravar();
+    }
+    return pendentes.current.length === 0;
   }
 
   function agendar() {
@@ -1068,7 +1099,13 @@ export default function EditorDoMapa({ pedido, onPedido, resumo, onSair }: Props
           className="mx-0.5 hidden h-6 w-px bg-[var(--bo-hairline)] sm:block"
         />
 
-        <MoreMenu label="Adicionar" icone={<IconeMais />} variante="secondary" items={adicionar} />
+        <MoreMenu
+          label="Adicionar"
+          icone={<IconeMais />}
+          variante="secondary"
+          items={adicionar}
+          opaco
+        />
 
         {!compacto && (
           <Button
@@ -1105,6 +1142,16 @@ export default function EditorDoMapa({ pedido, onPedido, resumo, onSair }: Props
           </button>
         )}
 
+        {!compacto && (
+          <MoreMenu
+            label="Partilhar"
+            icone={<IconePartilhar />}
+            variante="secondary"
+            items={partilhar.itens}
+            opaco
+          />
+        )}
+
         {!compacto ? (
           <Segmented<Vista>
             size="sm"
@@ -1119,6 +1166,7 @@ export default function EditorDoMapa({ pedido, onPedido, resumo, onSair }: Props
         ) : (
           <MoreMenu
             label="Mais"
+            opaco
             items={[
               {
                 label: "Sentar todos",
@@ -1130,10 +1178,12 @@ export default function EditorDoMapa({ pedido, onPedido, resumo, onSair }: Props
                 label: vista === "visual" ? "Ver em lista" : "Ver o desenho",
                 onClick: () => setVista(vista === "visual" ? "lista" : "visual"),
               },
+              ...partilhar.itens,
             ]}
           />
         )}
       </Glass>
+      {partilhar.folha}
 
       {/* ── O GRUPO QUE NÃO COUBE, E OS GRUPOS PARTIDOS ──────────────────── */}
       {(naoCoube || partidos.length > 0) && (
