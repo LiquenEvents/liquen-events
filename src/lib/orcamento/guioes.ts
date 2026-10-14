@@ -60,6 +60,12 @@ export interface ResumoDeGuiao {
    */
   aceite: boolean;
   momentos: TimelineItem[];
+  /**
+   * O mapa de mesas do evento, em números — `null` quando ainda não há mapa.
+   * Opcional porque só o `/api/guioes` o calcula; quem monta resumos à mão
+   * (testes, o Guiões) não precisa dele.
+   */
+  mesas?: { mesas: number; sentados: number; pessoas: number } | null;
 }
 
 /**

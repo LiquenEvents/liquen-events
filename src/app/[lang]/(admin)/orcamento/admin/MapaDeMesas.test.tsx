@@ -86,6 +86,15 @@ async function abrir(mapa?: Mapa) {
   await screen.findByText("Sentados");
 }
 
+/** O contador «Sentados» da barra de cima (a mesa tem um «0/4» igual). */
+const sentados = () => within(screen.getByRole("group", { name: "Sentados" }));
+
+/** «Adicionar ▾» e uma das linhas do menu. */
+async function adicionar(rotulo: string) {
+  fireEvent.click(screen.getByRole("button", { name: "Adicionar" }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: new RegExp(`^${rotulo}`) }));
+}
+
 const COM_UMA_MESA: Mapa = {
   versao: 1,
   mesas: [{ id: "m1", nome: "Mesa 1", forma: "redonda", x: 200, y: 200, lugares: 4 }],
@@ -126,14 +135,14 @@ afterEach(() => {
 describe("o mapa de mesas", () => {
   it("abre o evento e conta quem há para sentar, sem os recusados", async () => {
     await abrir();
-    expect(screen.getByText("0/4")).toBeInTheDocument();
+    expect(sentados().getByText("0/4")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Família Silva/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Tia Rosa/ })).toBeNull();
   });
 
   it("acrescentar uma mesa redonda desenha-a e grava, com a base", async () => {
     await abrir();
-    fireEvent.click(screen.getByRole("button", { name: "+ Redonda" }));
+    await adicionar("Mesa redonda");
     expect(
       await screen.findByRole("button", { name: /^Mesa 1, redonda, 8 lugares, 0 ocupados/ }),
     ).toBeInTheDocument();
@@ -150,7 +159,7 @@ describe("o mapa de mesas", () => {
       screen.getByRole("button", { name: "Lugar 2 da Mesa 1: livre", hidden: true }),
       { key: "Enter" },
     );
-    expect(await screen.findByText("3/4")).toBeInTheDocument();
+    await waitFor(() => expect(sentados().getByText("3/4")).toBeInTheDocument());
     expect(
       screen.getByRole("button", { name: "Lugar 2 da Mesa 1: Família Silva 1/3", hidden: true }),
     ).toBeInTheDocument();
@@ -168,7 +177,7 @@ describe("o mapa de mesas", () => {
     );
     expect(await screen.findByText(/Ficou 1 pessoa/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Acrescentar 1 lugar à Mesa 1" }));
-    expect(await screen.findByText("3/4")).toBeInTheDocument();
+    await waitFor(() => expect(sentados().getByText("3/4")).toBeInTheDocument());
   });
 
   it("as setas movem a mesa", async () => {
@@ -230,10 +239,149 @@ describe("o mapa de mesas", () => {
       return { status: 200, json: { ...pedido(), ...c } };
     };
     await abrir(COM_UMA_MESA);
-    fireEvent.click(screen.getByRole("button", { name: "+ Quadrada" }));
+    await adicionar("Mesa quadrada");
     await waitFor(() => expect(gravados).toHaveLength(2), { timeout: 3000 });
     const final = (gravados[1] as { mapaDeMesas: Mapa }).mapaDeMesas;
     expect(final.mesas.map((m) => m.id)).toEqual(expect.arrayContaining(["m1", "m2"]));
     expect(final.mesas).toHaveLength(3);
+  });
+});
+
+/**
+ * O ecrã de trabalho (14/10): «que dê para trabalhar num espaço mais amplo»,
+ * «adicionar uma mesa, adicionar um lugar», e a lista dos eventos melhor.
+ */
+describe("o ecrã de trabalho", () => {
+  it("abrir um evento põe a sala no ecrã inteiro, e o Escape volta à lista", async () => {
+    await abrir(COM_UMA_MESA);
+    const ecra = screen.getByRole("region", { name: "Mapa de mesas de TESTE Ana e Rui" });
+    expect(ecra.className).toMatch(/fixed inset-0/);
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.queryByRole("region", { name: "Mapa de mesas de TESTE Ana e Rui" })).toBeNull(),
+    );
+    expect(screen.getByRole("button", { name: /TESTE Ana e Rui/ })).toBeInTheDocument();
+  });
+
+  it("o Escape primeiro larga a mesa escolhida, e só depois sai", async () => {
+    await abrir(COM_UMA_MESA);
+    fireEvent.keyDown(screen.getByRole("button", { name: /^Mesa 1, redonda/ }), { key: "Enter" });
+    expect(screen.getByRole("toolbar", { name: /Mesa 1/ })).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("toolbar", { name: /Mesa 1/ })).toBeNull();
+    expect(screen.getByRole("region", { name: /Mapa de mesas de/ })).toBeInTheDocument();
+  });
+
+  it("«Adicionar» também traz os elementos da sala", async () => {
+    await abrir();
+    await adicionar("Pista de dança");
+    expect(await screen.findByRole("button", { name: /^Pista de dança\./ })).toBeInTheDocument();
+  });
+
+  it("a barrinha junto da mesa acrescenta e tira cadeiras, no desenho", async () => {
+    await abrir(COM_UMA_MESA);
+    fireEvent.keyDown(screen.getByRole("button", { name: /^Mesa 1, redonda/ }), { key: "Enter" });
+    fireEvent.click(screen.getByRole("button", { name: "Acrescentar uma cadeira à Mesa 1" }));
+    expect(screen.getByRole("button", { name: /^Mesa 1, redonda, 5 lugares/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Tirar uma cadeira da Mesa 1" }));
+    fireEvent.click(screen.getByRole("button", { name: "Tirar uma cadeira da Mesa 1" }));
+    expect(screen.getByRole("button", { name: /^Mesa 1, redonda, 3 lugares/ })).toBeInTheDocument();
+  });
+
+  it("duplicar a mesa dá uma igual ao lado, com o nome seguinte", async () => {
+    await abrir(COM_UMA_MESA);
+    fireEvent.keyDown(screen.getByRole("button", { name: /^Mesa 1, redonda/ }), { key: "Enter" });
+    fireEvent.click(screen.getByRole("button", { name: "Duplicar a Mesa 1" }));
+    expect(
+      screen.getByRole("button", { name: /^Mesa 2, redonda, 4 lugares, 0 ocupados/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("⌘Z anula o último passo e ⇧⌘Z refá-lo", async () => {
+    await abrir(COM_UMA_MESA);
+    fireEvent.keyDown(screen.getByRole("button", { name: /^Mesa 1, redonda/ }), { key: "Enter" });
+    fireEvent.click(screen.getByRole("button", { name: "Acrescentar uma cadeira à Mesa 1" }));
+    expect(screen.getByRole("button", { name: /^Mesa 1, redonda, 5 lugares/ })).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "z", metaKey: true });
+    expect(screen.getByRole("button", { name: /^Mesa 1, redonda, 4 lugares/ })).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "z", metaKey: true, shiftKey: true });
+    expect(screen.getByRole("button", { name: /^Mesa 1, redonda, 5 lugares/ })).toBeInTheDocument();
+    // E o botão da barra faz o mesmo.
+    fireEvent.click(screen.getByRole("button", { name: "Anular o último passo" }));
+    expect(screen.getByRole("button", { name: /^Mesa 1, redonda, 4 lugares/ })).toBeInTheDocument();
+  });
+
+  it("escrever o nome de uma mesa é UM passo de anular, e não um por letra", async () => {
+    await abrir(COM_UMA_MESA);
+    fireEvent.keyDown(screen.getByRole("button", { name: /^Mesa 1, redonda/ }), { key: "Enter" });
+    const nome = screen.getByLabelText("Nome da mesa");
+    for (const v of ["Mesa 1 N", "Mesa 1 No", "Mesa 1 Noi"])
+      fireEvent.change(nome, { target: { value: v } });
+    expect(screen.getByRole("button", { name: /^Mesa 1 Noi, redonda/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Anular o último passo" }));
+    expect(screen.getByRole("button", { name: /^Mesa 1, redonda/ })).toBeInTheDocument();
+  });
+
+  it("arrastar um convidado da lista para uma cadeira senta-o lá", async () => {
+    await abrir(COM_UMA_MESA);
+    const cadeira = screen.getByRole("button", { name: "Lugar 3 da Mesa 1: livre", hidden: true });
+    const antes = document.elementFromPoint;
+    document.elementFromPoint = () => cadeira as unknown as Element;
+    try {
+      fireEvent.pointerDown(screen.getByRole("button", { name: /Rui Costa/ }), {
+        button: 0,
+        clientX: 10,
+        clientY: 10,
+      });
+      fireEvent.pointerMove(window, { clientX: 200, clientY: 200 });
+      fireEvent.pointerUp(window, { clientX: 200, clientY: 200 });
+    } finally {
+      document.elementFromPoint = antes;
+    }
+    expect(
+      await screen.findByRole("button", { name: "Lugar 3 da Mesa 1: Rui Costa", hidden: true }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("a lista dos eventos", () => {
+  it("cada cartão diz em que pé está o mapa", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              guioes: [
+                { ...EVENTOS[0], mesas: { mesas: 8, sentados: 64, pessoas: 74 } },
+                { ...EVENTOS[0], id: "q2", cliente: "TESTE Rita", data: "2099-07-01", mesas: null },
+              ],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+      ),
+    );
+    render(
+      <ToastProvider>
+        <MapaDeMesas carregarPedido={async () => ({ ok: true, quote: pedido() })} />
+      </ToastProvider>,
+    );
+    expect(await screen.findByText("8 mesas · 64/74 sentados")).toBeInTheDocument();
+    expect(screen.getByText("Sem mapa ainda")).toBeInTheDocument();
+    // O próximo vai à cabeça.
+    expect(screen.getByText("Próximo evento")).toBeInTheDocument();
+  });
+
+  it("a procura filtra pelo nome", async () => {
+    render(
+      <ToastProvider>
+        <MapaDeMesas carregarPedido={async () => ({ ok: true, quote: pedido() })} />
+      </ToastProvider>,
+    );
+    await screen.findByRole("button", { name: /TESTE Ana e Rui/ });
+    fireEvent.change(screen.getByRole("searchbox", { name: "Procurar eventos" }), {
+      target: { value: "ninguém" },
+    });
+    expect(await screen.findByText("Nenhum evento com esse nome")).toBeInTheDocument();
   });
 });

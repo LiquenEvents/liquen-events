@@ -8,8 +8,11 @@ import {
   apagarMesa,
   chaveDoLugar,
   contas,
+  desfazer,
+  duplicarMesa,
   ELEMENTOS,
   gruposPartidos,
+  historicoVazio,
   lerChave,
   lerMapa,
   levantar,
@@ -24,6 +27,8 @@ import {
   porSentar,
   quemEstaNaMesa,
   reconciliar,
+  refazer,
+  registar,
   ROTULO_DA_FORMA,
   sentar,
   sentarAutomaticamente,
@@ -31,38 +36,72 @@ import {
   sentarResto,
   TECTOS,
   type FormaDaMesa,
+  type Historico,
   type MapaDeMesas,
   type Pessoa,
   type TipoDeElemento,
 } from "@/lib/orcamento/mapa-de-mesas";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
-import { Button, Field, FolhaOuDialogo, Inspector, Segmented, useAdaptativo } from "../ui";
+import { Button, Field, FolhaOuDialogo, Glass, Segmented, useAdaptativo } from "../ui";
 import { useAnular } from "../ui/anular";
 import { ESTADO, PRESSAO } from "../ui/movimento";
+import { MoreMenu, type MoreMenuItem } from "../MoreMenu";
 import { useToast } from "../Toast";
-import Sala, { type Seleccao } from "./Sala";
+import Sala, { type Margens, type Seleccao } from "./Sala";
+import {
+  ICONE_DO_ELEMENTO,
+  IconeAnular,
+  IconeFechar,
+  IconeMais,
+  IconeMesaComprida,
+  IconeMesaQuadrada,
+  IconeMesaRedonda,
+  IconePessoas,
+  IconeRefazer,
+  IconeVarinha,
+  IconeVoltar,
+} from "./icones";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
- * O EDITOR DO MAPA DE MESAS DE UM EVENTO
+ * O EDITOR DO MAPA DE MESAS DE UM EVENTO — O ECRÃ DE TRABALHO
  * ════════════════════════════════════════════════════════════════════════════
  *
  * As regras estão em `lib/orcamento/mapa-de-mesas.ts`; aqui vivem o estado, a
  * gravação e os painéis. Cada gesto é uma função pura sobre o mapa
- * (`mexer(gesto)`), e é isso que torna três coisas simples:
+ * (`mexer(gesto)`), e é isso que torna quatro coisas simples:
  *
  *   · GRAVAR — o mapa grava-se 600 ms depois do último gesto, com a `base`
  *     (o que o servidor tinha), como as listas da gaveta;
  *   · A COLISÃO — se outra pessoa gravou entretanto (409), os gestos que
  *     ainda não chegaram ao servidor aplicam-se POR CIMA do mapa dela, em vez
  *     de o apagar ou de deitar fora o trabalho de quem está aqui;
- *   · ANULAR — o estado de antes de um gesto grande guarda-se e repõe-se.
+ *   · ANULAR E REFAZER — o mapa de antes de cada gesto guarda-se numa pilha
+ *     (50 passos, `registar`/`desfazer`/`refazer`), com ⌘Z e ⇧⌘Z;
+ *   · O AVISO «ANULAR» — os gestos grandes (apagar, sentar toda a gente)
+ *     dizem-no num aviso de 10 s, como no resto da casa.
+ *
+ * ── O ECRÃ INTEIRO (pedido dela, 14/10) ───────────────────────────────────
+ * «que dê para trabalhar num espaço mais amplo, onde dá para ver tudo». A sala
+ * passou de uma caixa entalada entre duas colunas para o ecrã inteiro, por cima
+ * do back office, e o resto FLUTUA sobre ela: a barra de cima (a única de
+ * vidro — `LIQUID-GLASS.md`, uma camada por ecrã), a lista de espera à
+ * esquerda e o painel da peça à direita, opacos. O «Encaixar» da sala sabe o
+ * que os painéis tapam (`margens`) e mostra a sala inteira no espaço que
+ * sobra. No telemóvel e no tablet, os dois painéis são folhas.
  */
 
 type Gesto = (m: MapaDeMesas) => MapaDeMesas;
 type Vista = "visual" | "lista";
 
 const GRAVAR_DEPOIS_MS = 600;
+/** Escrever o nome de uma mesa é UM passo de anular, e não um por letra. */
+const JUNTAR_MS = 1500;
+/** Onde começam os painéis: a barra de cima e a sua folga. */
+const TOPO_PX = 84;
+const LARGURA_DA_LISTA_PX = 300;
+const LARGURA_DO_PAINEL_PX = 320;
+const LIMIAR_DO_ARRASTO_PX = 3;
 
 function novoId(): string {
   try {
@@ -72,9 +111,20 @@ function novoId(): string {
   }
 }
 
+export interface ResumoDoEvento {
+  evento?: string;
+  /** A data já dita por extenso. */
+  quando?: string;
+  local?: string;
+}
+
 interface Props {
   pedido: Quote;
   onPedido: (q: Quote) => void;
+  /** O que se escreve debaixo do nome, na barra de cima. */
+  resumo?: ResumoDoEvento;
+  /** «← Eventos», o Escape e o gesto de voltar. */
+  onSair: () => void;
 }
 
 /** Os grupos por sentar, pela ordem da lista. */
@@ -99,10 +149,42 @@ function agrupar(
   return [...por.values()];
 }
 
-export default function EditorDoMapa({ pedido, onPedido }: Props) {
+/** Um campo de texto, o editor de texto rico, ou um select: as teclas são dele. */
+function aEscrever(alvo: EventTarget | null): boolean {
+  const el = alvo as HTMLElement | null;
+  if (!el?.tagName) return false;
+  return el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName.toUpperCase());
+}
+
+/** O anel do «Sentados»: quanto da sala já tem lugar. */
+function Anel({ feito, total }: { feito: number; total: number }) {
+  const r = 9;
+  const volta = 2 * Math.PI * r;
+  const parte = total > 0 ? Math.min(1, feito / total) : 0;
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" className="shrink-0">
+      <circle cx="12" cy="12" r={r} fill="none" stroke="var(--bo-tinta-10)" strokeWidth="3" />
+      <circle
+        cx="12"
+        cy="12"
+        r={r}
+        fill="none"
+        stroke="var(--bo-accent)"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeDasharray={`${volta * parte} ${volta}`}
+        transform="rotate(-90 12 12)"
+      />
+    </svg>
+  );
+}
+
+export default function EditorDoMapa({ pedido, onPedido, resumo, onSair }: Props) {
   const { toast } = useToast();
   const anular = useAnular();
-  const { telemovel } = useAdaptativo();
+  const { desktop } = useAdaptativo();
+  /** Telemóvel e tablet: os painéis são folhas, e a barra de cima encolhe. */
+  const compacto = !desktop;
 
   const [lista, setLista] = useState<Guest[]>(pedido.guestList ?? []);
   const listaGravada = useRef<Guest[]>(pedido.guestList ?? []);
@@ -115,6 +197,10 @@ export default function EditorDoMapa({ pedido, onPedido }: Props) {
   const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [estado, setEstado] = useState<"gravado" | "a-gravar" | "por-gravar">("gravado");
 
+  const [historico, setHistorico] = useState<Historico>(historicoVazio);
+  const historicoRef = useRef(historico);
+  const ultimaJunta = useRef<{ chave: string; quando: number } | null>(null);
+
   const [vista, setVista] = useState<Vista>("visual");
   const [seleccao, setSeleccao] = useState<Seleccao>(null);
   const [aSentar, setASentar] = useState<string | null>(null);
@@ -123,8 +209,12 @@ export default function EditorDoMapa({ pedido, onPedido }: Props) {
     mesaId: string;
     ficaram: number;
   } | null>(null);
+  /** Telemóvel: a folha da lista de espera. Computador: a lista recolhida. */
   const [esperaAberta, setEsperaAberta] = useState(false);
-  const [elementosAbertos, setElementosAbertos] = useState(false);
+  const [listaRecolhida, setListaRecolhida] = useState(false);
+  /** Telemóvel: a folha da peça escolhida. */
+  const [pecaAberta, setPecaAberta] = useState(false);
+  const [realce, setRealce] = useState<string | null>(null);
 
   useEffect(
     () => () => {
@@ -190,10 +280,28 @@ export default function EditorDoMapa({ pedido, onPedido }: Props) {
     temporizador.current = setTimeout(() => void gravar(), GRAVAR_DEPOIS_MS);
   }
 
-  /** Aplica um gesto, mostra-o já, e grava daqui a pouco. Devolve o mapa novo. */
-  function mexer(gesto: Gesto): MapaDeMesas {
-    const novo = gesto(mapaRef.current);
-    if (novo === mapaRef.current) return novo;
+  function mudarHistorico(h: Historico) {
+    historicoRef.current = h;
+    setHistorico(h);
+  }
+
+  /**
+   * Aplica um gesto, mostra-o já, e grava daqui a pouco. Devolve o mapa novo.
+   * `juntar`: gestos seguidos com a mesma chave (as letras de um nome) contam
+   * como UM passo de anular.
+   */
+  function mexer(gesto: Gesto, opcoes: { registar?: boolean; juntar?: string } = {}): MapaDeMesas {
+    const antes = mapaRef.current;
+    const novo = gesto(antes);
+    if (novo === antes) return novo;
+    if (opcoes.registar !== false) {
+      const agora = Date.now();
+      const ultima = ultimaJunta.current;
+      const mesmoPasso =
+        !!opcoes.juntar && ultima?.chave === opcoes.juntar && agora - ultima.quando < JUNTAR_MS;
+      if (!mesmoPasso) mudarHistorico(registar(historicoRef.current, antes));
+      ultimaJunta.current = opcoes.juntar ? { chave: opcoes.juntar, quando: agora } : null;
+    }
     mapaRef.current = novo;
     setMapa(novo);
     pendentes.current.push(gesto);
@@ -208,6 +316,22 @@ export default function EditorDoMapa({ pedido, onPedido }: Props) {
     anular(mensagem, () => {
       mexer(() => antes);
     });
+  }
+
+  function desfazerUm() {
+    const r = desfazer(historicoRef.current, mapaRef.current);
+    if (!r) return;
+    mudarHistorico(r.historico);
+    ultimaJunta.current = null;
+    mexer(() => r.mapa, { registar: false });
+  }
+
+  function refazerUm() {
+    const r = refazer(historicoRef.current, mapaRef.current);
+    if (!r) return;
+    mudarHistorico(r.historico);
+    ultimaJunta.current = null;
+    mexer(() => r.mapa, { registar: false });
   }
 
   // ── A LISTA DE CONVIDADOS (só acrescentar daqui) ────────────────────────
@@ -259,6 +383,7 @@ export default function EditorDoMapa({ pedido, onPedido }: Props) {
   // ── O QUE SE MOSTRA ───────────────────────────────────────────────────────
   const numeros = useMemo(() => contas(mapa, lista), [mapa, lista]);
   const espera = useMemo(() => agrupar(porSentar(mapa, lista)), [mapa, lista]);
+  const porSentarN = espera.reduce((s, g) => s + g.faltam, 0);
   const partidos = useMemo(() => gruposPartidos(mapa), [mapa]);
   const mesaEscolhida =
     seleccao?.tipo === "mesa" ? (mapa.mesas.find((m) => m.id === seleccao.id) ?? null) : null;
@@ -279,9 +404,15 @@ export default function EditorDoMapa({ pedido, onPedido }: Props) {
   function acrescentarElemento(tipo: TipoDeElemento) {
     const id = novoId();
     const novo = mexer((m) => novoElemento(m, tipo, id).mapa);
-    setElementosAbertos(false);
     if (novo.elementos.some((e) => e.id === id)) setSeleccao({ tipo: "elemento", id });
     else toast(`O mapa já tem ${TECTOS.elementos} elementos — é o máximo.`, "error");
+  }
+
+  function duplicar(mesaId: string) {
+    const id = novoId();
+    const novo = mexer((m) => duplicarMesa(m, mesaId, id).mapa);
+    if (novo.mesas.some((m) => m.id === id)) setSeleccao({ tipo: "mesa", id });
+    else toast(`O mapa já tem ${TECTOS.mesas} mesas — é o máximo.`, "error");
   }
 
   function sentarGrupoEm(convidadoId: string, mesaId: string, lugar?: number) {
@@ -305,6 +436,7 @@ export default function EditorDoMapa({ pedido, onPedido }: Props) {
       const m = mapaRef.current.mesas.find((x) => x.id === s.id);
       if (!m) return;
       setSeleccao(null);
+      setPecaAberta(false);
       mexerComAnular(`${m.nome} apagada. Quem lá estava voltou à lista de espera.`, (x) =>
         apagarMesa(x, s.id),
       );
@@ -312,6 +444,7 @@ export default function EditorDoMapa({ pedido, onPedido }: Props) {
       const e = mapaRef.current.elementos.find((x) => x.id === s.id);
       if (!e) return;
       setSeleccao(null);
+      setPecaAberta(false);
       mexerComAnular(`«${e.nome}» apagado.`, (x) => apagarElemento(x, s.id));
     }
   }
@@ -330,6 +463,22 @@ export default function EditorDoMapa({ pedido, onPedido }: Props) {
         (x) => mudarMesa(x, mesaId, { lugares }),
       );
     } else mexer((x) => mudarMesa(x, mesaId, { lugares }));
+  }
+
+  function rodar(mesaId: string) {
+    const m = mapaRef.current.mesas.find((x) => x.id === mesaId);
+    if (m) mexer((x) => mudarMesa(x, mesaId, { rodada: !m.rodada }));
+  }
+
+  function editarNome(mesaId: string) {
+    setSeleccao({ tipo: "mesa", id: mesaId });
+    if (compacto) setPecaAberta(true);
+    // Depois de o painel aparecer.
+    requestAnimationFrame(() => {
+      const campo = document.querySelector<HTMLInputElement>("[data-nome-da-peca] input");
+      campo?.focus();
+      campo?.select();
+    });
   }
 
   function sentarTodos() {
@@ -351,21 +500,165 @@ export default function EditorDoMapa({ pedido, onPedido }: Props) {
     );
   }
 
-  const ondeSentar = (convidadoId: string) => (
-    <select
-      aria-label={`Sentar ${nomeDoGrupo(convidadoId)} em…`}
-      className="h-9 min-w-0 rounded-lg border border-[var(--bo-hairline-strong)] bg-[var(--bo-surface)] px-2 text-xs"
-      value=""
-      onChange={(e) => e.target.value && sentarGrupoEm(convidadoId, e.target.value)}
-    >
-      <option value="">Sentar em…</option>
-      {mapa.mesas.map((m) => (
-        <option key={m.id} value={m.id} disabled={livresDaMesa(mapa, m).length === 0}>
-          {m.nome} · {livresDaMesa(mapa, m).length} livres
-        </option>
-      ))}
-    </select>
-  );
+  // ── AS TECLAS DO ECRÃ DE TRABALHO ────────────────────────────────────────
+  const teclas = useRef<(e: KeyboardEvent) => void>(() => {});
+  // A cada desenho, o ouvinte passa a ver o estado deste desenho.
+  useEffect(() => {
+    teclas.current = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || aEscrever(e.target)) return;
+      const mod = e.metaKey || e.ctrlKey;
+      const tecla = e.key.toLowerCase();
+      if (mod && tecla === "z") {
+        e.preventDefault();
+        if (e.shiftKey) refazerUm();
+        else desfazerUm();
+      } else if (mod && tecla === "y") {
+        e.preventDefault();
+        refazerUm();
+      } else if (mod && tecla === "d" && mesaEscolhida) {
+        e.preventDefault();
+        duplicar(mesaEscolhida.id);
+      } else if (e.key === "Escape") {
+        // Um menu ou uma folha abertos fecham-se a si; o Escape não é para cá.
+        if (document.querySelector('[role="menu"], [role="dialog"]')) return;
+        if (aSentar) setASentar(null);
+        else if (seleccao) setSeleccao(null);
+        else onSair();
+      }
+    };
+  });
+  useEffect(() => {
+    const ouvir = (e: KeyboardEvent) => teclas.current(e);
+    window.addEventListener("keydown", ouvir);
+    return () => window.removeEventListener("keydown", ouvir);
+  }, []);
+
+  // ── ARRASTAR UM CONVIDADO DA LISTA PARA UMA CADEIRA ──────────────────────
+  /**
+   * O §12.4 do sistema de design: só depois de 3 px é arrasto (antes é um
+   * toque, que escolhe o grupo como sempre); a cadeira por baixo acende-se; o
+   * que não cai num alvo volta para a lista. O alvo descobre-se pelo mesmo
+   * `data-alvo` que a sala usa para largar uma pessoa de uma cadeira noutra.
+   */
+  const [arrasto, setArrasto] = useState<{
+    convidadoId: string;
+    nome: string;
+    x: number;
+    y: number;
+    lugar: string | null;
+    mesa: string | null;
+  } | null>(null);
+  const arrastou = useRef(false);
+
+  function comecarArrasto(e: React.PointerEvent, convidadoId: string, nome: string) {
+    if (e.button !== 0 || compacto) return;
+    const inicio = { x: e.clientX, y: e.clientY };
+    arrastou.current = false;
+    let corrente: typeof arrasto = null;
+    function mover(ev: PointerEvent) {
+      if (
+        !arrastou.current &&
+        Math.hypot(ev.clientX - inicio.x, ev.clientY - inicio.y) < LIMIAR_DO_ARRASTO_PX
+      )
+        return;
+      arrastou.current = true;
+      const sob = document.elementFromPoint?.(ev.clientX, ev.clientY) ?? null;
+      const lugar = sob?.closest?.("[data-alvo^='lugar|']")?.getAttribute("data-alvo") ?? null;
+      const mesa = sob?.closest?.("[data-alvo^='mesa|']")?.getAttribute("data-alvo") ?? null;
+      corrente = {
+        convidadoId,
+        nome,
+        x: ev.clientX,
+        y: ev.clientY,
+        lugar: lugar ? lugar.split("|")[1] : null,
+        mesa: mesa ? mesa.split("|")[1] : null,
+      };
+      setArrasto(corrente);
+    }
+    function largar() {
+      window.removeEventListener("pointermove", mover);
+      window.removeEventListener("pointerup", largar);
+      window.removeEventListener("pointercancel", largar);
+      setArrasto(null);
+      if (!arrastou.current || !corrente) return;
+      if (corrente.lugar) {
+        const { mesaId, lugar } = lerChave(corrente.lugar);
+        sentarGrupoEm(convidadoId, mesaId, lugar);
+      } else if (corrente.mesa) {
+        sentarGrupoEm(convidadoId, corrente.mesa);
+      }
+    }
+    window.addEventListener("pointermove", mover);
+    window.addEventListener("pointerup", largar);
+    window.addEventListener("pointercancel", largar);
+  }
+
+  // ── PEÇAS DO ECRÃ ─────────────────────────────────────────────────────────
+  const adicionar: MoreMenuItem[] = [
+    {
+      label: "Mesa redonda",
+      hint: "8 lugares à volta",
+      icon: <IconeMesaRedonda />,
+      onClick: () => acrescentarMesa("redonda"),
+    },
+    {
+      label: "Mesa comprida",
+      hint: "10 lugares, dos dois lados",
+      icon: <IconeMesaComprida />,
+      onClick: () => acrescentarMesa("comprida"),
+    },
+    {
+      label: "Mesa quadrada",
+      hint: "8 lugares, pelos quatro lados",
+      icon: <IconeMesaQuadrada />,
+      onClick: () => acrescentarMesa("quadrada"),
+    },
+    // Escritos um a um, e não com um `.map`: o compilador do React lê um
+    // `onClick` criado dentro de um `.map` em desenho como podendo correr já.
+    {
+      label: ELEMENTOS.noivos.nome,
+      hint: "Elemento da sala",
+      icon: <ICONE_DO_ELEMENTO.noivos />,
+      onClick: () => acrescentarElemento("noivos"),
+    },
+    {
+      label: ELEMENTOS.pista.nome,
+      hint: "Elemento da sala",
+      icon: <ICONE_DO_ELEMENTO.pista />,
+      onClick: () => acrescentarElemento("pista"),
+    },
+    {
+      label: ELEMENTOS.palco.nome,
+      hint: "Elemento da sala",
+      icon: <ICONE_DO_ELEMENTO.palco />,
+      onClick: () => acrescentarElemento("palco"),
+    },
+    {
+      label: ELEMENTOS.buffet.nome,
+      hint: "Elemento da sala",
+      icon: <ICONE_DO_ELEMENTO.buffet />,
+      onClick: () => acrescentarElemento("buffet"),
+    },
+    {
+      label: ELEMENTOS.bar.nome,
+      hint: "Elemento da sala",
+      icon: <ICONE_DO_ELEMENTO.bar />,
+      onClick: () => acrescentarElemento("bar"),
+    },
+    {
+      label: ELEMENTOS.outro.nome,
+      hint: "Elemento da sala",
+      icon: <ICONE_DO_ELEMENTO.outro />,
+      onClick: () => acrescentarElemento("outro"),
+    },
+  ];
+
+  const podeAnular = historico.passado.length > 0;
+  const podeRefazer = historico.futuro.length > 0;
+  const estadoDaGravacao =
+    estado === "a-gravar" ? "A guardar…" : estado === "por-gravar" ? "Por guardar" : "Guardado";
+
+  const botaoRedondo = `alvo-toque flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[var(--bo-text)] hover:bg-[var(--bo-tinta-6)] disabled:opacity-35 ${ESTADO} ${PRESSAO}`;
 
   const listaDeEspera = (
     <div className="flex flex-col gap-3">
@@ -391,396 +684,622 @@ export default function EditorDoMapa({ pedido, onPedido }: Props) {
             : "Toda a gente está sentada."}
         </p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
-          {espera.map((g) => {
-            const escolhido = aSentar === g.convidadoId;
-            return (
-              <li key={g.convidadoId} className="flex items-center gap-2">
-                <button
-                  type="button"
-                  aria-pressed={escolhido}
-                  onClick={() => {
-                    setASentar(escolhido ? null : g.convidadoId);
-                    if (!escolhido && telemovel) setEsperaAberta(false);
-                  }}
-                  className={`alvo-toque flex min-w-0 flex-1 items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-sm ${ESTADO} ${PRESSAO} ${
-                    escolhido
-                      ? "border-[var(--bo-accent)] bg-[var(--bo-accent-lavagem)]"
-                      : "border-[var(--bo-hairline)] bg-[var(--bo-surface)] hover:bg-[var(--bo-tinta-6)]"
-                  }`}
-                >
-                  <span className="min-w-0 truncate">
-                    {g.grupo}
-                    {g.rsvp === "pendente" && (
-                      <span className="ml-1.5 text-[11px] text-[var(--bo-text-muted)]">
-                        · por confirmar
-                      </span>
-                    )}
-                  </span>
-                  <span className="shrink-0 tabular-nums text-xs text-[var(--bo-text-muted)]">
-                    {g.faltam < g.de ? `${g.faltam} de ${g.de}` : g.de}
-                  </span>
-                </button>
-                {vista === "lista" && mapa.mesas.length > 0 && ondeSentar(g.convidadoId)}
-              </li>
-            );
-          })}
-        </ul>
+        <>
+          {!compacto && (
+            <p className="text-[11px] leading-snug text-[var(--bo-text-muted)]">
+              Arrasta um nome para uma cadeira, ou toca nele e depois num lugar livre.
+            </p>
+          )}
+          <ul className="flex flex-col gap-1.5">
+            {espera.map((g) => {
+              const escolhido = aSentar === g.convidadoId;
+              return (
+                <li key={g.convidadoId} className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    aria-pressed={escolhido}
+                    onPointerDown={(e) => comecarArrasto(e, g.convidadoId, g.grupo)}
+                    onPointerEnter={() => setRealce(g.convidadoId)}
+                    onPointerLeave={() => setRealce((r) => (r === g.convidadoId ? null : r))}
+                    onClick={() => {
+                      if (arrastou.current) {
+                        arrastou.current = false;
+                        return;
+                      }
+                      setASentar(escolhido ? null : g.convidadoId);
+                      if (!escolhido && compacto) setEsperaAberta(false);
+                    }}
+                    className={`alvo-toque flex min-w-0 flex-1 touch-none items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-sm ${ESTADO} ${PRESSAO} ${
+                      escolhido
+                        ? "border-[var(--bo-accent)] bg-[var(--bo-accent-lavagem)]"
+                        : "cursor-grab border-[var(--bo-hairline)] bg-[var(--bo-surface)] hover:bg-[var(--bo-tinta-6)]"
+                    }`}
+                  >
+                    <span className="min-w-0 truncate">
+                      {g.grupo}
+                      {g.rsvp === "pendente" && (
+                        <span className="ml-1.5 text-[11px] text-[var(--bo-text-muted)]">
+                          · por confirmar
+                        </span>
+                      )}
+                    </span>
+                    <span className="shrink-0 rounded-full bg-[var(--bo-tinta-6)] px-2 py-0.5 tabular-nums text-xs text-[var(--bo-text-muted)]">
+                      {g.faltam < g.de ? `${g.faltam} de ${g.de}` : g.de}
+                    </span>
+                  </button>
+                  {vista === "lista" && mapa.mesas.length > 0 && (
+                    <select
+                      aria-label={`Sentar ${nomeDoGrupo(g.convidadoId)} em…`}
+                      className="h-9 min-w-0 rounded-lg border border-[var(--bo-hairline-strong)] bg-[var(--bo-surface)] px-2 text-xs"
+                      value=""
+                      onChange={(e) =>
+                        e.target.value && sentarGrupoEm(g.convidadoId, e.target.value)
+                      }
+                    >
+                      <option value="">Sentar em…</option>
+                      {mapa.mesas.map((m) => (
+                        <option
+                          key={m.id}
+                          value={m.id}
+                          disabled={livresDaMesa(mapa, m).length === 0}
+                        >
+                          {m.nome} · {livresDaMesa(mapa, m).length} livres
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </>
       )}
       <NovoConvidado onAcrescentar={acrescentarConvidado} />
     </div>
   );
 
-  return (
-    <div className="flex flex-col gap-3">
-      {/* ── O TOPO: as contas, a vista e o estado da gravação ───────────── */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <p className="text-sm text-[var(--bo-text)]">
-          <span className="bo-eyebrow mr-1.5 text-[var(--bo-text-muted)]">Sentados</span>
-          <strong className="tabular-nums">
-            {numeros.sentados}/{numeros.total}
-          </strong>
-          <span className="ml-2 text-xs text-[var(--bo-text-muted)] tabular-nums">
-            {numeros.lugares} lugares · {numeros.livres} livres
-          </span>
-        </p>
-        <Segmented<Vista>
-          size="sm"
-          ariaLabel="Ver o mapa"
-          value={vista}
-          onChange={setVista}
-          options={[
-            { value: "visual", label: "Visual" },
-            { value: "lista", label: "Lista" },
-          ]}
-        />
-        <span role="status" className="ml-auto text-xs text-[var(--bo-text-muted)]">
-          {estado === "a-gravar"
-            ? "A guardar…"
-            : estado === "por-gravar"
-              ? "Por guardar"
-              : "Guardado"}
-        </span>
-      </div>
-
-      {/* ── AS PEÇAS ─────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-2">
-        {(["redonda", "comprida", "quadrada"] as const).map((f) => (
-          <Button key={f} size="sm" variant="secondary" onClick={() => acrescentarMesa(f)}>
-            + {ROTULO_DA_FORMA[f]}
-          </Button>
-        ))}
-        <Button size="sm" variant="secondary" onClick={() => setElementosAbertos(true)}>
-          + Elemento da sala
-        </Button>
-        <Button
-          size="sm"
-          variant="primary"
-          onClick={sentarTodos}
-          disabled={mapa.mesas.length === 0}
-        >
-          Sentar automaticamente
-        </Button>
-        {telemovel && (
-          <Button size="sm" variant="ghost" onClick={() => setEsperaAberta(true)}>
-            Lista de espera · {espera.reduce((s, g) => s + g.faltam, 0)}
-          </Button>
-        )}
-      </div>
-
-      {/* ── O GRUPO QUE NÃO COUBE: as duas saídas, ditas ─────────────────── */}
-      {naoCoube && (
-        <div
-          role="status"
-          className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--bo-aviso-tom)]/35 bg-[var(--bo-aviso-tom)]/[0.06] px-3 py-2 text-sm"
-        >
-          <span className="min-w-0 flex-1">
-            {naoCoube.ficaram === 1 ? "Ficou 1 pessoa" : `Ficaram ${naoCoube.ficaram} pessoas`} de{" "}
-            <strong>{nomeDoGrupo(naoCoube.convidadoId)}</strong> sem lugar nesta mesa.
-          </span>
-          {(() => {
-            const mesa = mapa.mesas.find((m) => m.id === naoCoube.mesaId);
-            const cabem = mesa ? TECTOS.lugaresPorMesa - mesa.lugares : 0;
-            return mesa && cabem > 0 ? (
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => {
-                  const r = acrescentarLugares(mapaRef.current, mesa.id, naoCoube.ficaram);
-                  mexer(() => r.mapa);
-                  sentarGrupoEm(naoCoube.convidadoId, mesa.id);
-                }}
-              >
-                Acrescentar {Math.min(cabem, naoCoube.ficaram)}{" "}
-                {Math.min(cabem, naoCoube.ficaram) === 1 ? "lugar" : "lugares"} à {mesa.nome}
-              </Button>
-            ) : null;
-          })()}
-          {maisProximaComLugar(mapa, naoCoube.mesaId) && (
+  const painelDaPeca = (
+    <>
+      {mesaEscolhida && (
+        <div className="flex flex-col gap-4 p-4">
+          <div data-nome-da-peca>
+            <Field
+              as="input"
+              label="Nome da mesa"
+              value={mesaEscolhida.nome}
+              onChange={(e) =>
+                mexer((m) => mudarMesa(m, mesaEscolhida.id, { nome: e.target.value }), {
+                  juntar: `nome-${mesaEscolhida.id}`,
+                })
+              }
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs text-[var(--bo-text-muted)]">Forma</span>
+            <Segmented<FormaDaMesa>
+              size="sm"
+              ariaLabel="Forma da mesa"
+              value={mesaEscolhida.forma}
+              onChange={(forma) => mexer((m) => mudarMesa(m, mesaEscolhida.id, { forma }))}
+              options={(["redonda", "comprida", "quadrada"] as const).map((f) => ({
+                value: f,
+                label: ROTULO_DA_FORMA[f],
+              }))}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[var(--bo-text-muted)]">Lugares</span>
             <Button
               size="sm"
               variant="secondary"
-              onClick={() => {
-                const r = sentarResto(
-                  mapaRef.current,
-                  lista,
-                  naoCoube.convidadoId,
-                  naoCoube.mesaId,
-                );
-                mexer(() => r.mapa);
-                setNaoCoube(r.ficaram > 0 ? { ...naoCoube, ficaram: r.ficaram } : null);
-              }}
+              aria-label="Menos um lugar"
+              disabled={mesaEscolhida.lugares <= 1}
+              onClick={() => mudarLugares(mesaEscolhida.id, mesaEscolhida.lugares - 1)}
             >
-              Sentar o resto na mesa mais próxima
+              −
             </Button>
-          )}
-          <Button size="sm" variant="ghost" onClick={() => setNaoCoube(null)}>
-            Deixar assim
+            <span className="min-w-8 text-center tabular-nums" aria-live="polite">
+              {mesaEscolhida.lugares}
+            </span>
+            <Button
+              size="sm"
+              variant="secondary"
+              aria-label="Mais um lugar"
+              disabled={mesaEscolhida.lugares >= TECTOS.lugaresPorMesa}
+              onClick={() => mudarLugares(mesaEscolhida.id, mesaEscolhida.lugares + 1)}
+            >
+              +
+            </Button>
+            {mesaEscolhida.forma !== "redonda" && (
+              <Button size="sm" variant="ghost" onClick={() => rodar(mesaEscolhida.id)}>
+                Rodar
+              </Button>
+            )}
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs text-[var(--bo-text-muted)]">Quem está sentado</span>
+            <ol className="flex flex-col gap-1.5">
+              {quemEstaNaMesa(mapa, mesaEscolhida).map(({ lugar, chave, ocupante }) => {
+                const grupo = ocupante
+                  ? lista.find((g) => g.id === ocupante.convidadoId)
+                  : undefined;
+                return (
+                  <li key={chave} className="flex items-center gap-2 text-sm">
+                    <span className="w-5 shrink-0 text-right text-xs tabular-nums text-[var(--bo-text-muted)]">
+                      {lugar + 1}
+                    </span>
+                    {ocupante ? (
+                      <>
+                        {grupo && grupo.party > 1 ? (
+                          <input
+                            aria-label={`Nome da pessoa no lugar ${lugar + 1}`}
+                            className="h-9 min-w-0 flex-1 rounded-lg border border-[var(--bo-hairline-strong)] bg-[var(--bo-surface)] px-2 text-sm"
+                            placeholder={nomeDoLugar({ ...ocupante, nome: undefined }, lista)}
+                            defaultValue={ocupante.nome ?? ""}
+                            onBlur={(e) => mexer((m) => nomearLugar(m, chave, e.target.value))}
+                          />
+                        ) : (
+                          <span className="min-w-0 flex-1 truncate">
+                            {nomeDoLugar(ocupante, lista)}
+                          </span>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => mexer((m) => levantar(m, chave))}
+                        >
+                          Levantar
+                        </Button>
+                      </>
+                    ) : (
+                      <span className="flex-1 text-xs text-[var(--bo-text-muted)]">livre</span>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="secondary" onClick={() => duplicar(mesaEscolhida.id)}>
+              Duplicar mesa
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => apagar({ tipo: "mesa", id: mesaEscolhida.id })}
+            >
+              Apagar mesa
+            </Button>
+          </div>
+        </div>
+      )}
+      {elementoEscolhido && (
+        <div className="flex flex-col gap-4 p-4">
+          <div data-nome-da-peca>
+            <Field
+              as="input"
+              label="Nome"
+              value={elementoEscolhido.nome}
+              onChange={(e) =>
+                mexer((m) => mudarElemento(m, elementoEscolhido.id, { nome: e.target.value }), {
+                  juntar: `nome-${elementoEscolhido.id}`,
+                })
+              }
+            />
+          </div>
+          {(["largura", "altura"] as const).map((lado) => (
+            <div key={lado} className="flex items-center gap-2">
+              <span className="w-16 text-xs text-[var(--bo-text-muted)]">
+                {lado === "largura" ? "Largura" : "Altura"}
+              </span>
+              <Button
+                size="sm"
+                variant="secondary"
+                aria-label={`Menos ${lado}`}
+                onClick={() =>
+                  mexer((m) =>
+                    mudarElemento(m, elementoEscolhido.id, {
+                      [lado]: elementoEscolhido[lado] - 50,
+                    }),
+                  )
+                }
+              >
+                −
+              </Button>
+              <span className="min-w-14 text-center text-sm tabular-nums">
+                {elementoEscolhido[lado]} cm
+              </span>
+              <Button
+                size="sm"
+                variant="secondary"
+                aria-label={`Mais ${lado}`}
+                onClick={() =>
+                  mexer((m) =>
+                    mudarElemento(m, elementoEscolhido.id, {
+                      [lado]: elementoEscolhido[lado] + 50,
+                    }),
+                  )
+                }
+              >
+                +
+              </Button>
+            </div>
+          ))}
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={() => apagar({ tipo: "elemento", id: elementoEscolhido.id })}
+          >
+            Apagar
           </Button>
         </div>
       )}
+    </>
+  );
 
-      {partidos.length > 0 && !naoCoube && (
-        <p className="text-xs text-[var(--bo-aviso)]">
-          {partidos.length === 1 ? "1 grupo está" : `${partidos.length} grupos estão`} em mais do
-          que uma mesa: {partidos.map(nomeDoGrupo).join(", ")}.
-        </p>
+  const listaVisivel = !compacto && !listaRecolhida;
+  const painelVisivel = !compacto && !!(mesaEscolhida || elementoEscolhido);
+  const margens: Margens = compacto
+    ? { topo: 72, esquerda: 0, direita: 0, fundo: 72 }
+    : {
+        topo: TOPO_PX,
+        esquerda: listaVisivel ? LARGURA_DA_LISTA_PX + 24 : 0,
+        direita: painelVisivel ? LARGURA_DO_PAINEL_PX + 24 : 0,
+        fundo: 0,
+      };
+
+  // No telemóvel a folha da peça só abre com o «Editar» de baixo: abri-la
+  // sozinha ao acrescentar a pista ou o buffet tapava a sala que se queria ver.
+  const folhaDaPeca = compacto && pecaAberta && !!(mesaEscolhida || elementoEscolhido);
+
+  return (
+    <div
+      className="fixed inset-0 z-40 overflow-hidden bg-[var(--bo-chao)]"
+      role="region"
+      aria-label={`Mapa de mesas de ${pedido.name}`}
+    >
+      {/* ── A SALA, POR BAIXO DE TUDO ───────────────────────────────────── */}
+      {vista === "visual" ? (
+        <>
+          {mapa.mesas.length === 0 && mapa.elementos.length === 0 && (
+            <div className="pointer-events-none absolute inset-x-0 top-1/2 z-[1] mx-auto flex max-w-sm -translate-y-1/2 flex-col items-center gap-2 px-6 text-center">
+              <IconeMesaRedonda tamanho={40} />
+              <p className="text-base font-medium text-[var(--bo-text)]">A sala está vazia</p>
+              <p className="text-sm text-[var(--bo-text-muted)]">
+                Em «Adicionar» há mesas redondas, compridas e quadradas, e os noivos, a pista, o
+                palco, o buffet e o bar. Arrasta cada peça para o sítio dela.
+              </p>
+            </div>
+          )}
+          <Sala
+            cheio
+            margens={margens}
+            mapa={mapa}
+            lista={lista}
+            seleccao={seleccao}
+            aSentar={aSentar !== null}
+            realce={realce}
+            lugarAceso={arrasto?.lugar ?? null}
+            mesaAcesa={arrasto && !arrasto.lugar ? arrasto.mesa : null}
+            onSeleccionar={setSeleccao}
+            onMoverMesa={(id, x, y) => mexer((m) => mudarMesa(m, id, { x, y }))}
+            onMoverElemento={(id, x, y) => mexer((m) => mudarElemento(m, id, { x, y }))}
+            onApagar={apagar}
+            onTocarLugar={tocarLugar}
+            onLevarPessoa={(de, para) => {
+              const oc = mapaRef.current.lugares[de];
+              if (oc) mexer((m) => sentar(m, para, oc));
+            }}
+            onMudarLugares={mudarLugares}
+            onDuplicar={duplicar}
+            onRodar={rodar}
+            onEditarNome={editarNome}
+          />
+        </>
+      ) : (
+        <div
+          className="absolute inset-0 overflow-y-auto overscroll-contain px-3 pb-24"
+          style={{
+            paddingTop: margens.topo,
+            paddingLeft: compacto ? undefined : margens.esquerda + 12,
+            paddingRight: compacto ? undefined : margens.direita + 12,
+          }}
+        >
+          <VistaEmLista
+            mapa={mapa}
+            lista={lista}
+            onMudar={(chave, destino) => {
+              const oc = mapaRef.current.lugares[chave];
+              if (!oc) return;
+              if (destino === "") mexer((m) => levantar(m, chave));
+              else {
+                const mesa = mapaRef.current.mesas.find((x) => x.id === destino);
+                const livre = mesa ? livresDaMesa(mapaRef.current, mesa)[0] : undefined;
+                if (mesa && livre !== undefined)
+                  mexer((m) => sentar(m, chaveDoLugar(mesa.id, livre), oc));
+              }
+            }}
+            onEscolherMesa={(id) => setSeleccao({ tipo: "mesa", id })}
+          />
+        </div>
       )}
 
-      <div className="flex gap-4">
-        <div className="grid min-w-0 flex-1 gap-4 lg:grid-cols-[15rem_minmax(0,1fr)] lg:items-start">
-          {!telemovel && (
-            <section aria-labelledby="titulo-espera" className="flex flex-col gap-2">
-              <h2 id="titulo-espera" className="bo-eyebrow text-[var(--bo-text-muted)]">
-                Lista de espera · {espera.reduce((s, g) => s + g.faltam, 0)}
-              </h2>
-              {listaDeEspera}
-            </section>
-          )}
-
-          {vista === "visual" ? (
-            <div className="min-w-0">
-              {mapa.mesas.length === 0 && mapa.elementos.length === 0 && (
-                <p className="mb-2 text-sm text-[var(--bo-text-muted)]">
-                  Começa por acrescentar mesas. Arrasta-as para o sítio; arrasta o vazio para andar
-                  pela sala, e usa dois dedos (ou Ctrl e a roda) para aproximar.
-                </p>
-              )}
-              <Sala
-                mapa={mapa}
-                lista={lista}
-                seleccao={seleccao}
-                aSentar={aSentar !== null}
-                onSeleccionar={setSeleccao}
-                onMoverMesa={(id, x, y) => mexer((m) => mudarMesa(m, id, { x, y }))}
-                onMoverElemento={(id, x, y) => mexer((m) => mudarElemento(m, id, { x, y }))}
-                onApagar={apagar}
-                onTocarLugar={tocarLugar}
-                onLevarPessoa={(de, para) => {
-                  const oc = mapaRef.current.lugares[de];
-                  if (oc) mexer((m) => sentar(m, para, oc));
-                }}
-              />
-            </div>
-          ) : (
-            <VistaEmLista
-              mapa={mapa}
-              lista={lista}
-              onMudar={(chave, destino) => {
-                const oc = mapaRef.current.lugares[chave];
-                if (!oc) return;
-                if (destino === "") mexer((m) => levantar(m, chave));
-                else {
-                  const mesa = mapaRef.current.mesas.find((x) => x.id === destino);
-                  const livre = mesa ? livresDaMesa(mapaRef.current, mesa)[0] : undefined;
-                  if (mesa && livre !== undefined)
-                    mexer((m) => sentar(m, chaveDoLugar(mesa.id, livre), oc));
-                }
-              }}
-              onEscolherMesa={(id) => setSeleccao({ tipo: "mesa", id })}
-            />
-          )}
+      {/* ── A BARRA DE CIMA: o único vidro do ecrã ─────────────────────── */}
+      <Glass
+        superficie="barra"
+        className="absolute inset-x-3 top-3 z-20 flex items-center gap-1.5 rounded-[var(--bo-raio-painel)] border border-[var(--bo-hairline)] bg-[var(--bo-surface)]/78 p-1.5 shadow-[var(--bo-sombra-suspensa)] sm:gap-2"
+      >
+        <button
+          type="button"
+          onClick={onSair}
+          aria-label="Voltar aos eventos"
+          className={`alvo-toque flex h-10 shrink-0 items-center gap-1 rounded-full pl-2 pr-3 text-sm text-[var(--bo-text)] hover:bg-[var(--bo-tinta-6)] ${ESTADO} ${PRESSAO}`}
+        >
+          <IconeVoltar />
+          <span className="hidden sm:inline">Eventos</span>
+        </button>
+        <div className="min-w-0 flex-1 px-1">
+          <p className="truncate text-sm font-medium text-[var(--bo-text)]">{pedido.name}</p>
+          <p className="truncate text-xs text-[var(--bo-tinta-72)]">
+            {[resumo?.evento, resumo?.quando, resumo?.local].filter(Boolean).join(" · ") ||
+              "Mapa de mesas"}
+            <span className="sr-only"> · </span>
+            <span role="status" className="ml-2 text-[var(--bo-tinta-72)]">
+              {estadoDaGravacao}
+            </span>
+          </p>
         </div>
 
-        <Inspector
-          aberto={!!(mesaEscolhida || elementoEscolhido)}
-          onFechar={() => setSeleccao(null)}
-          titulo={mesaEscolhida?.nome ?? elementoEscolhido?.nome ?? ""}
+        <div
+          role="group"
+          aria-label="Sentados"
+          className="flex shrink-0 items-center gap-2 rounded-full px-2 py-1"
+          title={`${numeros.lugares} lugares · ${numeros.livres} livres`}
         >
-          {mesaEscolhida && (
-            <div className="flex flex-col gap-4 p-4">
-              <Field
-                as="input"
-                label="Nome da mesa"
-                value={mesaEscolhida.nome}
-                onChange={(e) =>
-                  mexer((m) => mudarMesa(m, mesaEscolhida.id, { nome: e.target.value }))
-                }
-              />
-              <div className="flex flex-col gap-1.5">
-                <span className="text-xs text-[var(--bo-text-muted)]">Forma</span>
-                <Segmented<FormaDaMesa>
-                  size="sm"
-                  ariaLabel="Forma da mesa"
-                  value={mesaEscolhida.forma}
-                  onChange={(forma) => mexer((m) => mudarMesa(m, mesaEscolhida.id, { forma }))}
-                  options={(["redonda", "comprida", "quadrada"] as const).map((f) => ({
-                    value: f,
-                    label: ROTULO_DA_FORMA[f],
-                  }))}
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-[var(--bo-text-muted)]">Lugares</span>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  aria-label="Menos um lugar"
-                  disabled={mesaEscolhida.lugares <= 1}
-                  onClick={() => mudarLugares(mesaEscolhida.id, mesaEscolhida.lugares - 1)}
-                >
-                  −
-                </Button>
-                <span className="min-w-8 text-center tabular-nums" aria-live="polite">
-                  {mesaEscolhida.lugares}
-                </span>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  aria-label="Mais um lugar"
-                  disabled={mesaEscolhida.lugares >= TECTOS.lugaresPorMesa}
-                  onClick={() => mudarLugares(mesaEscolhida.id, mesaEscolhida.lugares + 1)}
-                >
-                  +
-                </Button>
-                {mesaEscolhida.forma !== "redonda" && (
+          <Anel feito={numeros.sentados} total={numeros.total} />
+          <span className="hidden text-xs text-[var(--bo-tinta-72)] lg:inline">Sentados</span>
+          <span className="text-sm font-medium tabular-nums text-[var(--bo-text)]">
+            {numeros.sentados}/{numeros.total}
+          </span>
+        </div>
+
+        <span
+          aria-hidden="true"
+          className="mx-0.5 hidden h-6 w-px bg-[var(--bo-hairline)] sm:block"
+        />
+
+        <MoreMenu label="Adicionar" icone={<IconeMais />} variante="secondary" items={adicionar} />
+
+        {!compacto && (
+          <Button
+            size="sm"
+            variant="primary"
+            onClick={sentarTodos}
+            disabled={mapa.mesas.length === 0}
+            iconLeft={<IconeVarinha />}
+          >
+            Sentar todos
+          </Button>
+        )}
+
+        <button
+          type="button"
+          className={botaoRedondo}
+          onClick={desfazerUm}
+          disabled={!podeAnular}
+          aria-label="Anular o último passo"
+          title="Anular (⌘Z)"
+        >
+          <IconeAnular />
+        </button>
+        {!compacto && (
+          <button
+            type="button"
+            className={botaoRedondo}
+            onClick={refazerUm}
+            disabled={!podeRefazer}
+            aria-label="Refazer"
+            title="Refazer (⇧⌘Z)"
+          >
+            <IconeRefazer />
+          </button>
+        )}
+
+        {!compacto ? (
+          <Segmented<Vista>
+            size="sm"
+            ariaLabel="Ver o mapa"
+            value={vista}
+            onChange={setVista}
+            options={[
+              { value: "visual", label: "Visual" },
+              { value: "lista", label: "Lista" },
+            ]}
+          />
+        ) : (
+          <MoreMenu
+            label="Mais"
+            items={[
+              {
+                label: "Sentar todos",
+                hint: "Os grupos confirmados, sem os partir",
+                onClick: sentarTodos,
+              },
+              { label: "Refazer", onClick: refazerUm },
+              {
+                label: vista === "visual" ? "Ver em lista" : "Ver o desenho",
+                onClick: () => setVista(vista === "visual" ? "lista" : "visual"),
+              },
+            ]}
+          />
+        )}
+      </Glass>
+
+      {/* ── O GRUPO QUE NÃO COUBE, E OS GRUPOS PARTIDOS ──────────────────── */}
+      {(naoCoube || partidos.length > 0) && (
+        <div
+          className="absolute left-1/2 z-20 w-[min(36rem,calc(100%-1.5rem))] -translate-x-1/2"
+          style={{ top: margens.topo }}
+        >
+          {naoCoube ? (
+            <div
+              role="status"
+              className="flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--bo-aviso-tom)]/35 bg-[var(--bo-elevado)] px-3 py-2 text-sm shadow-[var(--bo-sombra-suspensa)]"
+            >
+              <span className="min-w-0 flex-1">
+                {naoCoube.ficaram === 1 ? "Ficou 1 pessoa" : `Ficaram ${naoCoube.ficaram} pessoas`}{" "}
+                de <strong>{nomeDoGrupo(naoCoube.convidadoId)}</strong> sem lugar nesta mesa.
+              </span>
+              {(() => {
+                const mesa = mapa.mesas.find((m) => m.id === naoCoube.mesaId);
+                const cabem = mesa ? TECTOS.lugaresPorMesa - mesa.lugares : 0;
+                return mesa && cabem > 0 ? (
                   <Button
                     size="sm"
-                    variant="ghost"
-                    onClick={() =>
-                      mexer((m) =>
-                        mudarMesa(m, mesaEscolhida.id, { rodada: !mesaEscolhida.rodada }),
-                      )
-                    }
+                    variant="secondary"
+                    onClick={() => {
+                      const r = acrescentarLugares(mapaRef.current, mesa.id, naoCoube.ficaram);
+                      mexer(() => r.mapa);
+                      sentarGrupoEm(naoCoube.convidadoId, mesa.id);
+                    }}
                   >
-                    Rodar
+                    Acrescentar {Math.min(cabem, naoCoube.ficaram)}{" "}
+                    {Math.min(cabem, naoCoube.ficaram) === 1 ? "lugar" : "lugares"} à {mesa.nome}
                   </Button>
-                )}
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <span className="text-xs text-[var(--bo-text-muted)]">Quem está sentado</span>
-                <ol className="flex flex-col gap-1.5">
-                  {quemEstaNaMesa(mapa, mesaEscolhida).map(({ lugar, chave, ocupante }) => {
-                    const grupo = ocupante
-                      ? lista.find((g) => g.id === ocupante.convidadoId)
-                      : undefined;
-                    return (
-                      <li key={chave} className="flex items-center gap-2 text-sm">
-                        <span className="w-5 shrink-0 text-right text-xs tabular-nums text-[var(--bo-text-muted)]">
-                          {lugar + 1}
-                        </span>
-                        {ocupante ? (
-                          <>
-                            {grupo && grupo.party > 1 ? (
-                              <input
-                                aria-label={`Nome da pessoa no lugar ${lugar + 1}`}
-                                className="h-9 min-w-0 flex-1 rounded-lg border border-[var(--bo-hairline-strong)] bg-[var(--bo-surface)] px-2 text-sm"
-                                placeholder={nomeDoLugar({ ...ocupante, nome: undefined }, lista)}
-                                defaultValue={ocupante.nome ?? ""}
-                                onBlur={(e) => mexer((m) => nomearLugar(m, chave, e.target.value))}
-                              />
-                            ) : (
-                              <span className="min-w-0 flex-1 truncate">
-                                {nomeDoLugar(ocupante, lista)}
-                              </span>
-                            )}
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => mexer((m) => levantar(m, chave))}
-                            >
-                              Levantar
-                            </Button>
-                          </>
-                        ) : (
-                          <span className="flex-1 text-xs text-[var(--bo-text-muted)]">livre</span>
-                        )}
-                      </li>
+                ) : null;
+              })()}
+              {maisProximaComLugar(mapa, naoCoube.mesaId) && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    const r = sentarResto(
+                      mapaRef.current,
+                      lista,
+                      naoCoube.convidadoId,
+                      naoCoube.mesaId,
                     );
-                  })}
-                </ol>
-              </div>
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={() => apagar({ tipo: "mesa", id: mesaEscolhida.id })}
-              >
-                Apagar mesa
+                    mexer(() => r.mapa);
+                    setNaoCoube(r.ficaram > 0 ? { ...naoCoube, ficaram: r.ficaram } : null);
+                  }}
+                >
+                  Sentar o resto na mesa mais próxima
+                </Button>
+              )}
+              <Button size="sm" variant="ghost" onClick={() => setNaoCoube(null)}>
+                Deixar assim
               </Button>
             </div>
+          ) : (
+            <p className="mx-auto w-fit rounded-full border border-[var(--bo-hairline)] bg-[var(--bo-elevado)] px-3 py-1.5 text-xs text-[var(--bo-aviso)] shadow-[var(--bo-sombra-erguida)]">
+              {partidos.length === 1 ? "1 grupo está" : `${partidos.length} grupos estão`} em mais
+              do que uma mesa: {partidos.map(nomeDoGrupo).join(", ")}.
+            </p>
           )}
-          {elementoEscolhido && (
-            <div className="flex flex-col gap-4 p-4">
-              <Field
-                as="input"
-                label="Nome"
-                value={elementoEscolhido.nome}
-                onChange={(e) =>
-                  mexer((m) => mudarElemento(m, elementoEscolhido.id, { nome: e.target.value }))
-                }
-              />
-              {(["largura", "altura"] as const).map((lado) => (
-                <div key={lado} className="flex items-center gap-2">
-                  <span className="w-16 text-xs text-[var(--bo-text-muted)]">
-                    {lado === "largura" ? "Largura" : "Altura"}
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    aria-label={`Menos ${lado}`}
-                    onClick={() =>
-                      mexer((m) =>
-                        mudarElemento(m, elementoEscolhido.id, {
-                          [lado]: elementoEscolhido[lado] - 50,
-                        }),
-                      )
-                    }
-                  >
-                    −
-                  </Button>
-                  <span className="min-w-14 text-center text-sm tabular-nums">
-                    {elementoEscolhido[lado]} cm
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    aria-label={`Mais ${lado}`}
-                    onClick={() =>
-                      mexer((m) =>
-                        mudarElemento(m, elementoEscolhido.id, {
-                          [lado]: elementoEscolhido[lado] + 50,
-                        }),
-                      )
-                    }
-                  >
-                    +
-                  </Button>
-                </div>
-              ))}
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={() => apagar({ tipo: "elemento", id: elementoEscolhido.id })}
+        </div>
+      )}
+
+      {/* ── A LISTA DE ESPERA, À ESQUERDA ───────────────────────────────── */}
+      {!compacto &&
+        (listaVisivel ? (
+          <section
+            aria-labelledby="titulo-espera"
+            className="absolute bottom-3 left-3 z-10 flex flex-col overflow-hidden rounded-[var(--bo-raio-painel)] border border-[var(--bo-hairline)] bg-[var(--bo-elevado)] shadow-[var(--bo-sombra-suspensa)]"
+            style={{ top: TOPO_PX, width: LARGURA_DA_LISTA_PX }}
+          >
+            <div className="flex items-center justify-between gap-2 border-b border-[var(--bo-hairline)] px-4 py-3">
+              <h2 id="titulo-espera" className="text-sm font-medium text-[var(--bo-text)]">
+                Por sentar{" "}
+                <span className="tabular-nums text-[var(--bo-text-muted)]">· {porSentarN}</span>
+              </h2>
+              <button
+                type="button"
+                className={`${botaoRedondo} h-8 w-8`}
+                onClick={() => setListaRecolhida(true)}
+                aria-label="Recolher a lista de espera"
+                title="Recolher"
               >
-                Apagar
-              </Button>
+                <IconeFechar />
+              </button>
             </div>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
+              {listaDeEspera}
+            </div>
+          </section>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setListaRecolhida(false)}
+            className={`alvo-toque absolute left-3 z-10 flex items-center gap-2 rounded-full border border-[var(--bo-hairline)] bg-[var(--bo-elevado)] px-4 py-2 text-sm shadow-[var(--bo-sombra-suspensa)] hover:bg-[var(--bo-surface-hover)] ${ESTADO} ${PRESSAO}`}
+            style={{ top: TOPO_PX }}
+          >
+            <IconePessoas />
+            Por sentar{" "}
+            <span className="tabular-nums text-[var(--bo-text-muted)]">· {porSentarN}</span>
+          </button>
+        ))}
+
+      {/* ── O PAINEL DA PEÇA ESCOLHIDA, À DIREITA ───────────────────────── */}
+      {painelVisivel && (
+        <aside
+          aria-label={mesaEscolhida?.nome ?? elementoEscolhido?.nome ?? "Peça"}
+          className="absolute right-3 z-10 flex max-h-[calc(100%-6rem)] flex-col overflow-hidden rounded-[var(--bo-raio-painel)] border border-[var(--bo-hairline)] bg-[var(--bo-elevado)] shadow-[var(--bo-sombra-suspensa)]"
+          style={{ top: TOPO_PX, width: LARGURA_DO_PAINEL_PX }}
+        >
+          <div className="flex items-center justify-between gap-2 border-b border-[var(--bo-hairline)] px-4 py-3">
+            <h2 className="truncate text-sm font-medium text-[var(--bo-text)]">
+              {mesaEscolhida?.nome ?? elementoEscolhido?.nome}
+            </h2>
+            <button
+              type="button"
+              className={`${botaoRedondo} h-8 w-8`}
+              onClick={() => setSeleccao(null)}
+              aria-label="Fechar o painel"
+              title="Fechar (Esc)"
+            >
+              <IconeFechar />
+            </button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{painelDaPeca}</div>
+        </aside>
+      )}
+
+      {/* ── NO TELEMÓVEL: a pastilha da lista de espera, em baixo ───────── */}
+      {compacto && (
+        <div className="absolute bottom-4 left-3 z-10 flex gap-2">
+          <button
+            type="button"
+            onClick={() => setEsperaAberta(true)}
+            className={`alvo-toque flex items-center gap-2 rounded-full border border-[var(--bo-hairline)] bg-[var(--bo-elevado)] px-4 py-2.5 text-sm shadow-[var(--bo-sombra-suspensa)] ${ESTADO} ${PRESSAO}`}
+          >
+            <IconePessoas />
+            Lista de espera · {porSentarN}
+          </button>
+          {(mesaEscolhida || elementoEscolhido) && (
+            <button
+              type="button"
+              onClick={() => setPecaAberta(true)}
+              className={`alvo-toque flex items-center gap-2 rounded-full border border-[var(--bo-hairline)] bg-[var(--bo-elevado)] px-4 py-2.5 text-sm shadow-[var(--bo-sombra-suspensa)] ${ESTADO} ${PRESSAO}`}
+            >
+              Editar {mesaEscolhida?.nome ?? elementoEscolhido?.nome}
+            </button>
           )}
-        </Inspector>
-      </div>
+        </div>
+      )}
+
+      {/* ── O NOME QUE VAI NO DEDO, A CAMINHO DE UMA CADEIRA ────────────── */}
+      {arrasto && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed z-50 -translate-x-1/2 -translate-y-[130%] rounded-full bg-[var(--bo-accent)] px-3 py-1.5 text-sm font-medium text-[var(--bo-sobre-acento)] shadow-[var(--bo-sombra-suspensa)]"
+          style={{ left: arrasto.x, top: arrasto.y }}
+        >
+          {arrasto.nome}
+        </div>
+      )}
 
       <FolhaOuDialogo
-        aberto={telemovel && esperaAberta}
+        aberto={compacto && esperaAberta}
         onFechar={() => setEsperaAberta(false)}
         titulo="Lista de espera"
         descricao="Toca num convidado e depois num lugar livre."
@@ -789,19 +1308,11 @@ export default function EditorDoMapa({ pedido, onPedido }: Props) {
       </FolhaOuDialogo>
 
       <FolhaOuDialogo
-        aberto={elementosAbertos}
-        onFechar={() => setElementosAbertos(false)}
-        titulo="Elementos da sala"
-        descricao="Para o desenho fazer sentido na sala."
-        largura="sm"
+        aberto={folhaDaPeca}
+        onFechar={() => setPecaAberta(false)}
+        titulo={mesaEscolhida?.nome ?? elementoEscolhido?.nome ?? ""}
       >
-        <div className="grid grid-cols-2 gap-2">
-          {(Object.keys(ELEMENTOS) as TipoDeElemento[]).map((t) => (
-            <Button key={t} variant="secondary" onClick={() => acrescentarElemento(t)}>
-              {ELEMENTOS[t].nome}
-            </Button>
-          ))}
-        </div>
+        {painelDaPeca}
       </FolhaOuDialogo>
     </div>
   );
@@ -827,7 +1338,7 @@ function VistaEmLista({
     return <p className="text-sm text-[var(--bo-text-muted)]">Ainda não há mesas.</p>;
   }
   return (
-    <div className="grid min-w-0 gap-3 @container sm:grid-cols-2">
+    <div className="grid min-w-0 gap-3 @container sm:grid-cols-2 lg:grid-cols-3">
       {mapa.mesas.map((mesa) => {
         const sentados = quemEstaNaMesa(mapa, mesa).filter((l) => l.ocupante);
         return (
@@ -885,6 +1396,10 @@ function VistaEmLista({
   );
 }
 
+/**
+ * Um convidado novo, daqui mesmo. O nome em cima, a toda a largura — na
+ * captura dela, ao lado do «Pessoas», o campo cortava «Nome (pessoa ou fa».
+ */
 function NovoConvidado({
   onAcrescentar,
 }: {
@@ -899,7 +1414,7 @@ function NovoConvidado({
     setQuantos("1");
   }
   return (
-    <div className="flex flex-wrap items-end gap-2 border-t border-[var(--bo-hairline)] pt-3">
+    <div className="flex flex-col gap-2 border-t border-[var(--bo-hairline)] pt-3">
       <Field
         as="input"
         label="Novo convidado"
@@ -907,21 +1422,28 @@ function NovoConvidado({
         onChange={(e) => setNome(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && acrescentar()}
         placeholder="Nome (pessoa ou família)"
-        containerClassName="min-w-[8rem] flex-1"
       />
-      <Field
-        as="input"
-        type="number"
-        min={1}
-        max={1000}
-        label="Pessoas"
-        value={quantos}
-        onChange={(e) => setQuantos(e.target.value)}
-        containerClassName="w-20"
-      />
-      <Button size="sm" variant="secondary" onClick={acrescentar} disabled={!nome.trim()}>
-        Acrescentar
-      </Button>
+      <div className="flex items-end gap-2">
+        <Field
+          as="input"
+          type="number"
+          min={1}
+          max={1000}
+          label="Pessoas"
+          value={quantos}
+          onChange={(e) => setQuantos(e.target.value)}
+          containerClassName="w-24"
+        />
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={acrescentar}
+          disabled={!nome.trim()}
+          className="flex-1"
+        >
+          Acrescentar
+        </Button>
+      </div>
     </div>
   );
 }

@@ -40,9 +40,17 @@ export interface MoreMenuProps {
   items: MoreMenuItem[];
   /** Visible trigger label (also the accessible name alongside the glyph). */
   label?: string;
+  /**
+   * O glifo do botão, quando não é o «⋯». O mapa de mesas tem um «Adicionar»
+   * com um «+» e um «Partilhar» com a seta: um menu é um menu, mas o que ele
+   * abre diz-se pelo desenho do botão.
+   */
+  icone?: ReactNode;
+  /** O peso do botão; `ghost` por omissão, como sempre foi. */
+  variante?: "ghost" | "secondary";
 }
 
-export function MoreMenu({ items, label = "Mais" }: MoreMenuProps) {
+export function MoreMenu({ items, label = "Mais", icone, variante = "ghost" }: MoreMenuProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -121,7 +129,7 @@ export function MoreMenu({ items, label = "Mais" }: MoreMenuProps) {
     <div ref={rootRef} className="relative">
       <Button
         ref={triggerRef}
-        variant="ghost"
+        variant={variante}
         size="sm"
         // No telemóvel o rótulo esconde-se (`hidden sm:inline` abaixo) e sobra
         // só o glifo "⋯": o botão fica com 39 px de largura, três abaixo do
@@ -140,11 +148,13 @@ export function MoreMenu({ items, label = "Mais" }: MoreMenuProps) {
         aria-controls={open ? menuId : undefined}
         onClick={() => setOpen((o) => !o)}
         iconLeft={
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <circle cx="5" cy="12" r="1.6" />
-            <circle cx="12" cy="12" r="1.6" />
-            <circle cx="19" cy="12" r="1.6" />
-          </svg>
+          icone ?? (
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <circle cx="5" cy="12" r="1.6" />
+              <circle cx="12" cy="12" r="1.6" />
+              <circle cx="19" cy="12" r="1.6" />
+            </svg>
+          )
         }
       >
         <span className="hidden sm:inline">{label}</span>
