@@ -37,6 +37,7 @@ import { enviarEventos, ipDoPedido } from "@/lib/meta/capi";
 import { EVENTOS as EVENTOS_META } from "@/lib/meta/eventos";
 import { desserializar as desserializarMeta } from "@/lib/meta/click-id";
 import { FUSO_DO_ESTUDIO } from "@/lib/fuso";
+import { quemPedeEOCasal } from "@/lib/orcamento/quem-pede";
 
 export const maxDuration = 30;
 
@@ -290,6 +291,14 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
     : "";
   const name = form.name?.trim() || "Sem nome";
   const firstName = name.split(" ")[0] || "o cliente";
+  // Quem vai em grande: o casal, quando quem escreveu não é um dos dois (a mãe
+  // da noiva, uma wedding planner). Ver `quem-pede.ts` — a 14/10 ela leu
+  // «Maria Silva» em grande num pedido da Luana e do Afonso.
+  const { titulo, feitoPor } = quemPedeEOCasal({
+    name,
+    partnerA: form.partnerA,
+    partnerB: form.partnerB,
+  });
   const subtitle = [et, cat].filter(Boolean).join(" · ");
   /**
    * ══════════════════════════════════════════════════════════════════════════
@@ -383,12 +392,12 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
     .filter(Boolean)
     .join(" · ");
   const subject = subjectLead
-    ? `Pedido de orçamento · ${subjectLead} — ${name}`
-    : `Pedido de orçamento — ${name}`;
+    ? `Pedido de orçamento · ${subjectLead} — ${titulo}`
+    : `Pedido de orçamento — ${titulo}`;
 
   // Hidden inbox-preview line — surfaces what the subject can't.
   const preheader = [
-    name,
+    feitoPor ? `${titulo} (pedido de ${feitoPor})` : titulo,
     dateHero + (isWeekend ? " (fim de semana)" : ""),
     subtitle,
     form.guests ? `${form.guests} convidados` : "",
@@ -483,7 +492,8 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
   // valores são os que estas linhas de cima já decidiam.
   const html = htmlDoPedidoParaAEquipa({
     logo: logoUrl,
-    nome: name,
+    nome: titulo,
+    feitoPor,
     data: dateHero,
     fimDeSemana: isWeekend,
     subtitulo: subtitle,
@@ -492,6 +502,7 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
     mailto: mailtoHref,
     lembrete: nudge,
     primeiroNome: firstName,
+    respostaPara: form.email ?? "",
     pedido: linhasDoPedido,
     contacto: linhasDeContacto,
     notas: form.notes ?? "",
@@ -533,6 +544,7 @@ function buildEmail(id: string, form: QuoteFormData, breakdown?: PriceBreakdown)
     "",
     "QUEM PEDIU",
     `Nome: ${name}`,
+    feitoPor ? `(Não é um dos noivos — o casal é ${titulo}.)` : null,
     form.email ? `Email: ${form.email}` : null,
     form.phone ? `Telefone: ${form.phone}` : null,
     form.company ? `Empresa: ${form.company}` : null,

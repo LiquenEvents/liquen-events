@@ -1,79 +1,47 @@
 import { esc } from "./mail";
+import { ESTILO_DA_CARTA } from "./email-pedido-recebido";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
- * O EMAIL QUE A EQUIPA RECEBE, NO MESMO DESENHO DO QUE VAI AO CLIENTE
+ * O EMAIL QUE A EQUIPA RECEBE, COM A ESTRUTURA DA CARTA AO CLIENTE
  * ════════════════════════════════════════════════════════════════════════════
  *
- * Pedido dela, com a fotografia do email «Novo pedido de orçamento» à frente:
- * «quando recebemos está assim. coloca também com a mesma estrutura e design
- * quando enviamos para o cliente o email».
+ * Pedido dela, a 14/10: «quero que coloques a estrutura do email que enviamos
+ * para o cliente a dizer que recebemos o pedido no email que recebemos quando
+ * recebemos o pedido do cliente».
  *
- * O desenho é o de `docs/email-pedido-recebido-apple.html` (ver
- * `email-pedido-recebido.ts`): a mesma folha de estilo, o mesmo cartão de
- * 640 px, o mesmo logótipo, o mesmo título grande, o mesmo botão em cápsula, os
- * mesmos cartões cinzentos com linhas e o mesmo rodapé. O que muda é o
- * CONTEÚDO, que é o da equipa e não o do cliente:
+ * O email ao cliente passou à CARTA (`email-pedido-recebido.ts`, o desenho dela
+ * em `docs/email-pedido-recebido-carta.html`), e este ficou para trás no
+ * desenho anterior (fundo cinzento, cartão, cápsula, cartões cinzentos). Passa
+ * à mesma estrutura, pela mesma ordem:
  *
- *   · o título é o nome de quem pediu, e a data vem logo a seguir, em
- *     destaque — é ela que decide se o trabalho cabe na agenda;
- *   · os botões falam COM o cliente (WhatsApp com a mensagem já escrita,
- *     `mailto` com o assunto já escrito) — os mesmos de antes;
- *   · todos os campos que o email anterior mostrava continuam cá, incluindo a
- *     decoração, a cerimónia, o orçamento e as notas;
- *   · a referência fica, no rodapé: este email é interno, e é por ela que se
- *     procura o pedido mais tarde. (A regra «não mostrar a referência» é do
- *     email ao CLIENTE.)
+ *   · página branca de 600 px, o logótipo à esquerda;
+ *   · o título grande e, por baixo, em cinzento, o que é e quando é;
+ *   · o filete;
+ *   · o que fazer (responder por WhatsApp ou por email), como ligações — a
+ *     carta não tem cápsulas;
+ *   · o resumo numa tabela de linhas finas, com o mesmo desenho das linhas da
+ *     carta (rótulo de 140 px, filete de `#d2d2d7`), o contacto incluído, e a
+ *     referência no fim;
+ *   · as notas do cliente como texto da carta;
+ *   · o rodapé por baixo de um filete.
  *
- * Não leva a assinatura nem o banner: não é a casa a escrever a alguém, é um
- * aviso para dentro — e o email anterior também não os levava.
+ * A folha de estilo é a MESMA constante (`ESTILO_DA_CARTA`), importada e não
+ * copiada: o modo escuro e o telemóvel ficam iguais nos dois sem ninguém ter
+ * de os manter em dois sítios.
  *
- * Este ficheiro só desenha. Quem decide os valores (o que é a data em
- * destaque, que linhas há, os `href` dos botões) continua a ser o `buildEmail`
- * da rota, que é onde essas decisões já estavam escritas e testadas.
+ * O título é quem é — o casal, quando quem escreveu é outra pessoa (ver
+ * `quem-pede.ts`) — porque é isso que a equipa procura primeiro. Não leva a
+ * assinatura nem o banner: não é a casa a escrever a alguém, é um aviso para
+ * dentro.
+ *
+ * Este ficheiro só desenha. Quem decide os valores (a data, que linhas há, os
+ * `href`) continua a ser o `buildEmail` da rota.
  */
 
-/**
- * A folha de estilo do desenho, igual à do email ao cliente. Está aqui escrita
- * outra vez, e não importada, porque o corpo daquele email é gerado a partir
- * do ficheiro dela; a igualdade das duas está presa por teste
- * (`email-pedido-equipa.test.ts`), para não se afastarem sem ninguém dar por
- * isso.
- */
-export const ESTILO_DO_EMAIL = `<style>
-  body { margin:0; padding:0; width:100% !important; background:#f5f5f7; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
-  table { border-collapse:collapse; mso-table-lspace:0; mso-table-rspace:0; }
-  img { border:0; line-height:100%; outline:none; text-decoration:none; -ms-interpolation-mode:bicubic; }
-  a { color:#4d6650; }
-  .sf { font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,'Helvetica Neue',Helvetica,Arial,sans-serif; }
+/** A folha de estilo, a da carta. O nome antigo fica para quem já o usa. */
+export const ESTILO_DO_EMAIL = ESTILO_DA_CARTA;
 
-  @media only screen and (max-width:660px) {
-    .canvas { padding:0 !important; }
-    .card { border-radius:0 !important; }
-    .pad { padding-left:24px !important; padding-right:24px !important; }
-    .h1 { font-size:32px !important; line-height:36px !important; letter-spacing:0 !important; }
-    .intro { font-size:19px !important; line-height:27px !important; }
-    .h2 { font-size:21px !important; line-height:25px !important; }
-    .cta-gap { display:block !important; height:14px !important; width:100% !important; }
-    .cta-cell { display:block !important; width:100% !important; text-align:center !important; }
-    .box-pad { padding-left:20px !important; padding-right:20px !important; }
-  }
-
-  @media (prefers-color-scheme: dark) {
-    body, .canvas { background:#000000 !important; }
-    .card { background:#1d1d1f !important; }
-    .t1 { color:#f5f5f7 !important; }
-    .t2 { color:#a1a1a6 !important; }
-    .t3 { color:#86868b !important; }
-    .box { background:#2a2a2c !important; }
-    .line { border-color:#424245 !important; }
-    .accent { color:#9dc0a2 !important; }
-    .btn { background:#5d7a61 !important; }
-    .step { background:#5d7a61 !important; }
-  }
-</style>`;
-
-/** Uma linha de um cartão. Com `href`, o valor é uma ligação (mailto, tel). */
 export interface LinhaDoCartao {
   rotulo: string;
   valor: string;
@@ -83,7 +51,10 @@ export interface LinhaDoCartao {
 export interface DadosDoPedidoParaAEquipa {
   /** `cid:` do logótipo. */
   logo: string;
+  /** O que vai em grande: o casal, ou quem escreveu (ver `quem-pede.ts`). */
   nome: string;
+  /** Quem escreveu, quando não é um dos noivos: uma linha por baixo do nome. */
+  feitoPor?: string | null;
   /** «sexta, 6 nov 2026», ou o intervalo de um evento de vários dias. */
   data: string;
   fimDeSemana: boolean;
@@ -96,6 +67,8 @@ export interface DadosDoPedidoParaAEquipa {
   /** O lembrete de responder depressa — o do pedido urgente, quando o é. */
   lembrete: string;
   primeiroNome: string;
+  /** Para onde vai a resposta a este email (o email do pedido), se o houver. */
+  respostaPara?: string;
   pedido: LinhaDoCartao[];
   contacto: LinhaDoCartao[];
   notas: string;
@@ -104,95 +77,80 @@ export interface DadosDoPedidoParaAEquipa {
   quando: string;
 }
 
-/** As linhas de um cartão, com o filete por baixo de todas menos a última. */
-function linhas(lista: readonly LinhaDoCartao[]): string {
-  return lista
-    .map((l, i) => {
-      const ultima = i === lista.length - 1;
-      const filete = ultima ? "" : "border-bottom:1px solid #d2d2d7;";
-      const classe = ultima ? "" : " line";
-      const valor = l.href
-        ? `<a href="${esc(l.href)}" class="accent" style="color:#4d6650;text-decoration:none;">${esc(l.valor)}</a>`
-        : esc(l.valor);
-      return `          <tr>
-            <td class="t2${classe}" style="padding:14px 12px 14px 0;${filete}color:#6e6e73;">${esc(l.rotulo)}</td>
-            <td class="t1${classe}" align="right" style="padding:14px 0;${filete}color:#1d1d1f;">${valor}</td>
-          </tr>
-`;
-    })
-    .join("");
-}
-
-/** Um cartão cinzento com título e linhas — o «O seu pedido.» do desenho dela. */
-function cartao(titulo: string, lista: readonly LinhaDoCartao[], espacoEmCima: number): string {
-  if (lista.length === 0) return "";
-  return `  <tr><td class="pad" style="padding:${espacoEmCima}px 56px 0;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="box" style="background:#f5f5f7;border-radius:18px;">
-      <tr><td class="box-pad" style="padding:28px 28px 6px;">
-        <h2 class="h2 t1" style="margin:0;font-size:24px;line-height:28px;font-weight:600;letter-spacing:0.2px;color:#1d1d1f;">${esc(titulo)}</h2>
-      </td></tr>
-      <tr><td class="box-pad" style="padding:0 28px 14px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:17px;line-height:22px;">
-${linhas(lista)}        </table>
-      </td></tr>
-    </table>
-  </td></tr>
-
+/**
+ * Uma linha do resumo, com o desenho das linhas da carta: todas com o filete
+ * de cima, e a última também com o de baixo.
+ */
+function linhaDoResumo(l: LinhaDoCartao, ultima: boolean, quebra = false): string {
+  const fundo = ultima ? "border-bottom:1px solid #d2d2d7;" : "";
+  const valor = l.href
+    ? `<a href="${esc(l.href)}" class="accent" style="color:#4d6650;text-decoration:none;">${esc(l.valor)}</a>`
+    : esc(l.valor);
+  return `      <tr>
+        <td class="lbl t2 line" width="140" valign="top" style="width:140px;padding:12px 12px 12px 0;border-top:1px solid #d2d2d7;${fundo}color:#6e6e73;">${esc(l.rotulo)}</td>
+        <td class="t1 line" valign="top" style="padding:12px 0;border-top:1px solid #d2d2d7;${fundo}color:#1d1d1f;${quebra ? "word-break:break-all;" : ""}">${valor}</td>
+      </tr>
 `;
 }
 
 /**
- * Os botões. Três casos, agora que um pedido pode chegar só com telefone OU só
- * com email: a cápsula do WhatsApp e a ligação do email; só a cápsula; ou a
- * cápsula a ser o email. Um botão com `href` vazio parecia um botão e não fazia
- * nada — a pior das avarias num email que a equipa lê com pressa.
+ * O que fazer, em ligações e não em cápsulas (a carta não as tem). Três casos,
+ * agora que um pedido pode chegar só com telefone OU só com email; uma ligação
+ * com `href` vazio parecia uma acção e não fazia nada.
  */
-function botoes(whatsapp: string, mailto: string): string {
-  const capsula = (href: string, texto: string) => `          <!--[if mso]>
-          <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="${esc(href)}" style="height:46px;v-text-anchor:middle;width:210px;" arcsize="50%" stroke="f" fillcolor="#4d6650">
-            <w:anchorlock/><center style="color:#ffffff;font-family:'Segoe UI',Arial,sans-serif;font-size:17px;">${esc(texto)}</center>
-          </v:roundrect>
-          <![endif]-->
-          <!--[if !mso]><!-- -->
-          <a href="${esc(href)}" class="btn" style="display:inline-block;background:#4d6650;color:#ffffff;text-decoration:none;font-size:17px;line-height:20px;font-weight:400;padding:13px 24px;border-radius:980px;">${esc(texto)}</a>
-          <!--<![endif]-->`;
-
-  if (whatsapp && mailto) {
-    return `        <td class="cta-cell" align="center">
-${capsula(whatsapp, "Enviar WhatsApp")}
-        </td>
-        <td class="cta-gap" width="24" style="width:24px;font-size:0;line-height:0;">&nbsp;</td>
-        <td class="cta-cell" align="center">
-          <a href="${esc(mailto)}" class="accent" style="color:#4d6650;text-decoration:none;font-size:17px;line-height:20px;white-space:nowrap;">Responder por email&nbsp;›</a>
-        </td>`;
+function responder(whatsapp: string, mailto: string): string {
+  const ligacao = (href: string, texto: string) =>
+    `<a href="${esc(href)}" class="accent" style="color:#4d6650;text-decoration:none;font-weight:600;white-space:nowrap;">${esc(texto)}&nbsp;›</a>`;
+  const partes = [
+    whatsapp ? ligacao(whatsapp, "Enviar WhatsApp") : "",
+    mailto ? ligacao(mailto, "Responder por email") : "",
+  ].filter(Boolean);
+  if (partes.length === 0) {
+    // Inalcançável pelo esquema (exige email ou telefone), mas se alguém
+    // afrouxar essa regra é melhor um aviso do que uma ligação morta.
+    return `<span class="t2" style="color:#6e6e73;">Sem contacto registado.</span>`;
   }
-  if (whatsapp || mailto) {
-    return `        <td class="cta-cell" align="center">
-${capsula(whatsapp || mailto, whatsapp ? "Enviar WhatsApp" : "Responder ao cliente")}
-        </td>`;
-  }
-  // Inalcançável pelo esquema (exige email ou telefone), mas se alguém afrouxar
-  // essa regra é melhor um aviso do que um botão morto.
-  return `        <td class="cta-cell t2" align="center" style="font-size:17px;line-height:25px;color:#6e6e73;">Sem contacto registado.</td>`;
+  // Espaços normais à volta do «·»: num telemóvel estreito as duas ligações
+  // quebram para duas linhas em vez de saírem da largura do ecrã.
+  return partes.join(` <span class="t3" style="color:#86868b;">&nbsp;·&nbsp;</span> `);
 }
 
 export function htmlDoPedidoParaAEquipa(d: DadosDoPedidoParaAEquipa): string {
-  const data = `${esc(d.data)}${d.fimDeSemana ? " · fim de semana" : ""}`;
+  const quando = `${d.data}${d.fimDeSemana ? " · fim de semana" : ""}`;
+  const subtitulo = ["Novo pedido de orçamento", d.subtitulo, quando].filter(Boolean).join(" · ");
+  const feitoPor = d.feitoPor
+    ? `
+    <p class="t2" style="margin:6px 0 0;font-size:17px;line-height:24px;color:#6e6e73;">Pedido feito por ${esc(d.feitoPor)}</p>`
+    : "";
+
+  // O resumo: o pedido, depois o contacto, e a referência no fim — por onde se
+  // procura o pedido mais tarde.
+  const todas: { l: LinhaDoCartao; quebra: boolean }[] = [
+    ...d.pedido.map((l) => ({ l, quebra: false })),
+    ...d.contacto.map((l) => ({ l, quebra: false })),
+    { l: { rotulo: "Referência", valor: d.referencia }, quebra: true },
+  ].filter(({ l }) => l.valor.trim() !== "");
+  const linhas = todas
+    .map(({ l, quebra }, i) => linhaDoResumo(l, i === todas.length - 1, quebra))
+    .join("");
+
   const notas = d.notas.trim()
-    ? `  <tr><td class="pad" style="padding:20px 56px 0;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="box" style="background:#f5f5f7;border-radius:18px;">
-      <tr><td class="box-pad" style="padding:24px 28px 26px;">
-        <p class="t1" style="margin:0;font-size:19px;line-height:23px;font-weight:600;color:#1d1d1f;">Notas do cliente</p>
-        <p class="t2" style="margin:6px 0 0;font-size:17px;line-height:25px;color:#6e6e73;white-space:pre-wrap;">${esc(d.notas.trim())}</p>
-      </td></tr>
-    </table>
+    ? `  <!-- Notas do cliente -->
+  <tr><td class="pad" style="padding:28px 40px 0;">
+    <p class="t2" style="margin:0;font-size:15px;line-height:22px;color:#6e6e73;">Notas do cliente</p>
+    <p class="t1" style="margin:6px 0 0;font-size:17px;line-height:27px;color:#1d1d1f;white-space:pre-wrap;">${esc(d.notas.trim())}</p>
   </td></tr>
 
 `
     : "";
 
+  const resposta =
+    d.feitoPor && d.respostaPara
+      ? `a resposta vai para ${esc(d.respostaPara)}`
+      : `a resposta vai direta para ${esc(d.primeiroNome)}`;
+
   return `<!DOCTYPE html>
-<html lang="pt" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<html lang="pt" xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -201,56 +159,55 @@ export function htmlDoPedidoParaAEquipa(d: DadosDoPedidoParaAEquipa): string {
 <meta name="supported-color-schemes" content="light dark">
 <title>Novo pedido de orçamento</title>
 <!--[if mso]>
-<style>table,td,div,p,a,h1,h2{font-family:'Segoe UI',Arial,sans-serif !important;}</style>
+<style>table,td,div,p,a,h1{font-family:'Segoe UI',Arial,sans-serif !important;}</style>
 <![endif]-->
 ${ESTILO_DO_EMAIL}
 </head>
-<body class="sf" style="margin:0;padding:0;background:#f5f5f7;">
+<body style="margin:0;padding:0;background:#ffffff;">
 
 <!-- Pré-visualização na caixa de entrada -->
-<div style="display:none;max-height:0;max-width:0;overflow:hidden;opacity:0;mso-hide:all;font-size:1px;line-height:1px;color:#f5f5f7;">${esc(d.preheader)}&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;</div>
+<div style="display:none;max-height:0;max-width:0;overflow:hidden;opacity:0;mso-hide:all;font-size:1px;line-height:1px;color:#ffffff;">${esc(d.preheader)}&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;</div>
 
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="canvas" style="background:#f5f5f7;">
-<tr><td align="center" class="canvas" style="padding:40px 12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="page" style="background:#ffffff;">
+<tr><td align="center">
 
-<!--[if mso]><table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td><![endif]-->
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="card sf" style="max-width:640px;background:#ffffff;border-radius:18px;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,'Helvetica Neue',Helvetica,Arial,sans-serif;color:#1d1d1f;">
+<!--[if mso]><table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td><![endif]-->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,'Helvetica Neue',Helvetica,Arial,sans-serif;color:#1d1d1f;">
 
-  <!-- 1. LOGÓTIPO -->
-  <tr><td align="center" class="pad" style="padding:44px 56px 0;">
-    <img src="${esc(d.logo)}" width="104" alt="LÍQUEN EVENTS" class="t1" style="display:block;width:104px;height:auto;font-size:13px;line-height:18px;font-weight:600;letter-spacing:2px;color:#4d6650;">
+  <!-- Logótipo -->
+  <tr><td class="pad top" style="padding:48px 40px 0;">
+    <img src="${esc(d.logo)}" width="96" alt="LÍQUEN EVENTS" style="display:block;width:96px;height:auto;font-size:12px;line-height:16px;font-weight:600;letter-spacing:2px;color:#4d6650;">
   </td></tr>
 
-  <!-- 2. QUEM PEDIU -->
-  <tr><td align="center" class="pad" style="padding:48px 56px 0;">
-    <p class="accent" style="margin:0 0 12px;font-size:17px;line-height:21px;font-weight:600;color:#4d6650;">Novo pedido de orçamento</p>
-    <h1 class="h1 t1" style="margin:0;font-size:40px;line-height:44px;font-weight:600;letter-spacing:-0.3px;color:#1d1d1f;">${esc(d.nome)}</h1>
+  <!-- Título: quem é, e o que é e quando -->
+  <tr><td class="pad" style="padding:40px 40px 0;">
+    <h1 class="h1 t1" style="margin:0;font-size:32px;line-height:36px;font-weight:600;letter-spacing:0.1px;color:#1d1d1f;">${esc(d.nome)}</h1>
+    <p class="t2" style="margin:6px 0 0;font-size:17px;line-height:24px;color:#6e6e73;">${esc(subtitulo)}</p>${feitoPor}
   </td></tr>
 
-  <!-- 3. A DATA, EM DESTAQUE: é ela que decide se o trabalho cabe na agenda -->
-  <tr><td align="center" class="pad" style="padding:20px 56px 0;">
-    <p class="intro t1" style="margin:0;font-size:21px;line-height:29px;font-weight:400;color:#1d1d1f;">${data}</p>
-${d.subtitulo ? `    <p class="t2" style="margin:14px 0 0;font-size:17px;line-height:25px;color:#6e6e73;">${esc(d.subtitulo)}</p>\n` : ""}  </td></tr>
-
-  <!-- 4. RESPONDER AO CLIENTE -->
-  <tr><td align="center" class="pad" style="padding:30px 56px 0;">
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center">
-      <tr>
-${botoes(d.whatsapp, d.mailto)}
-      </tr>
-    </table>
-    <p class="t2" style="margin:16px 0 0;font-size:14px;line-height:20px;color:#6e6e73;">${esc(d.lembrete)}</p>
+  <!-- Linha -->
+  <tr><td class="pad" style="padding:28px 40px 0;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="line" style="border-top:1px solid #d2d2d7;font-size:0;line-height:0;">&nbsp;</td></tr></table>
   </td></tr>
 
-  <!-- 5. O PEDIDO -->
-${cartao("O pedido.", d.pedido, 56)}  <!-- 6. CONTACTO -->
-${cartao("Contacto.", d.contacto, 20)}  <!-- 7. NOTAS DO CLIENTE -->
-${notas}  <!-- 8. RODAPÉ -->
-  <tr><td class="pad" style="padding:32px 56px 44px;">
+  <!-- Responder ao cliente -->
+  <tr><td class="pad" style="padding:28px 40px 0;">
+    <p class="t1" style="margin:0;font-size:17px;line-height:27px;color:#1d1d1f;">${responder(d.whatsapp, d.mailto)}</p>
+    <p class="t2" style="margin:6px 0 0;font-size:15px;line-height:22px;color:#6e6e73;">${esc(d.lembrete)}</p>
+  </td></tr>
+
+  <!-- O pedido: tabela de linhas finas -->
+  <tr><td class="pad" style="padding:24px 40px 0;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:15px;line-height:22px;">
+${linhas}    </table>
+  </td></tr>
+
+${notas}  <!-- Rodapé -->
+  <tr><td class="pad" style="padding:28px 40px 48px;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-      <tr><td class="line" style="border-top:1px solid #d2d2d7;padding-top:18px;">
-        <p class="t2" style="margin:0;font-size:12px;line-height:16px;color:#6e6e73;">Também pode responder a este email — a resposta vai direta para ${esc(d.primeiroNome)}.</p>
-        <p class="t3" style="margin:8px 0 0;font-size:12px;line-height:16px;color:#86868b;">Ref. ${esc(d.referencia)} · ${esc(d.quando)}</p>
+      <tr><td class="line" style="border-top:1px solid #d2d2d7;padding-top:16px;">
+        <p class="t3" style="margin:0;font-size:12px;line-height:17px;color:#86868b;">Também pode responder a este email — ${resposta}.</p>
+        <p class="t3" style="margin:6px 0 0;font-size:12px;line-height:17px;color:#86868b;">Chegou a ${esc(d.quando)}.</p>
       </td></tr>
     </table>
   </td></tr>
@@ -260,6 +217,8 @@ ${notas}  <!-- 8. RODAPÉ -->
 
 </td></tr>
 </table>
+
 </body>
-</html>`;
+</html>
+`;
 }

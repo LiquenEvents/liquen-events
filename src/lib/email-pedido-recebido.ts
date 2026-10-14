@@ -275,6 +275,35 @@ function blocoDoBanner(banner: string | null, site: string): string {
 `;
 }
 
+/**
+ * A folha de estilo da carta, à letra. Exportada porque o email que a EQUIPA
+ * recebe quando chega um pedido passou a ter a mesma estrutura (14/10: «quero
+ * que coloques a estrutura do email que enviamos para o cliente… no email que
+ * recebemos quando recebemos o pedido do cliente»). Uma folha só: se a carta
+ * mudar de cor no modo escuro, o email da equipa muda com ela.
+ */
+export const ESTILO_DA_CARTA = `<style>
+  body { margin:0; padding:0; width:100% !important; background:#ffffff; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
+  table { border-collapse:collapse; mso-table-lspace:0; mso-table-rspace:0; }
+  img { border:0; line-height:100%; outline:none; text-decoration:none; -ms-interpolation-mode:bicubic; }
+
+  @media only screen and (max-width:640px) {
+    .pad { padding-left:24px !important; padding-right:24px !important; }
+    .top { padding-top:32px !important; }
+    .h1 { font-size:28px !important; line-height:32px !important; }
+    .lbl { width:112px !important; }
+  }
+
+  @media (prefers-color-scheme: dark) {
+    body, .page { background:#000000 !important; }
+    .t1 { color:#f5f5f7 !important; }
+    .t2 { color:#a1a1a6 !important; }
+    .t3 { color:#86868b !important; }
+    .line { border-color:#424245 !important; }
+    .accent { color:#9dc0a2 !important; }
+  }
+</style>`;
+
 export function emailPedidoRecebido(d: DadosDoPedidoRecebido): {
   subject: string;
   html: string;
@@ -341,27 +370,7 @@ export function emailPedidoRecebido(d: DadosDoPedidoRecebido): {
 <!--[if mso]>
 <style>table,td,div,p,a,h1{font-family:'Segoe UI',Arial,sans-serif !important;}</style>
 <![endif]-->
-<style>
-  body { margin:0; padding:0; width:100% !important; background:#ffffff; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
-  table { border-collapse:collapse; mso-table-lspace:0; mso-table-rspace:0; }
-  img { border:0; line-height:100%; outline:none; text-decoration:none; -ms-interpolation-mode:bicubic; }
-
-  @media only screen and (max-width:640px) {
-    .pad { padding-left:24px !important; padding-right:24px !important; }
-    .top { padding-top:32px !important; }
-    .h1 { font-size:28px !important; line-height:32px !important; }
-    .lbl { width:112px !important; }
-  }
-
-  @media (prefers-color-scheme: dark) {
-    body, .page { background:#000000 !important; }
-    .t1 { color:#f5f5f7 !important; }
-    .t2 { color:#a1a1a6 !important; }
-    .t3 { color:#86868b !important; }
-    .line { border-color:#424245 !important; }
-    .accent { color:#9dc0a2 !important; }
-  }
-</style>
+${ESTILO_DA_CARTA}
 </head>
 <body style="margin:0;padding:0;background:#ffffff;">
 
