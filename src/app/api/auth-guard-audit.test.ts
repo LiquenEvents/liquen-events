@@ -593,6 +593,8 @@ const ADMIN: Array<{ path: string; methods: string[] }> = [
   { path: "./admin/equipa/route", methods: ["GET"] },
   { path: "./orcamento/[id]/links/route", methods: ["GET", "POST"] },
   { path: "./orcamento/[id]/versoes/route", methods: ["GET"] },
+  // O recorte automático da capa, para o estúdio o mostrar igual ao PDF.
+  { path: "./orcamento/[id]/foco-da-capa/route", methods: ["GET"] },
   // «Ver as propostas que já mandei»: o PDF que seguiu, o link do casal e as
   // cópias dos emails — tudo dados de clientes, só com sessão.
   { path: "./orcamento/[id]/propostas/[pid]/pdf/route", methods: ["GET"] },
