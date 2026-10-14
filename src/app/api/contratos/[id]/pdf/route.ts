@@ -27,9 +27,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     // Mesmo filtro das rotas irmãs do portal e da proposta.
     const ref = String(contract.quoteId || contract.id).replace(/[^A-Za-z0-9_-]/g, "");
     // Uint8Array (não Buffer) para satisfazer o BodyInit da Response.
-    return new NextResponse(new Uint8Array(pdf), {
+    const corpo = new Uint8Array(pdf);
+    return new NextResponse(corpo, {
       headers: {
         "Content-Type": "application/pdf",
+        // O tamanho à frente deixa o browser contar o que já chegou.
+        "Content-Length": String(corpo.byteLength),
         "Content-Disposition": `inline; filename="Contrato-Liquen-${ref}.pdf"`,
       },
     });
