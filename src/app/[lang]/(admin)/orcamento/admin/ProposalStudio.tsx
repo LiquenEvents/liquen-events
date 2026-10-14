@@ -4,7 +4,6 @@ import {
   Fragment,
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -134,6 +133,7 @@ import NavEstudio from "./NavEstudio";
 import NotasInternas from "./NotasInternas";
 import AvisoDataOcupada from "./AvisoDataOcupada";
 import { estadoDasSeccoes, oQueFaltaParaEnviar, podeEnviar } from "@/lib/proposal-progress";
+import { hojeNoEstudio } from "@/lib/fuso";
 import {
   FRASE_DO_ESTADO,
   PASSOS,
@@ -144,7 +144,6 @@ import {
   type EstadoDoPasso,
   type Passo,
 } from "@/lib/orcamento/passos-do-estudio";
-import { hojeNoEstudio } from "@/lib/fuso";
 import {
   capituloDoTema,
   composicaoEmPalavras,
@@ -211,6 +210,7 @@ import { aquecerBiblioteca, aquecerFotosEmSegundoPlano } from "./theme-picker-ca
 // ponto a pulsar, e a contagem quando o código sabe contar — este ficheiro não
 // inventa nenhuma espera sua.
 import { Ajuda, Button, Card, EmCurso, Field, FolhaOuDialogo, Segmented } from "./ui";
+import { useAlturaDoConteudo } from "./ui/altura-do-conteudo";
 import {
   eCasamento,
   pedidoECasamento,
@@ -12276,28 +12276,13 @@ function DescricaoQueCresce({
   valor: string;
 }) {
   const meu = useRef<HTMLTextAreaElement | null>(null);
-  useLayoutEffect(() => {
-    const el = meu.current;
-    if (!el) return;
-    // ── VAZIA É UMA LINHA, E ISSO TEVE DE SER DITO ────────────────────────
-    // MEDIDO: um `<textarea>` VAZIO com este `placeholder` («Descrição
-    // (opcional) — ex.: runner floral com hortênsias verdes…») devolve
-    // `scrollHeight: 120` no Chrome — o placeholder é maquetizado como texto e
-    // conta. Uma caixa vazia abria com 122 px, quase o dobro dos 70 que tinha
-    // antes desta correcção. Sem altura escrita à mão, o `rows={1}` manda, e o
-    // mínimo de toque (44 px, globals.css) faz o resto.
-    if (valor === "") {
-      el.style.height = "";
-      return;
-    }
-    el.style.height = "auto";
-    // `scrollHeight` conta o conteúdo e o `padding` e NÃO conta a borda; com o
-    // `box-sizing: border-box` do Tailwind, escrevê-lo tal e qual em `height`
-    // faz a borda comer dois píxeis ao texto. Somar `offsetHeight -
-    // clientHeight` devolve o número exacto — a mesma conta, e a mesma medição,
-    // do `CampoQueCresce`.
-    el.style.height = `${el.scrollHeight + (el.offsetHeight - el.clientHeight)}px`;
-  }, [valor]);
+  // ── VAZIA É UMA LINHA, E ISSO TEVE DE SER DITO ────────────────────────
+  // MEDIDO: um `<textarea>` VAZIO com este `placeholder` devolve
+  // `scrollHeight: 120` no Chrome — o placeholder é maquetizado como texto e
+  // conta. Sem altura escrita à mão, o `rows={1}` manda, e o mínimo de toque
+  // (44 px, globals.css) faz o resto. E só se mede quando se vê — ver
+  // `ui/altura-do-conteudo.ts`.
+  useAlturaDoConteudo(meu, valor, { vaziaSemAltura: true });
   return <textarea {...resto} value={valor} rows={1} ref={meu} />;
 }
 
