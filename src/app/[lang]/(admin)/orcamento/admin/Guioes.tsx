@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { Supplier, CabecalhoDaFolha, Quote, TimelineItem } from "@/lib/orcamento/types";
 import {
   agoraNaRegua,
@@ -33,6 +33,13 @@ import { BotaoWhatsApp } from "./ui/BotaoWhatsApp";
 import { timelineParaWhatsApp } from "@/lib/whatsapp";
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 import { diaPorExtenso } from "@/lib/data-curta";
+import {
+  CartaoDoEvento,
+  GrelhaDeEventos,
+  filtrarPorProcura,
+  useEventosArrumados,
+} from "./ListaDeEventos";
+import { useCamadaDeHistoria } from "./useCamadaDeHistoria";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -343,17 +350,6 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
   const guioes = useMemo(() => ordenarGuioes(lista.data?.guioes ?? [], agora), [lista.data, agora]);
 
   /**
-   * A janela é COMUM a todas as réguas e calcula-se sobre a lista INTEIRA, não
-   * sobre a filtrada.
-   *
-   * Se dependesse do filtro, mudar de «Todos» para «Com problema» reescalava
-   * todas as fitas ao mesmo tempo — as barras mudavam de comprimento sem que
-   * nenhum dia tivesse mudado, e uma régua que se mexe quando os dados não
-   * mudam é uma régua em que não se acredita.
-   */
-  const janela = useMemo(() => janelaComum(guioes), [guioes]);
-
-  /**
    * O âmbito é o primeiro corte, e o filtro é o segundo.
    *
    * Por omissão «fechados», que é o que ela pediu primeiro: um guião do dia é
@@ -398,29 +394,19 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
   const aberto = useMemo(() => guioes.find((g) => g.id === abertoId) ?? null, [guioes, abertoId]);
 
   /**
-   * A lista visível, partida por MÊS, pela ordem em que já vinha.
-   *
-   * O ano só se escreve quando não é este — «Setembro», «Outubro», «Maio
-   * 2027». Escrever «2026» em todas as linhas de uma agenda de 2026 é ruído
-   * que se aprende a saltar, e foi essa a lição da lista dos próximos eventos
-   * do Calendário.
+   * A lista em cartões, com o desenho do mapa de mesas (14/10: «aquilo que
+   * fizeste em termos de design no mapa de mesas faz a mesma coisa para o
+   * timelines»): o próximo evento à cabeça, os meses como títulos e uma
+   * procura. O desenho e as contas vivem em `ListaDeEventos.tsx`, para os dois
+   * ecrãs não discordarem sobre o que é a lista dos eventos.
    */
-  const porMes = useMemo(() => {
-    const anoActual = new Date().getFullYear();
-    const grupos: { mes: string; eventos: typeof visiveis }[] = [];
-    for (const g of visiveis) {
-      const d = new Date(`${g.data}T12:00:00`);
-      const nome = d.toLocaleDateString("pt-PT", { month: "long" });
-      const mes =
-        d.getFullYear() === anoActual
-          ? nome.charAt(0).toUpperCase() + nome.slice(1)
-          : `${nome.charAt(0).toUpperCase() + nome.slice(1)} ${d.getFullYear()}`;
-      const ultimo = grupos[grupos.length - 1];
-      if (ultimo && ultimo.mes === mes) ultimo.eventos.push(g);
-      else grupos.push({ mes, eventos: [g] });
-    }
-    return grupos;
-  }, [visiveis]);
+  const [procura, setProcura] = useState("");
+  const procuraAdiada = useDeferredValue(procura);
+  const procurados = useMemo(
+    () => filtrarPorProcura(visiveis, procuraAdiada),
+    [visiveis, procuraAdiada],
+  );
+  const { proximo, porMes } = useEventosArrumados(procurados);
 
   /**
    * Abrir um guião é ir buscar o pedido inteiro.
@@ -452,11 +438,28 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
     } else setFalhaAoAbrir(r.porque);
   }
 
+  /** O último evento aberto: o cartão dele fica marcado ao voltar à lista. */
+  const [ultimoAberto, setUltimoAberto] = useState<string | null>(null);
   function fechar() {
+    const id = abertaRef.current;
     setAbertoId(null);
     abertaRef.current = null;
     setFalhaAoAbrir(null);
+    if (!id) return;
+    setUltimoAberto(id);
+    // Volta ao cartão de onde saiu — numa lista de trinta eventos, voltar ao
+    // topo era perder o sítio.
+    requestAnimationFrame(() => {
+      const el = Array.from(document.querySelectorAll<HTMLElement>("[data-evento]")).find(
+        (e) => e.dataset.evento === id,
+      );
+      el?.scrollIntoView?.({ block: "center" });
+      el?.focus({ preventScroll: true });
+    });
   }
+  /* A lista e o guião aberto trocam de lugar, como no mapa de mesas: o gesto de
+     voltar do telemóvel (e o do browser) volta à lista. */
+  useCamadaDeHistoria(!!abertoId, fechar);
 
   /**
    * O guião mudou no ecrã do evento — a lista tem de mudar com ele.
@@ -618,14 +621,14 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
         <PainelDeHoje guiao={oDeHoje} relogio={relogio} aoAbrir={() => abrir(oDeHoje.id)} />
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:items-start lg:gap-6">
+      <div className="flex flex-col gap-4">
         {/* ── A LISTA ──────────────────────────────────────────────────────
             No telemóvel a lista e o guião aberto trocam de lugar: dois painéis
             de largura inteira empilhados obrigavam a rolar a lista toda para
             chegar ao guião que se acabou de abrir. No computador vivem lado a
             lado, que é onde há largura para os dois. */}
-        <div className={abertoId ? "hidden lg:block" : "block"}>
-          <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div hidden={!!abertoId}>
+          <div className="mb-5 flex flex-wrap items-center gap-3">
             <Segmented<Filtro>
               ariaLabel="Filtrar as timelines"
               size="sm"
@@ -669,6 +672,16 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
                 { value: "todos", label: `Todos os eventos · ${contagensDoAmbito.todos}` },
               ]}
             />
+            {guioes.length > 0 && (
+              <input
+                type="search"
+                value={procura}
+                onChange={(e) => setProcura(e.target.value)}
+                placeholder="Procurar por nome ou local…"
+                aria-label="Procurar eventos"
+                className="bo-input h-10 min-w-0 flex-1 basis-56 rounded-full px-4 text-sm"
+              />
+            )}
           </div>
 
           {lista.loading && !lista.data ? (
@@ -699,6 +712,13 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
               description={`Os eventos entram aqui quando a proposta é aceite. Há ${contagensDoAmbito.todos} ${contagensDoAmbito.todos === 1 ? "evento" : "eventos"} com data noutros estados.`}
               action={{ label: "Ver todos os eventos", onClick: () => setAmbito("todos") }}
             />
+          ) : visiveis.length > 0 && procurados.length === 0 ? (
+            <EmptyState
+              icon={<IconeDeGuiao />}
+              title="Nenhum evento com esse nome"
+              description="Procura pelo nome do cliente, pelo tipo de evento ou pelo local."
+              action={{ label: "Limpar a procura", onClick: () => setProcura("") }}
+            />
           ) : visiveis.length === 0 ? (
             <EmptyState
               icon={<IconeDeGuiao />}
@@ -728,28 +748,28 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
                Colados ao topo (`sticky`) porque a coluna rola: sem isso, a
                meio de Julho já não se sabe em que mês se está — que é o mesmo
                defeito com outro nome. */
-            <ul className="flex flex-col gap-2">
-              {porMes.map(({ mes, eventos }) => (
-                <li key={mes}>
-                  <h2 className="bo-eyebrow sticky top-0 z-10 -mx-1 bg-[var(--bo-surface-sunken)]/85 px-1 py-1.5 text-[var(--bo-text-muted)] backdrop-blur">
-                    {mes}
-                  </h2>
-                  <ul className="mt-1 flex flex-col gap-2">
-                    {eventos.map((g) => (
-                      <li key={g.id}>
-                        <LinhaDeGuiao
-                          guiao={g}
-                          janela={janela}
-                          activo={g.id === abertoId}
-                          relogio={g.hoje ? relogio : null}
-                          aoAbrir={() => abrir(g.id)}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                </li>
-              ))}
-            </ul>
+            <GrelhaDeEventos
+              proximo={proximo}
+              porMes={porMes}
+              cartao={(g, destaque) => (
+                <CartaoDoEvento
+                  g={g}
+                  destaque={destaque}
+                  aAbrir={aAbrir === g.id}
+                  activo={g.id === ultimoAberto}
+                  onAbrir={() => void abrir(g.id)}
+                  nome={nomeDoCartao(g)}
+                  estado={<MomentosDoDia guiao={g} />}
+                  rodape={
+                    <span className="mt-1 flex flex-wrap items-center gap-1">
+                      {g.sinais.map((s) => (
+                        <Pastilha key={s.tipo} sinal={s} />
+                      ))}
+                    </span>
+                  }
+                />
+              )}
+            />
           )}
         </div>
 
@@ -768,17 +788,32 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
             abaixo dos 1024 px a grelha é de uma coluna só e a coluna implícita
             é `auto`, portanto não resolvia nada — que é exactamente a largura
             onde ela trabalha. */}
-        <div className={`min-w-0 ${abertoId ? "block" : "hidden lg:block"}`}>
-          {!aberto ? (
-            <div className="bo-card">
-              <EmptyState
-                icon={<IconeDeGuiao />}
-                title="Escolhe um evento"
-                description="A timeline abre-se aqui: a régua à escala, os avisos, e a folha para imprimir e dar à equipa."
-              />
-            </div>
-          ) : (
+        <div className="min-w-0" hidden={!abertoId}>
+          {!aberto ? null : (
             <div className="bo-card p-[var(--bo-p-cartao)]">
+              {/* A volta à lista, sempre à cabeça: a timeline ocupa a vista
+                  inteira, como o mapa de mesas (14/10, «ocupa o ecrã»). */}
+              <button
+                type="button"
+                onClick={fechar}
+                aria-label="Voltar aos eventos"
+                className={`alvo-toque -ml-2 mb-3 inline-flex items-center gap-1 rounded-full px-2 py-1 text-sm font-medium text-[var(--bo-accent)] hover:bg-[var(--bo-tinta-3)] ${ESTADO} ${PRESSAO}`}
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M15 5l-7 7 7 7" />
+                </svg>
+                Eventos
+              </button>
               <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                 {/* ── A HIERARQUIA ESTAVA INVERTIDA, COMO NOS OUTROS ECRÃS ──
                     «Daqui a 359 dias» estava ACIMA do nome do casal, em
@@ -899,9 +934,6 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
                       momentos: pedido?.timeline ?? [],
                     })}
                   />
-                  <Button size="sm" variant="ghost" onClick={fechar} className="lg:hidden">
-                    Voltar aos guiões
-                  </Button>
                 </div>
               </div>
 
@@ -1019,107 +1051,28 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
 }
 
 /**
- * ── A LINHA: UM DIA INTEIRO EM QUATRO LINHAS DE TEXTO E UMA FITA ──────────
- *
- * O botão é a linha toda e não um chevron ao canto: no telemóvel, um alvo de
- * 44 px ao lado de um cartão de 90 é a maneira de falhar o toque com a mão
- * ocupada. O nome acessível diz o dia, o cliente e o estado — que é o que
- * distingue esta linha das outras dezanove para quem ouve o ecrã.
+ * O nome que se ouve num cartão: quando, o dia, quem, e os avisos por extenso
+ * — o que distingue este evento dos outros vinte para quem ouve o ecrã.
  */
-function LinhaDeGuiao({
-  guiao,
-  janela,
-  activo,
-  relogio,
-  aoAbrir,
-}: {
-  guiao: GuiaoNaLista;
-  janela: ReturnType<typeof janelaComum>;
-  activo: boolean;
-  relogio: number | null;
-  aoAbrir: () => void;
-}) {
-  const emChoque = useMemo(() => {
-    const ids = new Set<string>();
-    for (const c of guiao.dia.choques) {
-      ids.add(c.a.id);
-      ids.add(c.b.id);
-    }
-    return ids;
-  }, [guiao.dia.choques]);
+function nomeDoCartao(guiao: GuiaoNaLista): string {
+  return `${quandoPorExtenso(guiao.faltamDias)}, ${dataPorExtenso(guiao.data)} — ${
+    guiao.cliente || "sem nome"
+  }. ${guiao.sinais.map((s) => s.frase).join(". ")}`;
+}
 
-  const quando = quandoPorExtenso(guiao.faltamDias);
-  const nome = `${quando}, ${dataPorExtenso(guiao.data)} — ${guiao.cliente || "sem nome"}. ${guiao.sinais
-    .map((s) => s.frase)
-    .join(". ")}`;
-
-  const temMomentos = guiao.momentos.length > 0;
-
+/** «12 momentos · 09:00–02:00» — ou nada, quando a pastilha já diz «Sem timeline». */
+function MomentosDoDia({ guiao }: { guiao: GuiaoNaLista }) {
+  const n = guiao.momentos.length;
+  if (n === 0) return null;
+  const horas =
+    guiao.dia.inicio !== null && guiao.dia.fim !== null
+      ? ` · ${horaDoMinuto(guiao.dia.inicio)}–${horaDoMinuto(guiao.dia.fim)}`
+      : "";
   return (
-    <button
-      type="button"
-      onClick={aoAbrir}
-      aria-label={nome}
-      aria-current={activo ? "true" : undefined}
-      className={`alvo-toque block w-full rounded-[var(--bo-raio-conteudo)] border p-3 text-left ${ESTADO} ${PRESSAO} ${
-        activo
-          ? "border-[var(--bo-accent)] bg-[var(--bo-accent-lavagem)]"
-          : "border-[var(--bo-hairline)] bg-[var(--bo-surface)] hover:bg-[var(--bo-tinta-3)]"
-      }`}
-    >
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="truncate text-sm font-medium text-[var(--bo-text)]">
-          {guiao.cliente || "Sem nome"}
-        </span>
-        <span
-          className={`shrink-0 text-[11px] tabular-nums ${
-            guiao.hoje ? "font-semibold text-[var(--bo-accent)]" : "text-[var(--bo-text-muted)]"
-          }`}
-        >
-          {quando}
-        </span>
-      </div>
-      <p className="bo-text-muted mt-0.5 truncate text-xs">
-        {dataPorExtenso(guiao.data)}
-        {guiao.evento ? ` · ${guiao.evento}` : ""}
-      </p>
-
-      <div className="mt-2.5">
-        {temMomentos ? (
-          <ReguaDoDia
-            dia={guiao.dia}
-            janela={janela}
-            emChoque={emChoque}
-            agora={relogio}
-            rotulo={`Régua do dia de ${guiao.cliente || "este evento"}: ${
-              guiao.dia.inicio !== null && guiao.dia.fim !== null
-                ? `das ${horaDoMinuto(guiao.dia.inicio)} às ${horaDoMinuto(guiao.dia.fim)}`
-                : "sem horas legíveis"
-            }, ${guiao.momentos.length} momentos.`}
-          />
-        ) : (
-          /* Um dia sem guião não desenha uma régua vazia: uma fita cinzenta de
-             bordo a bordo lê-se como «um dia inteiro ocupado por nada». Fica um
-             traço tracejado, que é a forma de «isto está por preencher». */
-          <span
-            aria-hidden="true"
-            className="block h-2 rounded-full border border-dashed border-[var(--bo-hairline-strong)]"
-          />
-        )}
-      </div>
-
-      <div className="mt-2 flex flex-wrap items-center gap-1">
-        {guiao.sinais.map((s) => (
-          <Pastilha key={s.tipo} sinal={s} />
-        ))}
-        {temMomentos && guiao.dia.inicio !== null && guiao.dia.fim !== null && (
-          <span className="bo-text-faint ms-auto text-[11px] tabular-nums">
-            {horaDoMinuto(guiao.dia.inicio)}–{horaDoMinuto(guiao.dia.fim)} ·{" "}
-            {porExtenso(guiao.dia.ocupado)}
-          </span>
-        )}
-      </div>
-    </button>
+    <span className="min-w-0 truncate text-xs tabular-nums text-[var(--bo-text-muted)]">
+      {n} {n === 1 ? "momento" : "momentos"}
+      {horas}
+    </span>
   );
 }
 

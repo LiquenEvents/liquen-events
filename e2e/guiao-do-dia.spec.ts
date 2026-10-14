@@ -158,8 +158,16 @@ test.describe("Timelines @guiao", () => {
     await expect(page.getByText("→ 12:00")).toBeVisible();
 
     // O vazio da tarde é o que o cronograma-base tem de propósito, e VÊ-SE — na
-    // banda entre os dois blocos, e não só na prosa em cima.
-    await expect(page.getByText(/3 h sem nada marcado/).first()).toBeVisible();
+    // banda entre os dois blocos, e não só na prosa em cima. Só o que se VÊ:
+    // a mesma frase existe em `sr-only` para o leitor de ecrã, e desde que a
+    // lista passou a cartões (14/10, sem a fita do dia) é essa a primeira que
+    // aparece no documento.
+    await expect(
+      page
+        .getByText(/3 h sem nada marcado/)
+        .filter({ visible: true })
+        .first(),
+    ).toBeVisible();
 
     // ── 4. MEXER NUM BLOCO, E O ECRÃ DIZER O QUE ISSO PROVOCA ───────────────
     // A receção passa de 1 h para 3 h: às 16:00 mais três horas são 19:00, e a

@@ -4,15 +4,18 @@ import { useDeferredValue, useMemo, useRef, useState } from "react";
 import type { Quote } from "@/lib/orcamento/types";
 import type { ResumoDeGuiao } from "@/lib/orcamento/guioes";
 import { diaPorExtenso } from "@/lib/data-curta";
-import { casaComAProcura } from "@/lib/procura";
 import { EmptyState, Segmented } from "./ui";
-import { ESTADO, PRESSAO } from "./ui/movimento";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { SkeletonList } from "./Skeleton";
 import { useCachedList } from "./useCachedList";
 import { useCamadaDeHistoria } from "./useCamadaDeHistoria";
 import { useTrincoDeScroll } from "./useTrincoDeScroll";
-import { eventCountdown } from "./util";
+import {
+  CartaoDoEvento,
+  GrelhaDeEventos,
+  filtrarPorProcura,
+  useEventosArrumados,
+} from "./ListaDeEventos";
 import EditorDoMapa from "./mesas/EditorDoMapa";
 
 /**
@@ -53,21 +56,6 @@ interface Props {
 
 type Ambito = "fechados" | "todos";
 
-const MESES_CURTOS = [
-  "jan",
-  "fev",
-  "mar",
-  "abr",
-  "mai",
-  "jun",
-  "jul",
-  "ago",
-  "set",
-  "out",
-  "nov",
-  "dez",
-];
-
 function IconeDeMesa() {
   return (
     <svg
@@ -85,28 +73,6 @@ function IconeDeMesa() {
       <circle cx="3.5" cy="12" r="1.6" />
       <circle cx="20.5" cy="12" r="1.6" />
     </svg>
-  );
-}
-
-/** O dia em grande, como na Agenda: o número, o mês, e o ano quando não é este. */
-function SeloDoDia({ data, grande = false }: { data: string; grande?: boolean }) {
-  const d = new Date(`${data}T12:00:00`);
-  const outroAno = d.getFullYear() !== new Date().getFullYear();
-  return (
-    <div
-      aria-hidden="true"
-      className={`flex shrink-0 flex-col items-center justify-center rounded-xl bg-[var(--bo-accent-lavagem)] text-[var(--bo-accent)] ${
-        grande ? "h-20 w-20" : "h-16 w-14"
-      }`}
-    >
-      <span className={`font-light leading-none tabular-nums ${grande ? "text-4xl" : "text-2xl"}`}>
-        {d.getDate()}
-      </span>
-      <span className="mt-1 text-[11px] uppercase tracking-wide">
-        {MESES_CURTOS[d.getMonth()]}
-        {outroAno && <span className="ml-0.5">’{String(d.getFullYear()).slice(2)}</span>}
-      </span>
-    </div>
   );
 }
 
@@ -138,75 +104,6 @@ function EstadoDoMapa({ mesas }: { mesas: ResumoDeGuiao["mesas"] }) {
   );
 }
 
-function CartaoDoEvento({
-  g,
-  aAbrir,
-  onAbrir,
-  destaque = false,
-}: {
-  g: ResumoDeGuiao;
-  aAbrir: boolean;
-  onAbrir: () => void;
-  destaque?: boolean;
-}) {
-  const falta = eventCountdown(g.data);
-  const detalhe = [g.evento, g.local].filter(Boolean).join(" · ");
-  return (
-    <button
-      type="button"
-      onClick={onAbrir}
-      aria-busy={aAbrir}
-      aria-label={`${g.cliente}, ${diaPorExtenso(g.data)}${detalhe ? `, ${detalhe}` : ""}`}
-      className={`bo-card alvo-toque group flex h-full w-full min-w-0 items-center gap-4 text-left hover:border-[var(--bo-hairline-strong)] hover:shadow-[var(--bo-sombra-erguida)] ${
-        destaque ? "p-5" : "p-4"
-      } ${ESTADO} ${PRESSAO}`}
-    >
-      <SeloDoDia data={g.data} grande={destaque} />
-      <span className="flex min-w-0 flex-1 flex-col gap-1">
-        {destaque && <span className="bo-eyebrow text-[var(--bo-accent)]">Próximo evento</span>}
-        <span
-          className={`truncate font-medium text-[var(--bo-text)] ${destaque ? "text-lg" : "text-base"}`}
-        >
-          {g.cliente}
-        </span>
-        <span className="truncate text-xs text-[var(--bo-text-muted)]">
-          {[diaPorExtenso(g.data), detalhe].filter(Boolean).join(" · ")}
-        </span>
-        <span className="mt-1 flex min-w-0 items-center gap-3">
-          {falta && (
-            <span
-              className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] ${
-                falta.tone === "today" || falta.tone === "soon"
-                  ? "bg-[var(--bo-aviso-lavagem)] text-[var(--bo-aviso)]"
-                  : "bg-[var(--bo-tinta-6)] text-[var(--bo-text-muted)]"
-              }`}
-            >
-              {falta.label}
-            </span>
-          )}
-          {aAbrir ? (
-            <span className="text-xs text-[var(--bo-text-muted)]">A abrir…</span>
-          ) : (
-            <EstadoDoMapa mesas={g.mesas} />
-          )}
-        </span>
-      </span>
-      <svg
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        aria-hidden="true"
-        className="shrink-0 text-[var(--bo-text-faint)] group-hover:text-[var(--bo-text-muted)]"
-      >
-        <path d="M9 5l7 7-7 7" />
-      </svg>
-    </button>
-  );
-}
-
 export default function MapaDeMesas({ carregarPedido, onQuoteAtualizado }: Props) {
   const lista = useCachedList<{ guioes: ResumoDeGuiao[] }>("guioes", "/api/guioes");
   const [ambito, setAmbito] = useState<Ambito>("fechados");
@@ -229,10 +126,7 @@ export default function MapaDeMesas({ carregarPedido, onQuoteAtualizado }: Props
   const eventos = useMemo(() => {
     const todos = [...(lista.data?.guioes ?? [])].sort((a, b) => a.data.localeCompare(b.data));
     const doAmbito = ambito === "todos" ? todos : todos.filter((g) => g.aceite);
-    const t = procuraAdiada.trim().toLowerCase();
-    return t
-      ? doAmbito.filter((g) => casaComAProcura(t, [g.cliente, g.local, g.evento]))
-      : doAmbito;
+    return filtrarPorProcura(doAmbito, procuraAdiada);
   }, [lista.data, ambito, procuraAdiada]);
   const contagens = useMemo(
     () => ({
@@ -242,28 +136,7 @@ export default function MapaDeMesas({ carregarPedido, onQuoteAtualizado }: Props
     [lista.data],
   );
 
-  /** O próximo evento (hoje ou depois), que vai à cabeça num cartão maior. */
-  const proximo = useMemo(() => {
-    const d = new Date();
-    const hoje = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    return eventos.find((g) => g.data >= hoje) ?? null;
-  }, [eventos]);
-
-  const porMes = useMemo(() => {
-    const anoActual = new Date().getFullYear();
-    const grupos: { mes: string; eventos: ResumoDeGuiao[] }[] = [];
-    for (const g of eventos) {
-      if (g.id === proximo?.id) continue;
-      const d = new Date(`${g.data}T12:00:00`);
-      const nome = d.toLocaleDateString("pt-PT", { month: "long" });
-      const cap = nome.charAt(0).toUpperCase() + nome.slice(1);
-      const mes = d.getFullYear() === anoActual ? cap : `${cap} ${d.getFullYear()}`;
-      const ultimo = grupos[grupos.length - 1];
-      if (ultimo && ultimo.mes === mes) ultimo.eventos.push(g);
-      else grupos.push({ mes, eventos: [g] });
-    }
-    return grupos;
-  }, [eventos, proximo]);
+  const { proximo, porMes } = useEventosArrumados(eventos);
 
   async function abrir(id: string) {
     abertaRef.current = id;
@@ -357,36 +230,19 @@ export default function MapaDeMesas({ carregarPedido, onQuoteAtualizado }: Props
           />
         )
       ) : (
-        <div className="flex flex-col gap-5">
-          {proximo && (
-            <div className="max-w-2xl">
-              <CartaoDoEvento
-                g={proximo}
-                destaque
-                aAbrir={aAbrir === proximo.id}
-                onAbrir={() => void abrir(proximo.id)}
-              />
-            </div>
+        <GrelhaDeEventos
+          proximo={proximo}
+          porMes={porMes}
+          cartao={(g, destaque) => (
+            <CartaoDoEvento
+              g={g}
+              destaque={destaque}
+              aAbrir={aAbrir === g.id}
+              onAbrir={() => void abrir(g.id)}
+              estado={<EstadoDoMapa mesas={g.mesas} />}
+            />
           )}
-          <ul className="flex flex-col gap-5">
-            {porMes.map(({ mes, eventos: doMes }) => (
-              <li key={mes}>
-                <h2 className="bo-eyebrow px-1 pb-2 text-[var(--bo-text-muted)]">{mes}</h2>
-                <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {doMes.map((g) => (
-                    <li key={g.id} className="min-w-0">
-                      <CartaoDoEvento
-                        g={g}
-                        aAbrir={aAbrir === g.id}
-                        onAbrir={() => void abrir(g.id)}
-                      />
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            ))}
-          </ul>
-        </div>
+        />
       )}
     </div>
   );
