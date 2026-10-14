@@ -264,7 +264,7 @@ try {
       .first(),
   );
   await page
-    .getByRole("button", { name: /^1 Conteúdo$/ })
+    .getByRole("button", { name: /^1 Evento\b/ })
     .first()
     .waitFor({ timeout: 60_000 });
   await dormir(900);
