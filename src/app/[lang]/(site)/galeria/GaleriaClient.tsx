@@ -23,17 +23,24 @@ import { useAntecipacao } from "./useAntecipacao";
 import { useBlurTardio } from "./useBlurTardio";
 import { fraccaoDaBarra } from "@/lib/fraccao-da-barra";
 import { DUR_ELEMENTO_MS, DUR_VISTA_MS, EASE_IN, EASE_OUT } from "@/lib/motion/tokens";
+import { assentar } from "@/lib/motion/mola";
 import {
   type Caixa,
   aVista,
   caixaContida,
+  decidirDeslize,
+  DESLIZE_INTERVALO_PX,
   dentroDe,
+  elastico,
   janelaDaTira,
   miniaturasNaTira,
   POSE_FINAL,
   poseDaMiniatura,
   proporcao,
 } from "./voo";
+
+/** Quanto tempo a barra e a tira do visualizador ficam à vista sem mexer (GAL-4). */
+const CROMAGEM_ESCONDE_MS = 2500;
 
 const CATS = ["Todos", "Casamento", "Corporativo", "Conferência", "Aéreo", "Evento"] as const;
 
@@ -1177,15 +1184,18 @@ export default function GaleriaClient({
   // Fecho sem voo — para o gesto de arrastar-para-baixo, onde a própria foto
   // já saiu do ecrã com o dedo.
   const dismiss = fechado;
+  // SEM DAR A VOLTA (GAL-2). Da primeira para trás saltava para a 917 sem
+  // aviso; agora as pontas são pontas — o visualizador mostra-o com um
+  // elástico, e o ‹ e o › desaparecem lá.
   const prev = useCallback(() => {
-    if (lb === null) return;
+    if (lb === null || lb <= 0) return;
     setJustOpened(false);
-    setLb((lb - 1 + pool.length) % pool.length);
-  }, [lb, pool]);
+    setLb(lb - 1);
+  }, [lb]);
   const next = useCallback(() => {
-    if (lb === null) return;
+    if (lb === null || lb >= pool.length - 1) return;
     setJustOpened(false);
-    setLb((lb + 1) % pool.length);
+    setLb(lb + 1);
   }, [lb, pool]);
 
   // (Todos os efeitos exclusivos do lightbox — teclado/trap de foco, foco de
@@ -1623,12 +1633,22 @@ function Lightbox({
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
-  // Drag-to-dismiss / swipe gesture on the lightbox (touch). The photo layer
-  // and backdrop are driven directly via refs during the drag (no per-frame
-  // React re-render → stays at 60fps); state only changes on release.
+  /**
+   * TRÊS CAIXAS, CADA UMA COM O SEU TRABALHO (GAL-2).
+   *
+   *  · `photoLayerRef` — a camada FIXA da foto. Nunca se mexe: é ela que se
+   *    mede para o voo de abrir e fechar e para o «qualquer preto fecha»;
+   *  · `arrastoRef` — o arrastar para baixo para fechar (`translateY`);
+   *  · `pistaRef` — a pista das três fotografias (`translateX`), que segue o
+   *    dedo e assenta com a mola da casa.
+   *
+   * Os gestos escrevem nos `ref`s, nunca no estado: um arrasto não desenha o
+   * React fotograma a fotograma.
+   */
   const photoLayerRef = useRef<HTMLDivElement>(null);
+  const arrastoRef = useRef<HTMLDivElement>(null);
+  const pistaRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
-  const gestureRef = useRef({ x: 0, y: 0, dx: 0, dy: 0, axis: "" as "" | "x" | "y" });
   /** A cópia da miniatura que voa — ver `voo.ts`. Gerida à mão, fora do React. */
   const vooRef = useRef<HTMLImageElement>(null);
   const vooAnimRef = useRef<Animation | null>(null);
@@ -1748,13 +1768,289 @@ function Lightbox({
     [setJustOpened, setLb],
   );
 
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * A PISTA: A FOTO SEGUE O DEDO, E ASSENTA COM MOLA (GAL-2)
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * A anterior, a actual e a seguinte estão lado a lado. O dedo arrasta a pista
+   * inteira, e ao largar a mola da casa (`assentar`, a mesma da curadoria de
+   * fotografias) leva-a para a vizinha — com a velocidade que o dedo trazia —
+   * ou de volta ao sítio. Quem decide é `decidirDeslize` (voo.ts): 20 % da
+   * largura, ou um gesto rápido mesmo curto. Nas pontas não há vizinha, e o
+   * dedo sente um elástico (`elastico`) em vez de saltar para a 917.
+   *
+   * Sem `Element.animate` (jsdom) ou com movimento reduzido, nada desliza: a
+   * troca é imediata. O dedo continua a mover a foto — é manipulação directa,
+   * não animação.
+   */
+  const xRef = useRef(0);
+  const pararMolaRef = useRef<(() => void) | null>(null);
+  /** O sentido da viagem em curso (a mola a caminho da vizinha), ou 0. */
+  const viagemRef = useRef<-1 | 0 | 1>(0);
+  /** Para o clique que vem a seguir a um arrasto não contar como toque. */
+  const arrastouRef = useRef(false);
+  const desliza = arranque.anima && !arranque.reduzido;
+  /**
+   * Como se chegou à foto aberta: a deslizar (a vizinha que já estava na pista
+   * passa a ser a do meio, sem esbatimento) ou num salto (a tira, o Início, o
+   * Fim — esbate-se como antes).
+   */
+  const [entrada, setEntrada] = useState<"salto" | "deslize">("salto");
+  /**
+   * As vizinhas na pista só se montam depois de a foto aberta chegar (a mesma
+   * porta da pré-carga), ou assim que um gesto começa — aí já fazem falta.
+   */
+  const [vizinhasJa, setVizinhasJa] = useState(false);
+  const vizinhasJaRef = useRef(false);
+  const montarVizinhas = useCallback(() => {
+    if (vizinhasJaRef.current) return;
+    vizinhasJaRef.current = true;
+    setVizinhasJa(true);
+  }, []);
+
+  const pintarPista = useCallback((x: number) => {
+    xRef.current = x;
+    const pista = pistaRef.current;
+    if (pista) pista.style.transform = x ? `translate3d(${x}px, 0, 0)` : "";
+  }, []);
+  const pararMola = useCallback(() => {
+    pararMolaRef.current?.();
+    pararMolaRef.current = null;
+  }, []);
+  /** Uma volta da mola da casa até `alvo`, a partir de onde a pista está. */
+  const molaAte = useCallback(
+    (alvo: number, velocidadePxMs: number, fim?: () => void) => {
+      pararMola();
+      pararMolaRef.current = assentar(
+        { x: xRef.current - alvo, y: 0 },
+        (p) => {
+          pintarPista(alvo + p.x);
+          if (p.x === 0 && p.y === 0) {
+            pararMolaRef.current = null;
+            fim?.();
+          }
+        },
+        { x: velocidadePxMs * 1000, y: 0 },
+      );
+    },
+    [pararMola, pintarPista],
+  );
+
+  /** Troca para a vizinha — já, sem animação. */
+  const mudar = useCallback(
+    (dir: -1 | 1) => {
+      setEntrada("deslize");
+      if (dir > 0) next();
+      else prev();
+    },
+    [next, prev],
+  );
+  /** A pista viaja até à vizinha e, chegada lá, a vizinha passa a ser a aberta. */
+  const viajar = useCallback(
+    (dir: -1 | 1, velocidadePxMs = 0) => {
+      const largura = photoLayerRef.current?.clientWidth ?? 0;
+      viagemRef.current = dir;
+      molaAte(-dir * (largura + DESLIZE_INTERVALO_PX), velocidadePxMs, () => {
+        viagemRef.current = 0;
+        mudar(dir);
+      });
+    },
+    [molaAte, mudar],
+  );
+  /** Na ponta: um empurrão elástico, e volta. */
+  const empurrar = useCallback(
+    (dir: -1 | 1) => {
+      const largura = photoLayerRef.current?.clientWidth ?? 0;
+      pintarPista(elastico(-dir * 72, largura));
+      molaAte(0, 0);
+    },
+    [molaAte, pintarPista],
+  );
+  /** ‹ › e as setas: deslizam como o dedo. */
+  const andar = useCallback(
+    (dir: -1 | 1) => {
+      if (viagemRef.current) return; // uma viagem de cada vez
+      const existe = dir > 0 ? index < pool.length - 1 : index > 0;
+      if (!desliza) {
+        if (existe) mudar(dir);
+        return;
+      }
+      if (!existe) {
+        empurrar(dir);
+        return;
+      }
+      montarVizinhas();
+      // Um fotograma para a vizinha estar na pista antes de a pista andar.
+      requestAnimationFrame(() => viajar(dir));
+    },
+    [desliza, index, pool.length, mudar, empurrar, montarVizinhas, viajar],
+  );
+
+  // Uma foto nova está aberta: a pista volta a zero NO MESMO fotograma em que
+  // as fotografias trocam de lugar (efeito de layout, antes da pintura) — a
+  // vizinha que estava à direita passa a estar ao meio, e não se vê salto.
+  useIsomorphicLayoutEffect(() => {
+    pararMola();
+    viagemRef.current = 0;
+    pintarPista(0);
+  }, [index]);
+  useEffect(() => () => pararMolaRef.current?.(), []);
+
+  /** O gesto em curso. Só dedo e caneta: o rato tem os botões e as setas. */
+  const gesto = useRef({
+    id: -1,
+    x0: 0,
+    y0: 0,
+    dx: 0,
+    dy: 0,
+    eixo: "" as "" | "x" | "y",
+    base: 0,
+    amostras: [] as { t: number; x: number }[],
+  });
+  const aoPousar = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "mouse" || closing) return;
+    // Um dedo que pousa enquanto a foto ainda assenta agarra-a onde ela está.
+    pararMola();
+    viagemRef.current = 0;
+    gesto.current = {
+      id: e.pointerId,
+      x0: e.clientX,
+      y0: e.clientY,
+      dx: 0,
+      dy: 0,
+      eixo: "",
+      base: xRef.current,
+      amostras: [{ t: e.timeStamp, x: e.clientX }],
+    };
+    arrastouRef.current = false;
+  };
+  const aoMover = (e: React.PointerEvent<HTMLDivElement>) => {
+    const g = gesto.current;
+    if (e.pointerId !== g.id) return;
+    g.dx = e.clientX - g.x0;
+    g.dy = e.clientY - g.y0;
+    if (g.eixo === "") {
+      if (Math.abs(g.dx) < 8 && Math.abs(g.dy) < 8) return;
+      g.eixo = Math.abs(g.dy) > Math.abs(g.dx) ? "y" : "x";
+      arrastouRef.current = true;
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+      if (g.eixo === "y") arrastoRef.current?.classList.add("lb-dragging");
+      else montarVizinhas();
+    }
+    if (g.eixo === "x") {
+      g.amostras.push({ t: e.timeStamp, x: e.clientX });
+      while (g.amostras.length > 2 && e.timeStamp - g.amostras[0].t > 100) g.amostras.shift();
+      const largura = photoLayerRef.current?.clientWidth ?? 0;
+      const total = g.base + g.dx;
+      const semVizinha = (total > 0 && index <= 0) || (total < 0 && index >= pool.length - 1);
+      pintarPista(semVizinha ? elastico(total, largura) : total);
+    } else if (g.dy > 0) {
+      // Arrastar para baixo para fechar: a foto segue o dedo e o fundo
+      // desvanece, como nas Fotografias do iPhone.
+      const l = arrastoRef.current;
+      const b = backdropRef.current;
+      const escala = 1 - Math.min(g.dy / 1400, 0.12);
+      if (l) l.style.transform = `translateY(${g.dy}px) scale(${escala})`;
+      if (b) b.style.opacity = String(1 - Math.min(g.dy / 500, 0.72));
+    }
+  };
+  const aoLargar = (e: React.PointerEvent<HTMLDivElement>, cancelado = false) => {
+    const g = gesto.current;
+    if (e.pointerId !== g.id) return;
+    g.id = -1;
+    if (g.eixo === "x") {
+      const a = g.amostras;
+      const primeira = a[0];
+      const ultima = a[a.length - 1];
+      const dt = ultima.t - primeira.t;
+      const velocidade = dt > 0 ? (ultima.x - primeira.x) / dt : 0;
+      const largura = photoLayerRef.current?.clientWidth ?? 0;
+      const dir = cancelado
+        ? 0
+        : decidirDeslize({
+            dx: g.base + g.dx,
+            velocidade,
+            largura,
+            haAnterior: index > 0,
+            haSeguinte: index < pool.length - 1,
+          });
+      if (dir && desliza) viajar(dir, velocidade);
+      else if (dir) mudar(dir);
+      else if (desliza) molaAte(0, velocidade);
+      else pintarPista(0);
+    } else if (g.eixo === "y") {
+      const l = arrastoRef.current;
+      const b = backdropRef.current;
+      l?.classList.remove("lb-dragging");
+      if (!cancelado && g.dy > 120) {
+        if (l) l.style.transform = "translateY(115%) scale(0.88)";
+        if (b) b.style.opacity = "0";
+        window.setTimeout(dismiss, 220);
+      } else {
+        if (l) l.style.transform = "";
+        if (b) b.style.opacity = "";
+      }
+    }
+    g.eixo = "";
+  };
+
+  /**
+   * ══════════════════════════════════════════════════════════════════════════
+   * MAIS FOTOGRAFIA NO ECRÃ (GAL-4)
+   * ══════════════════════════════════════════════════════════════════════════
+   *
+   * A barra de cima, as setas e a tira flutuam POR CIMA da foto, e escondem-se
+   * ao fim de 2,5 s parados. Mexer o rato traz-as; um toque na foto mostra-as
+   * ou esconde-as (um toque no preto, fora dela, continua a fechar). Escondidas
+   * ficam `inert`: o Tab não cai num botão que não se vê.
+   *
+   * No telemóvel (ponteiro grosso) não há tira nem ‹ ›: ficam os gestos, e a
+   * barra de cima com o fechar.
+   */
+  const [tocar] = useState(
+    () => typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)").matches,
+  );
+  const [chromeVisivel, setChromeVisivel] = useState(true);
+  const [dicasAbertas, setDicasAbertas] = useState(false);
+  const esconderRef = useRef<number | undefined>(undefined);
+  /** O rato está por cima da barra ou da tira: não se esconde debaixo dele. */
+  const sobreChromeRef = useRef(false);
+  const agendarEsconder = useCallback(() => {
+    window.clearTimeout(esconderRef.current);
+    esconderRef.current = window.setTimeout(function esconder() {
+      const focado = document.activeElement?.closest?.(".lb-cromagem");
+      if (sobreChromeRef.current || focado) {
+        esconderRef.current = window.setTimeout(esconder, CROMAGEM_ESCONDE_MS);
+        return;
+      }
+      setDicasAbertas(false);
+      setChromeVisivel(false);
+    }, CROMAGEM_ESCONDE_MS);
+  }, []);
+  const mostrarChrome = useCallback(() => {
+    setChromeVisivel(true);
+    agendarEsconder();
+  }, [agendarEsconder]);
+  useEffect(() => {
+    agendarEsconder();
+    return () => window.clearTimeout(esconderRef.current);
+  }, [agendarEsconder]);
+  const alternarChrome = () => {
+    if (chromeVisivel) {
+      window.clearTimeout(esconderRef.current);
+      setDicasAbertas(false);
+      setChromeVisivel(false);
+    } else mostrarChrome();
+  };
+
   useEffect(() => {
     const fn = (e: KeyboardEvent) => {
       // A sair, as teclas já não mexem em nada: só o Tab continua preso.
       if (closing && e.key !== "Tab") return;
       if (e.key === "Escape") close();
-      else if (e.key === "ArrowLeft") prev();
-      else if (e.key === "ArrowRight") next();
+      else if (e.key === "ArrowLeft") andar(-1);
+      else if (e.key === "ArrowRight") andar(1);
       else if (e.key === "Home") {
         e.preventDefault();
         irPara(0);
@@ -1767,6 +2063,11 @@ function Lightbox({
         const d = dialogRef.current;
         if (document.fullscreenElement) void document.exitFullscreen?.().catch(() => {});
         else if (d?.requestFullscreen) void d.requestFullscreen().catch(() => {});
+      } else if (e.key === "Tab" && !chromeVisivel) {
+        // A barra está escondida (e `inert`): o primeiro Tab mostra-a, e é
+        // o seguinte que entra nela.
+        e.preventDefault();
+        mostrarChrome();
       } else if (e.key === "Tab" && dialogRef.current) {
         // Trap focus inside the lightbox dialog.
         const f = dialogRef.current.querySelectorAll<HTMLElement>(
@@ -1790,7 +2091,7 @@ function Lightbox({
     };
     window.addEventListener("keydown", fn);
     return () => window.removeEventListener("keydown", fn);
-  }, [close, prev, next, irPara, closing, pool.length]);
+  }, [close, andar, irPara, closing, pool.length, chromeVisivel, mostrarChrome]);
 
   // Move focus into the dialog on open; restore it to the trigger on close
   // (mount = abrir, unmount = fechar, já que este componente só vive aberto).
@@ -1919,9 +2220,10 @@ function Lightbox({
     const tile = miniaturaPintada(index);
     const imgTile = tile?.querySelector("img");
     const caixaTile = tile ? caixaDe(tile.getBoundingClientRect()) : null;
+    // A da FOTO ABERTA: com a pista, a camada tem também as vizinhas.
     const grande =
-      camada?.querySelector<HTMLImageElement>("img.lb-grande[data-carregada]") ??
-      camada?.querySelector<HTMLImageElement>("picture img");
+      camada?.querySelector<HTMLImageElement>("[data-actual] img.lb-grande[data-carregada]") ??
+      camada?.querySelector<HTMLImageElement>("[data-actual] picture img");
     if (
       copia &&
       camada &&
@@ -1976,80 +2278,68 @@ function Lightbox({
     return () => window.removeEventListener("resize", medir);
   }, []);
 
-  // Touch gestures on the open lightbox: horizontal swipe = prev/next,
-  // vertical drag-down = dismiss (the photo follows the finger and the backdrop
-  // fades, iOS-photos style). Attached as a NATIVE non-passive listener so the
-  // vertical drag can preventDefault (kill the rubber-band); the photo/backdrop
-  // are moved by writing to refs, never React state, so a drag never re-renders.
-  useEffect(() => {
-    const root = dialogRef.current;
-    if (!root) return;
-    const g = gestureRef.current;
-    const layer = () => photoLayerRef.current;
-    const backdrop = () => backdropRef.current;
-
-    const onStart = (e: TouchEvent) => {
-      const touch = e.touches[0];
-      g.x = touch.clientX;
-      g.y = touch.clientY;
-      g.dx = 0;
-      g.dy = 0;
-      g.axis = "";
-    };
-    const onMove = (e: TouchEvent) => {
-      const touch = e.touches[0];
-      g.dx = touch.clientX - g.x;
-      g.dy = touch.clientY - g.y;
-      if (g.axis === "") {
-        if (Math.abs(g.dx) < 8 && Math.abs(g.dy) < 8) return;
-        g.axis = Math.abs(g.dy) > Math.abs(g.dx) ? "y" : "x";
-        if (g.axis === "y") layer()?.classList.add("lb-dragging");
-      }
-      if (g.axis === "y" && g.dy > 0) {
-        e.preventDefault();
-        const l = layer();
-        const b = backdrop();
-        const scale = 1 - Math.min(g.dy / 1400, 0.12);
-        if (l) l.style.transform = `translateY(${g.dy}px) scale(${scale})`;
-        if (b) b.style.opacity = String(1 - Math.min(g.dy / 500, 0.72));
-      }
-    };
-    const onEnd = () => {
-      const l = layer();
-      const b = backdrop();
-      if (g.axis === "y") {
-        l?.classList.remove("lb-dragging");
-        if (g.dy > 120) {
-          if (l) l.style.transform = "translateY(115%) scale(0.88)";
-          if (b) b.style.opacity = "0";
-          window.setTimeout(dismiss, 220);
-        } else {
-          if (l) l.style.transform = "";
-          if (b) b.style.opacity = "";
-        }
-      } else if (g.axis === "x" && Math.abs(g.dx) > 50) {
-        if (g.dx < 0) next();
-        else prev();
-      }
-      g.axis = "";
-    };
-
-    root.addEventListener("touchstart", onStart, { passive: true });
-    root.addEventListener("touchmove", onMove, { passive: false });
-    root.addEventListener("touchend", onEnd, { passive: true });
-    return () => {
-      root.removeEventListener("touchstart", onStart);
-      root.removeEventListener("touchmove", onMove);
-      root.removeEventListener("touchend", onEnd);
-    };
-  }, [next, prev, dismiss]);
-
   if (typeof document === "undefined") return null;
 
   // Thumbnail strip around current photo
   const stripIdx = janelaDaTira(index, pool.length, nTira);
   // Em rede lenta / Save-Data não pré-carregamos os vizinhos full-screen.
   const preloadNeighbours = shouldPreloadNeighbours();
+  /** As fotografias na pista: a aberta e, quando já fazem falta, as vizinhas. */
+  const naPista = (heroLoaded || vizinhasJa ? [index - 1, index, index + 1] : [index]).filter(
+    (i) => i >= 0 && i < pool.length,
+  );
+
+  /**
+   * A pré-visualização de UMA fotografia — a miniatura que já está em cache.
+   * Serve a aberta (por baixo da grande) e as vizinhas na pista: quando uma
+   * vizinha passa a ser a aberta, este `<picture>` é o MESMO elemento (a
+   * chave do slide é o índice da foto), e a grande entra por cima dele.
+   */
+  const previa = (i: number) => (
+    <picture>
+      <source
+        media={CORTE_TELEMOVEL}
+        type="image/avif"
+        srcSet={srcsetDaGaleria(pool[i].src, ESCADA_TELEMOVEL, "avif")}
+        sizes={SIZES_DA_GRELHA}
+      />
+      <source
+        type="image/avif"
+        srcSet={srcsetDaGaleria(pool[i].src, ESCADA_ECRA_GRANDE, "avif")}
+        sizes={SIZES_DA_GRELHA}
+      />
+      {/*
+          AS DUAS LINHAS DE WebP, QUE FALTAVAM.
+
+          Esta pré-visualização existe para ser um acerto de cache: as
+          mesmas escadas e o mesmo `sizes` da grelha, para o browser
+          reutilizar o ficheiro que já tem e a fotografia aparecer a 0 ms.
+          Só que só havia `<source>` de AVIF — quem não lê AVIF caía no
+          `<img>`, que estava preso ao WebP de 768. Em secretária a grelha
+          guardou o de 1024: ficheiro diferente, cache falhada, e ~69 KB
+          descarregados no instante em que se prometeu "instantâneo".
+          São ~5 % das visitas, e para essas isto era ruído puro.
+        */}
+      <source
+        media={CORTE_TELEMOVEL}
+        type="image/webp"
+        srcSet={srcsetDaGaleria(pool[i].src, ESCADA_TELEMOVEL, "webp")}
+        sizes={SIZES_DA_GRELHA}
+      />
+      <source
+        type="image/webp"
+        srcSet={srcsetDaGaleria(pool[i].src, ESCADA_ECRA_GRANDE, "webp")}
+        sizes={SIZES_DA_GRELHA}
+      />
+      <img
+        src={ficheiroDaGaleria(pool[i].src, 768, "webp")}
+        alt=""
+        aria-hidden
+        className="absolute inset-0 h-full w-full object-contain"
+        decoding="async"
+      />
+    </picture>
+  );
 
   return createPortal(
     <div
@@ -2058,8 +2348,14 @@ function Lightbox({
       aria-modal="true"
       aria-label={`${dict.lbGallery}: ${labelText(pool[index].label)}, ${dict.lbPhoto} ${index + 1} ${dict.lbOf} ${pool.length}`}
       tabIndex={-1}
-      className="fixed inset-0 z-[60] flex flex-col select-none focus:outline-none"
+      className="fixed inset-0 z-[60] select-none focus:outline-none"
       onClick={close}
+      onPointerMove={(e) => {
+        if (e.pointerType !== "mouse") return;
+        sobreChromeRef.current = !!(e.target as Element).closest?.(".lb-cromagem .lb-chrome");
+        if (!chromeVisivel) mostrarChrome();
+        else agendarEsconder();
+      }}
     >
       {/* O fundo — camada própria, que é o que o gesto de arrastar-para-baixo
           desvanece. Toma a cor da fotografia aberta (GAL-3): um degradé que
@@ -2091,292 +2387,199 @@ function Lightbox({
         )}`}
       </p>
 
-      {/* Barra superior */}
+      {/* A FOTOGRAFIA OCUPA O ECRÃ (GAL-4), menos uma margem de 16 px (24 no
+          computador) e as zonas seguras do telemóvel — ver `.lb-palco`. A
+          barra e a tira flutuam por cima. `touch-none`: o dedo é do gesto,
+          não do scroll da página. */}
       <div
-        className="lb-scrim lb-chrome relative z-10 flex items-center justify-between px-5 pb-3.5 flex-shrink-0"
-        // Clear the notch so the counter / close button aren't hidden under
-        // the status bar on notched phones (keeps its base top padding too).
-        style={{ paddingTop: "calc(0.875rem + env(safe-area-inset-top))" }}
-        onClick={(e) => e.stopPropagation()}
+        ref={photoLayerRef}
+        className="lb-photo-layer lb-palco overflow-hidden touch-none"
+        onPointerDown={aoPousar}
+        onPointerMove={aoMover}
+        onPointerUp={(e) => aoLargar(e)}
+        onPointerCancel={(e) => aoLargar(e, true)}
+        onClick={(e) => {
+          // QUALQUER PRETO FECHA; um toque NA foto mostra ou esconde a barra.
+          // A camada vai de margem a margem, mas a foto encaixada não: conta a
+          // caixa pintada, pela proporção da foto. O clique que vem no fim de
+          // um arrasto não é um toque.
+          e.stopPropagation();
+          if (arrastouRef.current) {
+            arrastouRef.current = false;
+            return;
+          }
+          const camada = photoLayerRef.current;
+          if (!camada) return;
+          const foto = caixaContida(
+            caixaDe(camada.getBoundingClientRect()),
+            proporcao(pool[index].aspectRatio),
+          );
+          if (dentroDe(foto, e.clientX, e.clientY)) alternarChrome();
+          else close();
+        }}
       >
-        <div className="flex items-center gap-3">
-          <span className="text-white/70 text-xs font-light tabular-nums">{index + 1}</span>
-          {/* /60 (era /40): o separador media 3.66:1 a 12px, abaixo do minimo de 4.5:1. */}
-          <span className="text-white/60 text-xs">/</span>
-          <span className="text-white/55 text-xs tabular-nums">{pool.length}</span>
-          <span className="w-px h-3 bg-white/10 mx-1" />
-          {collectionFor(pool[index].src) && (
-            <span className="flex items-center">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  viewCollection(collectionFor(pool[index].src)!);
-                }}
-                aria-label={`${dict.viewWedding}: ${collectionFor(pool[index].src)}`}
-                title={dict.viewWedding}
-                // min-h + inline-flex: media 27x16px em telemovel, abaixo dos 24x24 CSS
-                // px minimos da WCAG 2.5.8. So cresce a caixa, o sublinhado fica igual.
-                className="inline-flex min-h-[24px] items-center text-white/70 text-xs hover:text-white underline decoration-white/25 hover:decoration-white/70 underline-offset-4 transition-colors"
-                style={{ fontFamily: "var(--font-playfair)" }}
-              >
-                {collectionFor(pool[index].src)}
-              </button>
-              <span className="text-white/20 mx-1.5">·</span>
-            </span>
-          )}
-          <span className="text-white/65 text-[10px] tracking-[0.15em] uppercase">
-            {labelText(pool[index].label)}
-          </span>
-        </div>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              close();
-            }}
-            aria-label={dict.lbClose}
-            // /60 (era /40): icone em repouso media 3.66:1, no limite de WCAG 1.4.11.
-            className="p-3 text-white/60 hover:text-white transition-colors rounded-full hover:bg-white/8"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
+        <div ref={arrastoRef} className="lb-arrasto absolute inset-0">
+          <div ref={pistaRef} className="lb-pista absolute inset-0">
+            {naPista.map((i) => {
+              const aberta = i === index;
+              return (
+                <div
+                  // A chave é a FOTOGRAFIA: ao deslizar, a vizinha passa a ser
+                  // a aberta sem desmontar — e a anterior sai de vez quando sai
+                  // da pista (era a dupla exposição a cada seta).
+                  key={i}
+                  data-actual={aberta ? "" : undefined}
+                  aria-hidden={aberta ? undefined : true}
+                  className="lb-slide absolute inset-0"
+                  style={{
+                    transform:
+                      i === index
+                        ? undefined
+                        : `translateX(calc(${i - index} * (100% + ${DESLIZE_INTERVALO_PX}px)))`,
+                  }}
+                >
+                  <div
+                    className={`absolute inset-0${
+                      aberta && entrada === "salto" && !(justOpened && arranque.voa)
+                        ? " lb-photo-in"
+                        : ""
+                    }`}
+                  >
+                    {/*
+                    ABRE COM A MINIATURA QUE JÁ ESTÁ EM CACHE, e só depois troca.
+
+                    A miniatura do mosaico em que se acabou de tocar já está no
+                    disco do browser: desenhá-la primeiro faz a abertura ser
+                    INSTANTÂNEA, e a versão grande entra por cima quando chega.
+                    O `sizes` é o DA GRELHA, não o do lightbox, de propósito: é
+                    o que faz o browser escolher o candidato que já tem.
+
+                    Fica montada depois de a grande carregar: o `onLoad` dispara
+                    quando a grande está pronta, não quando está VISÍVEL (entra
+                    com um esbatimento), e tirá-la deixava o fundo à vista.
+                  */}
+                    {previa(i)}
+                    {aberta && (
+                      <>
+                        {!foto.falhou && (
+                          <Image
+                            key={`${index}-${foto.tentativa}-${lbRaw ? "raw" : lbFormato}`}
+                            src={pool[index].src}
+                            alt={altText(pool[index].src, pool[index].label)}
+                            fill
+                            // "90vw", não "min(90vw, 1920px)". O tecto que o min() queria pôr
+                            // já é o do next.config (deviceSizes acaba em 1920), e a forma
+                            // com parênteses não casa com a regex que o Next usa para ler o
+                            // `sizes` — node_modules/next/dist/shared/lib/get-img-props.js:53,
+                            // `/(^|\s)(1?\d?\d)vw/g`, exige início-de-string ou espaço antes
+                            // do número. Com "min(90vw, …)" o 90vw vem precedido de "(", a
+                            // lista de percentagens fica vazia e o Next cai no ramo que emite
+                            // TODAS as 16 larguras do srcset — incluindo candidatos absurdos
+                            // de 16, 32 e 64 px. Com "90vw" são 10, e a largura que o browser
+                            // escolhe é a mesma (medido nos 8 perfis de dispositivo).
+                            sizes="90vw"
+                            quality={72}
+                            // A escada de formato, e depois o ficheiro original tal e qual
+                            // (ver `lbFormato` e `lbRaw`).
+                            {...(lbRaw
+                              ? { loader: ({ src }: { src: string }) => src }
+                              : {
+                                  loader: ({ src, width }: { src: string; width: number }) =>
+                                    ficheiroDaGaleria(src, snapGalleryWidth(width), lbFormato),
+                                })}
+                            onError={() => {
+                              // avif → webp → original → a frase. Nunca salta um degrau: o
+                              // WebP é o que salva quem não sabe ler AVIF, e o original é o
+                              // que salva quem não tem a derivada. Quando nem o original vem,
+                              // mostra-se o que aconteceu, e não a imagem partida do browser.
+                              anotar((a) =>
+                                a.cru
+                                  ? { ...a, falhou: true }
+                                  : a.formato === "avif"
+                                    ? { ...a, formato: "webp" }
+                                    : { ...a, cru: true },
+                              );
+                            }}
+                            // priority: the full-res lightbox photo is a DIFFERENT srcset
+                            // candidate than the tile thumbnail, so opening starts a cold fetch.
+                            // Fetching it high-priority (instead of default) shortens the
+                            // "black → pop" gap so the photo is ready as the open animation runs.
+                            // Next 16 deprecou `priority` a favor de `preload`; para uma
+                            // foto que ja esta no DOM a propria doc recomenda antes
+                            // fetchPriority="high", que e exactamente o efeito que se quer.
+                            fetchPriority="high"
+                            onLoad={() => anotar((a) => ({ ...a, carregada: true }))}
+                            // SEM o desfocado (`blurProps`). Pintava a área inteira em modo
+                            // cover, POR CIMA da pré-visualização nítida que já estava pronta
+                            // aos 140 ms, e só saía aos ~770 ms: abrir uma foto mostrava uma
+                            // mancha meio segundo. Agora a grande fica transparente até
+                            // chegar e entra por cima da pré-visualização (`lb-grande`).
+                            className="object-contain lb-grande"
+                            data-carregada={heroLoaded ? "" : undefined}
+                          />
+                        )}
+                        {foto.falhou && (
+                          <div className="pointer-events-none absolute inset-0 grid place-items-center p-6">
+                            <div
+                              role="alert"
+                              className="pointer-events-auto flex flex-col items-center gap-3 rounded-2xl bg-black/70 px-6 py-5 text-center ring-1 ring-white/10"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <p className="text-sm text-white/85">{dict.lbErro}</p>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setGuardado(estadoDaFotoDoZero(index, foto.tentativa + 1))
+                                }
+                                className="min-h-[44px] rounded-full px-5 text-sm text-white ring-1 ring-white/30 transition-colors duration-elemento hover:bg-white/10"
+                              >
+                                {dict.lbTentar}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
-      {/* Área da foto + botões */}
-      <div className="relative flex-1 flex items-center justify-center min-h-0">
-        {/* Botão anterior */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            prev();
-          }}
-          aria-label={dict.lbPrev}
-          className="lb-chrome absolute left-3 md:left-6 z-10 grid place-items-center w-11 h-11 md:w-12 md:h-12 rounded-full bg-black/40 text-white/75 ring-1 ring-white/10 hover:bg-black/60 hover:text-white hover:scale-105 active:scale-95 transition-all duration-200"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M15 19l-7-7 7-7"
-            />
-          </svg>
-        </button>
-
-        {/* Foto principal */}
-        <div
-          ref={photoLayerRef}
-          className="lb-photo-layer absolute inset-0 mx-2 md:mx-20 overflow-hidden"
-          onClick={(e) => {
-            // QUALQUER PRETO FECHA. A camada vai de margem a margem, mas a
-            // foto encaixada não: ao lado de uma foto ao alto ficam duas faixas
-            // largas que pareciam fundo e não fechavam. Conta a caixa pintada,
-            // pela proporção da foto; um clique na fotografia não fecha.
-            e.stopPropagation();
-            const camada = photoLayerRef.current;
-            if (!camada) return;
-            const foto = caixaContida(
-              caixaDe(camada.getBoundingClientRect()),
-              proporcao(pool[index].aspectRatio),
-            );
-            if (!dentroDe(foto, e.clientX, e.clientY)) close();
-          }}
-        >
-          {/* Uma chave por fotografia: a pré-visualização e a foto grande da
-              anterior saem de vez quando se muda. Sem ela o `<picture>` era o
-              MESMO elemento e a foto anterior ficava por baixo da nova até esta
-              chegar — via-se uma dupla exposição a cada seta. */}
-          <div
-            key={index}
-            className={`absolute inset-0${justOpened && arranque.voa ? "" : " lb-photo-in"}`}
-          >
-            {/*
-            ABRE COM A MINIATURA QUE JÁ ESTÁ EM CACHE, e só depois troca.
-
-            O que se abria era directamente a fotografia em resolução inteira,
-            com `fetchPriority="high"`. Isso é o pedido certo — mas é um pedido:
-            a 4G lento são umas centenas de milissegundos entre o toque e a
-            fotografia, e o que se vê nesse intervalo é preto.
-
-            A miniatura do mosaico em que se acabou de tocar já está no disco do
-            browser. Desenhá-la primeiro faz a abertura ser INSTANTÂNEA — a
-            fotografia está lá no mesmo frame do toque, ampliada, e a versão
-            grande entra por cima quando chega.
-
-            O `sizes` aqui é o DA GRELHA, não o do lightbox, e é de propósito:
-            é o que faz o browser escolher exactamente o candidato que já
-            descarregou. Com `90vw` escolheria outro ficheiro e isto passaria a
-            ser um segundo download em vez de um acerto na cache.
-          */}
-            {/*
-            Fica montada mesmo depois de a grande carregar. Tirá-la no `onLoad`
-            parece a limpeza óbvia e é um erro: o `onLoad` dispara quando a
-            fotografia grande está pronta, não quando ela está VISÍVEL — ela
-            entra com um esbatimento (`lb-grande`). Desmontar a miniatura nesse
-            instante deixava o fundo à vista durante todo o esbatimento, que é
-            exactamente o buraco que isto veio tapar.
-          */}
-            <picture>
-              <source
-                media={CORTE_TELEMOVEL}
-                type="image/avif"
-                srcSet={srcsetDaGaleria(pool[index].src, ESCADA_TELEMOVEL, "avif")}
-                sizes={SIZES_DA_GRELHA}
-              />
-              <source
-                type="image/avif"
-                srcSet={srcsetDaGaleria(pool[index].src, ESCADA_ECRA_GRANDE, "avif")}
-                sizes={SIZES_DA_GRELHA}
-              />
-              {/*
-              AS DUAS LINHAS DE WebP, QUE FALTAVAM.
-
-              Esta pré-visualização existe para ser um acerto de cache: as
-              mesmas escadas e o mesmo `sizes` da grelha, para o browser
-              reutilizar o ficheiro que já tem e a fotografia aparecer a 0 ms.
-              Só que só havia `<source>` de AVIF — quem não lê AVIF caía no
-              `<img>`, que estava preso ao WebP de 768. Em secretária a grelha
-              guardou o de 1024: ficheiro diferente, cache falhada, e ~69 KB
-              descarregados no instante em que se prometeu "instantâneo".
-              São ~5 % das visitas, e para essas isto era ruído puro.
-            */}
-              <source
-                media={CORTE_TELEMOVEL}
-                type="image/webp"
-                srcSet={srcsetDaGaleria(pool[index].src, ESCADA_TELEMOVEL, "webp")}
-                sizes={SIZES_DA_GRELHA}
-              />
-              <source
-                type="image/webp"
-                srcSet={srcsetDaGaleria(pool[index].src, ESCADA_ECRA_GRANDE, "webp")}
-                sizes={SIZES_DA_GRELHA}
-              />
-              <img
-                src={ficheiroDaGaleria(pool[index].src, 768, "webp")}
-                alt=""
-                aria-hidden
-                className="absolute inset-0 h-full w-full object-contain"
-                decoding="async"
-              />
-            </picture>
-            {!foto.falhou && (
+      {/* Pré-carrega só o vizinho SEGUINTE (o sentido de navegação dominante)
+          para que → seja instantâneo. Usa `sizes="90vw"` — o MESMO candidato que
+          a foto mostrada — para o browser acertar no recurso exato em cache no
+          passo seguinte (com 45vw carregava um URL diferente e o → voltava a
+          descodificar do zero). Só um vizinho (não os dois), fora de ecrã, e só
+          em rede boa (Save-Data / 2g / 3g ignora). O anterior carrega no ← —
+          raro. */}
+      <div aria-hidden className="absolute h-px w-px overflow-hidden opacity-0 pointer-events-none">
+        {preloadNeighbours &&
+          pool.length > 1 &&
+          heroLoaded &&
+          /**
+           * OS DOIS VIZINHOS, não só o seguinte.
+           *
+           * Isto pré-carregava só o `+1`, com a justificação de que o sentido
+           * de navegação dominante é para a frente e o `←` é raro. É verdade
+           * em média — e é exactamente por isso que o `←` era o gesto que
+           * doía: quem volta atrás está a voltar a uma fotografia de que
+           * gostou, e essa era a única que aparecia preta.
+           *
+           * O `-1` está quase sempre em cache (acabou de se passar por ela),
+           * portanto na prática isto custa zero bytes na navegação para a
+           * frente; só paga alguma coisa quando se ABRE a meio da grelha, que
+           * é uma vez por sessão.
+           */
+          // Só as vizinhas que EXISTEM: as pontas já não dão a volta.
+          [index + 1, index - 1]
+            .filter((i) => i >= 0 && i < pool.length)
+            .map((i) => (
               <Image
-                key={`${index}-${foto.tentativa}-${lbRaw ? "raw" : lbFormato}`}
-                src={pool[index].src}
-                alt={altText(pool[index].src, pool[index].label)}
-                fill
-                // "90vw", não "min(90vw, 1920px)". O tecto que o min() queria pôr
-                // já é o do next.config (deviceSizes acaba em 1920), e a forma
-                // com parênteses não casa com a regex que o Next usa para ler o
-                // `sizes` — node_modules/next/dist/shared/lib/get-img-props.js:53,
-                // `/(^|\s)(1?\d?\d)vw/g`, exige início-de-string ou espaço antes
-                // do número. Com "min(90vw, …)" o 90vw vem precedido de "(", a
-                // lista de percentagens fica vazia e o Next cai no ramo que emite
-                // TODAS as 16 larguras do srcset — incluindo candidatos absurdos
-                // de 16, 32 e 64 px. Com "90vw" são 10, e a largura que o browser
-                // escolhe é a mesma (medido nos 8 perfis de dispositivo).
-                sizes="90vw"
-                quality={72}
-                // A escada de formato, e depois o ficheiro original tal e qual
-                // (ver `lbFormato` e `lbRaw`).
-                {...(lbRaw
-                  ? { loader: ({ src }: { src: string }) => src }
-                  : {
-                      loader: ({ src, width }: { src: string; width: number }) =>
-                        ficheiroDaGaleria(src, snapGalleryWidth(width), lbFormato),
-                    })}
-                onError={() => {
-                  // avif → webp → original → a frase. Nunca salta um degrau: o
-                  // WebP é o que salva quem não sabe ler AVIF, e o original é o
-                  // que salva quem não tem a derivada. Quando nem o original vem,
-                  // mostra-se o que aconteceu, e não a imagem partida do browser.
-                  anotar((a) =>
-                    a.cru
-                      ? { ...a, falhou: true }
-                      : a.formato === "avif"
-                        ? { ...a, formato: "webp" }
-                        : { ...a, cru: true },
-                  );
-                }}
-                // priority: the full-res lightbox photo is a DIFFERENT srcset
-                // candidate than the tile thumbnail, so opening starts a cold fetch.
-                // Fetching it high-priority (instead of default) shortens the
-                // "black → pop" gap so the photo is ready as the open animation runs.
-                // Next 16 deprecou `priority` a favor de `preload`; para uma
-                // foto que ja esta no DOM a propria doc recomenda antes
-                // fetchPriority="high", que e exactamente o efeito que se quer.
-                fetchPriority="high"
-                onLoad={() => anotar((a) => ({ ...a, carregada: true }))}
-                // SEM o desfocado (`blurProps`). Pintava a área inteira em modo
-                // cover, POR CIMA da pré-visualização nítida que já estava pronta
-                // aos 140 ms, e só saía aos ~770 ms: abrir uma foto mostrava uma
-                // mancha meio segundo. Agora a grande fica transparente até
-                // chegar e entra por cima da pré-visualização (`lb-grande`).
-                className="object-contain lb-grande"
-                data-carregada={heroLoaded ? "" : undefined}
-              />
-            )}
-            {foto.falhou && (
-              <div className="pointer-events-none absolute inset-0 grid place-items-center p-6">
-                <div
-                  role="alert"
-                  className="pointer-events-auto flex flex-col items-center gap-3 rounded-2xl bg-black/70 px-6 py-5 text-center ring-1 ring-white/10"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <p className="text-sm text-white/85">{dict.lbErro}</p>
-                  <button
-                    type="button"
-                    onClick={() => setGuardado(estadoDaFotoDoZero(index, foto.tentativa + 1))}
-                    className="min-h-[44px] rounded-full px-5 text-sm text-white ring-1 ring-white/30 transition-colors duration-elemento hover:bg-white/10"
-                  >
-                    {dict.lbTentar}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Pré-carrega só o vizinho SEGUINTE (o sentido de navegação dominante)
-            para que → seja instantâneo. Usa `sizes="90vw"` — o MESMO candidato que
-            a foto mostrada — para o browser acertar no recurso exato em cache no
-            passo seguinte (com 45vw carregava um URL diferente e o → voltava a
-            descodificar do zero). Só um vizinho (não os dois), fora de ecrã, e só
-            em rede boa (Save-Data / 2g / 3g ignora). O anterior carrega no ← —
-            raro. */}
-        <div
-          aria-hidden
-          className="absolute h-px w-px overflow-hidden opacity-0 pointer-events-none"
-        >
-          {preloadNeighbours &&
-            pool.length > 1 &&
-            heroLoaded &&
-            /**
-             * OS DOIS VIZINHOS, não só o seguinte.
-             *
-             * Isto pré-carregava só o `+1`, com a justificação de que o sentido
-             * de navegação dominante é para a frente e o `←` é raro. É verdade
-             * em média — e é exactamente por isso que o `←` era o gesto que
-             * doía: quem volta atrás está a voltar a uma fotografia de que
-             * gostou, e essa era a única que aparecia preta.
-             *
-             * O `-1` está quase sempre em cache (acabou de se passar por ela),
-             * portanto na prática isto custa zero bytes na navegação para a
-             * frente; só paga alguma coisa quando se ABRE a meio da grelha, que
-             * é uma vez por sessão.
-             */
-            [1, -1].map((passo) => (
-              <Image
-                key={`${passo}:${(index + passo + pool.length) % pool.length}`}
-                src={pool[(index + passo + pool.length) % pool.length].src}
+                key={i}
+                src={pool[i].src}
                 alt=""
                 fill
                 // O MESMO `sizes` da foto mostrada (ver a nota lá em cima sobre
@@ -2393,70 +2596,174 @@ function Lightbox({
                 loading="eager"
               />
             ))}
-        </div>
-
-        {/* Botão próxima */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            next();
-          }}
-          aria-label={dict.lbNext}
-          className="lb-chrome absolute right-3 md:right-6 z-10 grid place-items-center w-11 h-11 md:w-12 md:h-12 rounded-full bg-black/40 text-white/75 ring-1 ring-white/10 hover:bg-black/60 hover:text-white hover:scale-105 active:scale-95 transition-all duration-200"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
       </div>
 
-      {/* Strip de thumbnails — deferido para o frame seguinte à abertura para
-          não pesar no commit de abertura (ver chromeReady). */}
-      {/* A altura fica reservada desde o primeiro fotograma (a activa tem
-          52 px, mais 12 de cada lado). Sem isto a tira chegava um fotograma
-          depois e encolhia a área da foto por baixo do voo. */}
+      {/* ── A CROMAGEM, A FLUTUAR (GAL-4) ──────────────────────────────────
+          A barra de cima, as setas e a tira. Esconde-se ao fim de 2,5 s sem
+          mexer, e `inert` enquanto escondida — ver `chromeVisivel`. */}
       <div
-        className="lb-chrome flex min-h-[76px] items-center justify-center gap-1 px-4 py-3 flex-shrink-0"
-        onClick={(e) => e.stopPropagation()}
+        className="lb-cromagem pointer-events-none absolute inset-0 z-10"
+        data-escondido={chromeVisivel ? undefined : ""}
+        inert={!chromeVisivel}
       >
-        {chromeReady &&
-          stripIdx.map((idx) => (
+        {/* Barra superior */}
+        <div
+          className="lb-scrim lb-chrome pointer-events-auto absolute inset-x-0 top-0 flex items-center justify-between px-5 pb-6"
+          // Clear the notch so the counter / close button aren't hidden under
+          // the status bar on notched phones (keeps its base top padding too).
+          style={{ paddingTop: "calc(0.875rem + env(safe-area-inset-top))" }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-white/70 text-xs font-light tabular-nums">{index + 1}</span>
+            {/* /60 (era /40): o separador media 3.66:1 a 12px, abaixo do minimo de 4.5:1. */}
+            <span className="text-white/60 text-xs">/</span>
+            <span className="text-white/55 text-xs tabular-nums">{pool.length}</span>
+            <span className="w-px h-3 bg-white/10 mx-1" />
+            {collectionFor(pool[index].src) && (
+              <span className="flex items-center">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    viewCollection(collectionFor(pool[index].src)!);
+                  }}
+                  aria-label={`${dict.viewWedding}: ${collectionFor(pool[index].src)}`}
+                  title={dict.viewWedding}
+                  // min-h + inline-flex: media 27x16px em telemovel, abaixo dos 24x24 CSS
+                  // px minimos da WCAG 2.5.8. So cresce a caixa, o sublinhado fica igual.
+                  className="inline-flex min-h-[24px] items-center text-white/70 text-xs hover:text-white underline decoration-white/25 hover:decoration-white/70 underline-offset-4 transition-colors"
+                  style={{ fontFamily: "var(--font-playfair)" }}
+                >
+                  {collectionFor(pool[index].src)}
+                </button>
+                <span className="text-white/20 mx-1.5">·</span>
+              </span>
+            )}
+            <span className="text-white/65 text-[10px] tracking-[0.15em] uppercase">
+              {labelText(pool[index].label)}
+            </span>
+          </div>
+          <div className="relative flex items-center gap-1">
+            {/* As dicas do teclado passaram a um «?» (GAL-4): a linha de baixo
+                comia altura à foto. Só com rato — ver `.lb-dica`. */}
             <button
-              key={idx}
-              onClick={() => irPara(idx)}
-              aria-label={`${dict.lbPhoto} ${idx + 1} ${dict.lbOf} ${pool.length}`}
-              aria-current={idx === index ? "true" : undefined}
-              className={`group relative flex-shrink-0 overflow-hidden transition-all duration-200 ${FOCUS_RING} ${
-                idx === index
-                  ? "w-[72px] h-[52px] ring-1 ring-white/60 opacity-100"
-                  : "w-[60px] h-[44px] opacity-50 hover:opacity-80 hover:scale-105"
-              }`}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setDicasAbertas((v) => !v);
+              }}
+              aria-label={dict.lbAtalhos}
+              aria-expanded={dicasAbertas}
+              className="lb-dica h-11 w-11 rounded-full text-sm text-white/60 transition-colors hover:bg-white/8 hover:text-white"
             >
-              {/* A tira usa as MESMAS miniaturas estáticas da grelha (loader
-                  pré-gerado): não gasta o optimizador e, para as fotos já
-                  vistas na grelha, o ficheiro já está na cache do browser —
-                  a tira aparece instantânea. */}
-              <Image
-                src={pool[idx].src}
-                alt=""
-                fill
-                sizes="72px"
-                loader={galleryImageLoader}
-                className="object-cover"
-                // Um quadrado de 72 px corta muito: pelo ponto de interesse,
-                // e não pelo centro (gallery-meta.json).
-                style={pool[idx].foco ? { objectPosition: pool[idx].foco } : undefined}
-              />
-              <FocusRing />
+              ?
             </button>
-          ))}
-      </div>
+            {dicasAbertas && (
+              <p className="lb-dica-caixa absolute right-0 top-full mt-1 whitespace-nowrap rounded-xl bg-black/80 px-3 py-2 text-[11px] tracking-widest text-white/80 ring-1 ring-white/10">
+                {dict.keyboardHint}
+              </p>
+            )}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                close();
+              }}
+              aria-label={dict.lbClose}
+              // /60 (era /40): icone em repouso media 3.66:1, no limite de WCAG 1.4.11.
+              className="p-3 text-white/60 hover:text-white transition-colors rounded-full hover:bg-white/8"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+        {!tocar && index > 0 && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              andar(-1);
+            }}
+            aria-label={dict.lbPrev}
+            className="lb-chrome pointer-events-auto absolute left-3 top-[calc(50%-1.5rem)] grid place-items-center w-11 h-11 md:left-6 md:w-12 md:h-12 rounded-full bg-black/40 text-white/75 ring-1 ring-white/10 hover:bg-black/60 hover:text-white hover:scale-105 active:scale-95 transition-all duration-200"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M15 19l-7-7 7-7"
+              />
+            </svg>
+          </button>
+        )}
+        {!tocar && index < pool.length - 1 && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              andar(1);
+            }}
+            aria-label={dict.lbNext}
+            className="lb-chrome pointer-events-auto absolute right-3 top-[calc(50%-1.5rem)] grid place-items-center w-11 h-11 md:right-6 md:w-12 md:h-12 rounded-full bg-black/40 text-white/75 ring-1 ring-white/10 hover:bg-black/60 hover:text-white hover:scale-105 active:scale-95 transition-all duration-200"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M9 5l7 7-7 7"
+              />
+            </svg>
+          </button>
+        )}
 
-      {/* Dicas teclado — só com rato (ver `.lb-dica`): num tablet com 768 px
-          ou mais aparecia «esc fechar» a quem não tem tecla Esc. */}
-      <p className="lb-dica text-center text-white/60 text-[10px] tracking-widest pb-2 flex-shrink-0">
-        {dict.keyboardHint}
-      </p>
+        {/* Strip de thumbnails — deferido para o frame seguinte à abertura
+            para não pesar no commit de abertura (ver chromeReady). No
+            telemóvel não há tira: ficam os gestos (GAL-4). */}
+        {!tocar && (
+          <div
+            className="lb-chrome lb-scrim-baixo pointer-events-auto absolute inset-x-0 bottom-0 flex min-h-[76px] items-center justify-center gap-1 px-4 pb-3 pt-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {chromeReady &&
+              stripIdx.map((idx) => (
+                <button
+                  key={idx}
+                  onClick={() => irPara(idx)}
+                  aria-label={`${dict.lbPhoto} ${idx + 1} ${dict.lbOf} ${pool.length}`}
+                  aria-current={idx === index ? "true" : undefined}
+                  className={`group relative flex-shrink-0 overflow-hidden transition-all duration-200 ${FOCUS_RING} ${
+                    idx === index
+                      ? "w-[72px] h-[52px] ring-1 ring-white/60 opacity-100"
+                      : "w-[60px] h-[44px] opacity-50 hover:opacity-80 hover:scale-105"
+                  }`}
+                >
+                  {/* A tira usa as MESMAS miniaturas estáticas da grelha (loader
+                      pré-gerado): não gasta o optimizador e, para as fotos já
+                      vistas na grelha, o ficheiro já está na cache do browser —
+                      a tira aparece instantânea. */}
+                  <Image
+                    src={pool[idx].src}
+                    alt=""
+                    fill
+                    sizes="72px"
+                    loader={galleryImageLoader}
+                    className="object-cover"
+                    // Um quadrado de 72 px corta muito: pelo ponto de interesse,
+                    // e não pelo centro (gallery-meta.json).
+                    style={pool[idx].foco ? { objectPosition: pool[idx].foco } : undefined}
+                  />
+                  <FocusRing />
+                </button>
+              ))}
+          </div>
+        )}
+      </div>
     </div>,
     document.body,
   );

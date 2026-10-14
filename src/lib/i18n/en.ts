@@ -248,6 +248,7 @@ export const en: Dict = {
     viewWedding: "View this wedding",
     backToGallery: "All photos",
     photosLabel: "photos",
+    lbAtalhos: "Keyboard shortcuts",
     keyboardHint: "← → navigate · f full screen · esc to close",
     backToTop: "Back to top",
     gridLabel: "Photo gallery",

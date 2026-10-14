@@ -37,8 +37,12 @@ const photos = PHOTOS.slice(0, 8).map((p) => ({ ...p, aspectRatio: "3/2" }));
 const precargas = () => [
   ...document.querySelectorAll<HTMLImageElement>("[aria-hidden].h-px.w-px img"),
 ];
-/** A fotografia grande (o último `<img>` da camada — o `<picture>` vem antes). */
-const heroi = () => [...document.querySelectorAll<HTMLImageElement>(".lb-photo-layer img")].at(-1)!;
+/**
+ * A fotografia grande da foto ABERTA. Com a pista (GAL-2) a camada tem também
+ * as pré-visualizações das vizinhas, por isso conta-se dentro de `[data-actual]`.
+ */
+const heroi = () =>
+  document.querySelector<HTMLImageElement>(".lb-photo-layer [data-actual] img.lb-grande")!;
 
 beforeEach(() => {
   vi.stubGlobal(
@@ -68,10 +72,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-/** Abre a primeira fotografia e dá-a por carregada. */
-async function abrirEcarregar() {
+/**
+ * Abre uma fotografia a meio (com as duas vizinhas) e dá-a por carregada. A
+ * primeira já não tem anterior: as pontas deixaram de dar a volta (GAL-2).
+ */
+async function abrirEcarregar(i = 3) {
   render(<GaleriaClient photos={photos} dict={pt.galeria} />);
-  fireEvent.click(document.querySelector<HTMLElement>("[data-tile-idx]")!);
+  fireEvent.click(document.querySelector<HTMLElement>(`[data-tile-idx="${i}"]`)!);
   // O `onLoad` do next/image passa por `img.decode()`, que é assíncrono.
   await act(async () => {
     fireEvent.load(heroi());
@@ -88,6 +95,11 @@ describe("pré-carga dos vizinhos no lightbox", () => {
   it("com a fotografia carregada, os dois vizinhos são pré-carregados", async () => {
     await abrirEcarregar();
     expect(precargas()).toHaveLength(2);
+  });
+
+  it("na primeira fotografia só há a seguinte para pré-carregar (sem dar a volta)", async () => {
+    await abrirEcarregar(0);
+    expect(precargas()).toHaveLength(1);
   });
 
   it("passar à fotografia seguinte não monta pré-cargas antes de ela chegar", async () => {

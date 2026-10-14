@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   aVista,
+  decidirDeslize,
+  elastico,
   caixaContida,
   dentroDe,
   focoEmFraccao,
@@ -153,5 +155,41 @@ describe("a tira de miniaturas", () => {
     expect(janelaDaTira(50, 100, 5)).toEqual([48, 49, 50, 51, 52]);
     expect(janelaDaTira(99, 100, 5)).toEqual([95, 96, 97, 98, 99]);
     expect(janelaDaTira(1, 3, 5)).toEqual([0, 1, 2]);
+  });
+});
+
+describe("decidirDeslize (GAL-2)", () => {
+  const base = { largura: 1000, haAnterior: true, haSeguinte: true };
+  it("muda a partir de 20 % da largura, devagar", () => {
+    expect(decidirDeslize({ ...base, dx: -201, velocidade: -0.05 })).toBe(1);
+    expect(decidirDeslize({ ...base, dx: 201, velocidade: 0.05 })).toBe(-1);
+    expect(decidirDeslize({ ...base, dx: -150, velocidade: -0.05 })).toBe(0);
+  });
+  it("um gesto rápido muda mesmo curto, mas não um toque trémulo", () => {
+    expect(decidirDeslize({ ...base, dx: -40, velocidade: -0.8 })).toBe(1);
+    expect(decidirDeslize({ ...base, dx: -5, velocidade: -0.8 })).toBe(0);
+  });
+  it("um gesto rápido ao contrário desiste, mesmo depois dos 20 %", () => {
+    expect(decidirDeslize({ ...base, dx: -400, velocidade: 0.9 })).toBe(0);
+  });
+  it("nunca vai para uma vizinha que não existe", () => {
+    expect(decidirDeslize({ ...base, haAnterior: false, dx: 600, velocidade: 2 })).toBe(0);
+    expect(decidirDeslize({ ...base, haSeguinte: false, dx: -600, velocidade: -2 })).toBe(0);
+  });
+});
+
+describe("elastico (GAL-2)", () => {
+  it("cresce cada vez mais devagar e nunca passa de um terço da largura", () => {
+    const a = elastico(100, 900);
+    const b = elastico(200, 900);
+    const c = elastico(10_000, 900);
+    expect(a).toBeGreaterThan(0);
+    expect(a).toBeLessThan(100);
+    expect(b - a).toBeLessThan(a);
+    expect(c).toBeLessThan(300);
+  });
+  it("é simétrico, e zero é zero", () => {
+    expect(elastico(-120, 900)).toBeCloseTo(-elastico(120, 900), 10);
+    expect(elastico(0, 900)).toBe(0);
   });
 });

@@ -248,6 +248,35 @@ como recomendação.
 >   anterior tapava isto por baixo (era a dupla exposição). Fica para a 2.ª
 >   parte, com o GAL-2.
 
+> **GAL-2 e GAL-4 — FEITAS a 14/10/2026** (ramo `feat/galeria-dedo`), a
+> pedido dela («Galeria, 2.ª parte»). Onde a execução se afastou do texto:
+>
+> - **a pista são três fotografias** (a anterior, a aberta e a seguinte), com
+>   24 px entre elas. As vizinhas mostram a pré-visualização que já está em
+>   cache e só se montam depois de a aberta chegar, ou quando um gesto começa
+>   — a mesma porta da pré-carga;
+> - **a mola é a da casa** (`src/lib/motion/mola.ts`, a da curadoria de
+>   fotografias), com a velocidade com que o dedo sai. Quem decide se muda é
+>   `decidirDeslize` (`voo.ts`): 20 % da largura, ou um gesto rápido
+>   (≥ 0,5 px/ms) a partir de 12 px. Um gesto rápido ao contrário desiste;
+> - **as pontas deixaram de dar a volta em todos os caminhos**: o dedo, as
+>   setas do teclado, o ‹ › (que desaparecem na primeira e na última) e a
+>   pré-carga. No dedo há um elástico (`elastico`, nunca mais de ⅓ da
+>   largura); nas setas, um empurrão curto;
+> - **o ‹ › e as setas do teclado também deslizam**, e a tira e o Início/Fim
+>   continuam a esbater-se: isto resolve os ~200 ms de fundo que a 1.ª parte
+>   deixou anotados;
+> - **o deslize é só na foto**: antes, deslizar na tira também mudava de foto;
+> - **a barra, as setas e a tira** ficam numa só camada (`.lb-cromagem`) que se
+>   esconde aos 2,5 s e fica `inert`. Um toque na foto alterna-a, mexer o rato
+>   trá-la, e o primeiro Tab também;
+> - **no telemóvel** (ponteiro grosso) não há tira nem ‹ ›, e a barra de cima
+>   fica com o fechar;
+> - **com movimento reduzido** o dedo continua a mover a foto (é manipulação
+>   directa), mas ao largar a troca é imediata;
+> - **ficou de fora** a experiência das duas fotos ao alto lado a lado, que o
+>   texto marca como «para ela ver antes».
+
 **GAL-10 · Saber que fotografias vendem** · P · impacto **médio**
 - Contar as fotos abertas, as navegações, os «Ver o casamento», as partilhas e
   os guardados. Só com consentimento, como o resto do site.

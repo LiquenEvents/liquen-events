@@ -250,6 +250,7 @@ export const pt = {
     viewWedding: "Ver este casamento",
     backToGallery: "Toda a galeria",
     photosLabel: "fotos",
+    lbAtalhos: "Atalhos de teclado",
     keyboardHint: "← → navegar · f ecrã inteiro · esc fechar",
     backToTop: "Voltar ao topo",
     gridLabel: "Galeria de fotografias",
