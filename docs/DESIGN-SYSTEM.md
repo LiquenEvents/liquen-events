@@ -69,6 +69,17 @@ No «Por onde segue» do estúdio, o email e o WhatsApp são logótipos a cores
 do botão do WhatsApp. As cores não são tokens, porque são a marca deles. A regra
 dos ícones em `currentColor` (§8.1) continua a valer para tudo o resto.
 
+**7. A espera (`ui/EmCurso.tsx`) segue o §10, e todas as descargas passam por ela.**
+Pedido dela (14/10): «quero melhorar a animação e a rapidez a descarregar
+qualquer coisa no back office». A barra tem 4 px; às cegas avança por igual
+até 85 % no tempo estimado e depois aproxima-se devagar de 95 %, sem parar
+(`espera-em-curso.ts`); o ponto usa o pulso do §8.2 (`bo-pulso`, 1,2 s,
+`PULSO` em `movimento.ts`), e o token `--ease-in-out` que ele nomeia foi
+acrescentado. O fim vê-se: `concluido` enche a barra e troca o ponto pelo
+visto durante `FIM_VISIVEL_MS`. As descargas (guião, contrato, cópia de
+segurança, foto, mapa de mesas) passam por `ui/descarregar.ts`, que lê os
+bytes contra o `Content-Length` — com o tamanho, a barra é verdadeira.
+
 ---
 
 ## PARTE 0 — QUEM ÉS, O QUE CONSTRÓIS, COMO TRABALHAS

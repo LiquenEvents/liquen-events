@@ -113,6 +113,13 @@
      transições da casa são de estado (cor, contorno, sombra) e não têm entrada
      nem saída. Esta pede-se onde há mesmo uma coisa a desaparecer. */
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  /* ── A curva do que RESPIRA ───────────────────────────────────────────────
+     Nem entrada nem saída: o pulso de «isto está a acontecer agora» (§8.2 do
+     sistema de design, `pulse`: 1 → 0,45 → 1, 1,2 s, `--ease-in-out`). Uma
+     respiração simétrica — acelerar e travar por igual nos dois sentidos — é
+     a única que não parece um piscar. Faltava o token; o documento já o
+     nomeava. */
+  --ease-in-out: cubic-bezier(0.42, 0, 0.58, 1);
 
   /* ══════════════════════════════════════════════════════════════════════
      TOKENS SEMÂNTICOS — A PARTE 1 DO BRIEF

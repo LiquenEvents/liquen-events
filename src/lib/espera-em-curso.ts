@@ -19,31 +19,48 @@
  * 100% e depois fique lá parada é pior do que barra nenhuma — ensina a não
  * acreditar nela, e a partir daí nenhuma barra do produto vale nada.
  *
- * Esta anda depressa no princípio e vai abrandando, e NUNCA chega ao fim
- * sozinha: só a resposta a fecha. É a forma honesta de dizer «está a andar, e
- * não sei quanto falta» — e o abrandamento é literal, porque quanto mais tempo
- * passa menos se sabe.
+ * Esta anda a passo certo até ao tempo estimado, depois vai abrandando, e
+ * NUNCA chega ao fim sozinha: só a resposta a fecha. É a forma honesta de
+ * dizer «está a andar, e não sei quanto falta» — e o abrandamento é literal,
+ * porque passado o estimado, quanto mais tempo passa menos se sabe.
  */
 
 /** A barra pára aqui. O que a fecha é a resposta, e só ela. */
-export const TECTO_DA_BARRA = 0.94;
+export const TECTO_DA_BARRA = 0.95;
+
+/** Onde a barra está quando passou exactamente o tempo estimado. */
+export const NO_ESTIMADO = 0.85;
 
 /**
  * Quanto da barra está cheia, de 0 a {@link TECTO_DA_BARRA}.
  *
- * `1 - e^(-2·t/estimado)`: no tempo estimado vai em 86%, ao dobro em 98% do
- * tecto, e nunca lá chega. Uma recta chegava ao fim e parava — que é o gesto
- * que faz uma barra deixar de ser acreditada.
+ * ── PORQUE É QUE DEIXOU DE SER UMA CURVA QUE DISPARA ────────────────────────
  *
- * O `estimadoMs` é o que faz isto acompanhar a máquina de quem espera: com uma
- * estimativa aprendida das gerações anteriores, num computador rápido a barra
- * anda depressa e num telemóvel com 4G fraco anda devagar. Sem estimativa
- * nenhuma, quem chama deve passar o palpite mais honesto que tiver — nunca
- * zero, que devolve uma barra parada.
+ * Era `0,94·(1 − e^(−2t/estimado))`: metade da barra no primeiro quinto do
+ * tempo, e depois quase parada. A 14/10 ela pediu «a animação a descarregar
+ * melhores mesmo muito», e o sistema de design (§10, Progresso) é explícito:
+ * «mantém em movimento; distribui o avanço uniformemente». Uma barra que
+ * dispara e depois se arrasta é a que parece encravada a meio — que é
+ * exactamente o que ela via no «A gerar o PDF…».
+ *
+ * Agora são duas partes, coladas sem salto:
+ *  · até ao tempo estimado, uma RECTA até {@link NO_ESTIMADO} (85%): o avanço
+ *    é uniforme, e com uma estimativa aprendida a barra chega perto do fim
+ *    quando a resposta costuma chegar;
+ *  · depois, aproxima-se do tecto (95%) cada vez mais devagar, sem nunca o
+ *    tocar nem parar. A inclinação à entrada desta parte é a mesma da recta,
+ *    por isso não há esquina: `0,10 · e^(−8,5·x)` tem derivada 0,85 em x = 0,
+ *    igual à da recta (0,85 por estimado).
+ *
+ * O que continua igual é a regra que faz todas as outras barras valerem
+ * alguma coisa: sem resposta, nunca chega ao fim.
  */
 export function avancoDaEspera(decorridoMs: number, estimadoMs: number): number {
   if (!(estimadoMs > 0) || !(decorridoMs > 0)) return 0;
-  return TECTO_DA_BARRA * (1 - Math.exp((-2 * decorridoMs) / estimadoMs));
+  const x = decorridoMs / estimadoMs;
+  if (x <= 1) return NO_ESTIMADO * x;
+  const resto = TECTO_DA_BARRA - NO_ESTIMADO;
+  return NO_ESTIMADO + resto * (1 - Math.exp((-NO_ESTIMADO / resto) * (x - 1)));
 }
 
 /**

@@ -44,6 +44,7 @@ import {
 import { porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 import { Button, Field, FolhaOuDialogo, Glass, Segmented, useAdaptativo } from "../ui";
 import { useAnular } from "../ui/anular";
+import { EmCurso } from "../ui/EmCurso";
 import { ESTADO, PRESSAO } from "../ui/movimento";
 import { MoreMenu, type MoreMenuItem } from "../MoreMenu";
 import { useToast } from "../Toast";
@@ -1184,6 +1185,25 @@ export default function EditorDoMapa({ pedido, onPedido, resumo, onSair }: Props
         )}
       </Glass>
       {partilhar.folha}
+
+      {/* ── O PDF DO MAPA A CHEGAR ─────────────────────────────────────────
+          «Descarregar», «WhatsApp» e «Imprimir» pedem o mesmo PDF, e até aqui
+          nenhum dizia nada enquanto ele vinha (o `aTrabalhar` existia e
+          ninguém o lia). Logo por baixo da barra de cima, e OPACO: a barra é
+          a única camada de vidro deste ecrã. */}
+      {partilhar.descarga.mostrar && (
+        <div
+          className="absolute left-1/2 z-30 w-[min(22rem,calc(100%-1.5rem))] -translate-x-1/2 rounded-xl bg-[var(--bo-elevado)] shadow-[var(--bo-sombra-suspensa)]"
+          style={{ top: margens.topo }}
+        >
+          <EmCurso
+            titulo="A preparar o PDF do mapa…"
+            pronto="PDF do mapa pronto"
+            estimadoMs={3000}
+            {...partilhar.descarga.barra}
+          />
+        </div>
+      )}
 
       {/* ── O GRUPO QUE NÃO COUBE, E OS GRUPOS PARTIDOS ──────────────────── */}
       {(naoCoube || partidos.length > 0) && (

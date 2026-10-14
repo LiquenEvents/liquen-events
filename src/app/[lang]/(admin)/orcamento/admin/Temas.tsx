@@ -6,7 +6,8 @@ import PhotoLightbox from "./PhotoLightbox";
 import ThemeCopyDialog, { type ThemeCopyOutcome } from "./ThemeCopyDialog";
 import FundirTemas, { type ThemeMergeOutcome } from "./FundirTemas";
 import { avisoDeTemaParecido, temasParecidos } from "@/lib/temas-parecidos";
-import { downloadMany, downloadName, downloadOne } from "./photo-download";
+import { downloadMany, downloadName } from "./photo-download";
+import { guardarBlob, useDescarga } from "./ui/descarregar";
 import {
   CHECK_CHUNK,
   MAX_PHOTO_ORDER,
@@ -4940,14 +4941,20 @@ function ThemeFolder({
   }, []);
 
   /** Transfere uma foto (a do visualizador ou a de um mosaico). */
+  // Uma foto é um original de vários MB: passa pelo `useDescarga`, que conta
+  // os bytes à medida que chegam (o visualizador mostra-os no botão).
+  const umaFoto = useDescarga();
   const downloadImage = useCallback(
     async (im: ThemeImage, i: number) => {
-      setDownloading(true);
-      const ok = await downloadOne(im.url, downloadName(im, theme.name, i));
-      setDownloading(false);
-      if (!ok) toast("Não foi possível transferir a foto.", "error");
+      try {
+        const { blob } = await umaFoto.obter(im.url);
+        // O nome é o NOSSO (tema + número), não o do armazenamento.
+        guardarBlob(blob, downloadName(im, theme.name, i));
+      } catch {
+        toast("Não foi possível transferir a foto.", "error");
+      }
     },
-    [theme.name, toast],
+    [theme.name, toast, umaFoto],
   );
 
   /** Transfere as fotos selecionadas, uma de cada vez (ver photo-download.ts). */
@@ -5700,7 +5707,8 @@ function ThemeFolder({
           onIndexChange={setZoomAt}
           onClose={closeZoom}
           onDownload={downloadImage}
-          downloading={downloading}
+          downloading={downloading || umaFoto.aCorrer}
+          transferencia={umaFoto.mostrar ? umaFoto.barra : null}
           // De onde a lupa cresce. `null` quando a célula já não está no ecrã
           // — aí abre como abria, do centro.
           origem={origemDaLupa}
