@@ -9831,3 +9831,26 @@ describe("os cinco passos do estúdio", () => {
     await waitFor(() => expect(passoActivo()).toMatch(/Orçamento/));
   });
 });
+
+/**
+ * «POR ONDE SEGUE» LOGO EM CIMA (14/10). Palavras dela: «coloca isto em cima
+ * para se ver logo no início e coloca o logo do email e do WhatsApp».
+ */
+describe("por onde segue, no topo do passo do envio", () => {
+  it("vem antes do resumo, e cada canal leva o seu logótipo", async () => {
+    seedDraft(1);
+    renderStudio();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^5\s*Rever e enviar/ }));
+    const grupo = await screen.findByRole("radiogroup", {
+      name: "Por onde é que a proposta segue",
+    });
+    const resumo = await screen.findByText("Resumo da proposta");
+    // O grupo aparece ANTES do resumo na ordem do documento.
+    expect(grupo.compareDocumentPosition(resumo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const opcao = (nome: string) => screen.getByRole("radio", { name: nome });
+    expect(opcao("Email").querySelectorAll("svg")).toHaveLength(1);
+    expect(opcao("WhatsApp").querySelectorAll("svg")).toHaveLength(1);
+    expect(opcao("Os dois").querySelectorAll("svg")).toHaveLength(2);
+  });
+});

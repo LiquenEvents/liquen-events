@@ -165,6 +165,7 @@ import {
 } from "@/lib/pdf-editorial/regra-da-capa";
 import { useTamanhoDoOriginal } from "./tamanhoDoOriginal";
 import { ArrastarParaEnquadrar } from "./ArrastarParaEnquadrar";
+import WhatsAppIcon from "@/components/WhatsAppIcon";
 import type { ProposalDoc } from "@/lib/proposal-doc";
 import type { CampoAMudar } from "@/lib/proposal-copy";
 import {
@@ -10759,6 +10760,92 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       </div>
       {/* ══════════ /PASSOS 1 a 4 ══════════ */}
 
+      {/* ══════════ PASSO 5 · Rever e enviar — por onde segue, LOGO EM CIMA ══════════
+          Palavras dela, a 14/10, com a captura deste bloco: «coloca isto em
+          cima para se ver logo no início e coloca o logo do email e do
+          WhatsApp». Estava a meio do passo, depois do resumo inteiro — a
+          primeira escolha do envio era a última coisa que se via. Sempre
+          montado e escondido como o envio aqui em baixo, para o salto de
+          «Falta o email» (`#seccao-envio`) ter onde cair. */}
+      <div
+        className={step === "enviar" && !sent ? "view-in mb-4" : undefined}
+        hidden={step !== "enviar" || sent}
+      >
+        <Section title="Por onde segue">
+          {/* ── POR ONDE SEGUE ────────────────────────────────────────────
+                  A escolha vem ANTES do resumo e do botão (e, desde 14/10, no
+                  topo do passo), porque muda o que o
+                  resumo quer dizer: com «só WhatsApp», a linha «Para: <email>»
+                  deixa de ser o destino e passa a ser só um dado do pedido.
+
+                  Os rótulos dizem o CANAL e não o verbo — «Email», «WhatsApp»,
+                  «Os dois» — porque o verbo já está no botão a seguir, e repetir
+                  «enviar» três vezes numa fila de três não ajuda a escolher. */}
+          <div className="scroll-mt-24" id="seccao-envio">
+            <Segmented
+              size="sm"
+              ariaLabel="Por onde é que a proposta segue"
+              value={canal}
+              onChange={escolherCanal}
+              options={[
+                { value: "email", label: "Email", icon: <IconeEnvelope /> },
+                {
+                  value: "whatsapp",
+                  label: "WhatsApp",
+                  icon: <WhatsAppIcon className="h-3.5 w-3.5 shrink-0" />,
+                },
+                {
+                  value: "ambos",
+                  label: "Os dois",
+                  icon: (
+                    <span className="inline-flex items-center gap-0.5" aria-hidden="true">
+                      <IconeEnvelope />
+                      <WhatsAppIcon className="h-3.5 w-3.5 shrink-0" />
+                    </span>
+                  ),
+                },
+              ]}
+            />
+            {/* ── O QUE CADA ESCOLHA FAZ, DITO ANTES DO GESTO ────────────
+                    Sem esta linha, «WhatsApp» prometia um envio automático que
+                    não existe: nenhuma página consegue mandar uma mensagem por
+                    alguém. O que acontece é o WhatsApp ABRIR com a mensagem
+                    escrita, e ser ela a escolher a quem — e isso é um segundo
+                    gesto, dela, depois deste. Dizê-lo aqui é a diferença entre
+                    uma expectativa cumprida e uma surpresa. */}
+            <p className="bo-text-muted mt-2 text-xs leading-relaxed">
+              {canal === "email"
+                ? "O cliente recebe a proposta em PDF por email."
+                : canal === "whatsapp"
+                  ? "Não sai email. A proposta é gerada e o link fica pronto — a seguir abres o WhatsApp e escolhes a quem o mandas."
+                  : "O cliente recebe o PDF por email, e a seguir abres o WhatsApp com o link para lho mandares também."}
+            </p>
+          </div>
+          {/* ── SEM DESTINATÁRIO, DIZ-SE AQUI E NÃO DEPOIS ──────────────
+                  Um pedido que entrou por telefone não tem email. Até aqui só
+                  se sabia DEPOIS de carregar em Enviar: a proposta ficava
+                  gravada, o email não saía, e o aviso vinha a seguir ao gesto.
+
+                  Agora está antes do dedo, e diz ONDE se resolve — no painel do
+                  pedido, que passou a deixar corrigir os contactos. */}
+          {/* ── E O AVISO DO EMAIL EM FALTA CALA-SE QUANDO NÃO É POR AÍ ──
+                  Com «só WhatsApp», não ter email de cliente deixou de ser um
+                  problema — é o caso NORMAL de um pedido que entrou por
+                  telefone. Um aviso cor de laranja a apontar para uma coisa
+                  que não faz falta ensina a ignorar avisos. */}
+          {!emailDoCliente && canal !== "whatsapp" && (
+            <p className="mt-3 flex items-start gap-1.5 rounded-xl border border-[var(--bo-aviso-tom)]/35 bg-[var(--bo-aviso-tom)]/[0.06] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]">
+              <span aria-hidden="true">⚠</span>
+              <span>
+                Este pedido não tem email de cliente, e sem ele a proposta não pode seguir por
+                email. Acrescenta-o nos <strong className="font-medium">contactos do pedido</strong>
+                , em Detalhes — ou escolhe «WhatsApp».
+              </span>
+            </p>
+          )}
+        </Section>
+      </div>
+
       {/* ══════════ PASSO 5 · Rever e enviar — o resumo, montado só aqui ══════════ */}
       {/* Only mount the preview while it's the active step. It was previously
           kept mounted (just `hidden`), so its filter/map over every service
@@ -10869,68 +10956,9 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           ) : (
             <>
               <p className="text-sm leading-relaxed text-[var(--bo-text-muted)]">
-                Confirma os dados abaixo e escolhe por onde segue.
+                Confirma os dados abaixo — por onde segue escolhe-se no topo deste passo.
               </p>
 
-              {/* ── POR ONDE SEGUE ────────────────────────────────────────────
-                  A escolha vem ANTES do resumo e do botão, porque muda o que o
-                  resumo quer dizer: com «só WhatsApp», a linha «Para: <email>»
-                  deixa de ser o destino e passa a ser só um dado do pedido.
-
-                  Os rótulos dizem o CANAL e não o verbo — «Email», «WhatsApp»,
-                  «Os dois» — porque o verbo já está no botão a seguir, e repetir
-                  «enviar» três vezes numa fila de três não ajuda a escolher. */}
-              <div className="mt-4 scroll-mt-24" id="seccao-envio">
-                <p className="bo-eyebrow mb-1.5 text-[var(--bo-text-muted)]">Por onde segue</p>
-                <Segmented
-                  size="sm"
-                  ariaLabel="Por onde é que a proposta segue"
-                  value={canal}
-                  onChange={escolherCanal}
-                  options={[
-                    { value: "email", label: "Email" },
-                    { value: "whatsapp", label: "WhatsApp" },
-                    { value: "ambos", label: "Os dois" },
-                  ]}
-                />
-                {/* ── O QUE CADA ESCOLHA FAZ, DITO ANTES DO GESTO ────────────
-                    Sem esta linha, «WhatsApp» prometia um envio automático que
-                    não existe: nenhuma página consegue mandar uma mensagem por
-                    alguém. O que acontece é o WhatsApp ABRIR com a mensagem
-                    escrita, e ser ela a escolher a quem — e isso é um segundo
-                    gesto, dela, depois deste. Dizê-lo aqui é a diferença entre
-                    uma expectativa cumprida e uma surpresa. */}
-                <p className="bo-text-muted mt-2 text-xs leading-relaxed">
-                  {canal === "email"
-                    ? "O cliente recebe a proposta em PDF por email."
-                    : canal === "whatsapp"
-                      ? "Não sai email. A proposta é gerada e o link fica pronto — a seguir abres o WhatsApp e escolhes a quem o mandas."
-                      : "O cliente recebe o PDF por email, e a seguir abres o WhatsApp com o link para lho mandares também."}
-                </p>
-              </div>
-              {/* ── SEM DESTINATÁRIO, DIZ-SE AQUI E NÃO DEPOIS ──────────────
-                  Um pedido que entrou por telefone não tem email. Até aqui só
-                  se sabia DEPOIS de carregar em Enviar: a proposta ficava
-                  gravada, o email não saía, e o aviso vinha a seguir ao gesto.
-
-                  Agora está antes do dedo, e diz ONDE se resolve — no painel do
-                  pedido, que passou a deixar corrigir os contactos. */}
-              {/* ── E O AVISO DO EMAIL EM FALTA CALA-SE QUANDO NÃO É POR AÍ ──
-                  Com «só WhatsApp», não ter email de cliente deixou de ser um
-                  problema — é o caso NORMAL de um pedido que entrou por
-                  telefone. Um aviso cor de laranja a apontar para uma coisa
-                  que não faz falta ensina a ignorar avisos. */}
-              {!emailDoCliente && canal !== "whatsapp" && (
-                <p className="mt-3 flex items-start gap-1.5 rounded-xl border border-[var(--bo-aviso-tom)]/35 bg-[var(--bo-aviso-tom)]/[0.06] px-3 py-2 text-xs leading-relaxed text-[var(--bo-tinta-72)]">
-                  <span aria-hidden="true">⚠</span>
-                  <span>
-                    Este pedido não tem email de cliente, e sem ele a proposta não pode seguir por
-                    email. Acrescenta-o nos{" "}
-                    <strong className="font-medium">contactos do pedido</strong>, em Detalhes — ou
-                    escolhe «WhatsApp».
-                  </span>
-                </p>
-              )}
               <dl className="mt-4 grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
                 <SummaryRow label="Para" value={quote.email || "—"} />
                 <SummaryRow label="Clientes" value={doc.clientNames || "—"} />
@@ -14404,5 +14432,28 @@ function UploadArea({
         }}
       />
     </button>
+  );
+}
+
+/**
+ * O envelope do «Email» em «Por onde segue» — ao lado do logótipo do WhatsApp,
+ * que já existia (`WhatsAppIcon`). O mesmo tamanho e a cor do texto do botão,
+ * para os dois se lerem como um par.
+ */
+function IconeEnvelope() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-3.5 w-3.5 shrink-0"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="3" y="5" width="18" height="14" rx="2.5" />
+      <path d="m4 7 8 6 8-6" />
+    </svg>
   );
 }
