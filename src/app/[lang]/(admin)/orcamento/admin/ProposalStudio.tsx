@@ -82,7 +82,7 @@ type CanalDeEnvio = "email" | "whatsapp" | "ambos";
 /** Onde fica a última escolha dela. */
 const CANAL_GUARDADO = "liquen-canal-de-envio";
 import PorqueNaoDaParaEnviar from "./PorqueNaoDaParaEnviar";
-import { ControlosDoEnvio, PastilhaDoEnvio } from "./BarraDoEnvioCompacta";
+import { ControlosDoEnvio, PainelDoEnvio, PastilhaDoEnvio } from "./BarraDoEnvioCompacta";
 import VistaDeConjunto from "./VistaDeConjunto";
 import PaginaEditorial, { fontesDasFolhas } from "./PaginaEditorial";
 import LupaDeFotos from "./LupaDeFotos";
@@ -4359,6 +4359,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   const larguraDoEstudio = useLarguraDaZona(caixaDoEstudio);
   const barraCompacta = larguraDoEstudio > 0 && larguraDoEstudio < LARGURA_DA_BARRA_INTEIRA;
   const [folhaDoEnvio, setFolhaDoEnvio] = useState(false);
+  /** No ecrã largo: o painel da pastilha do estado, e a pastilha onde se ancora. */
+  const [painelDoEnvio, setPainelDoEnvio] = useState(false);
+  const pastilhaDoEnvio = useRef<HTMLButtonElement>(null);
+  const fecharPainelDoEnvio = useCallback(() => setPainelDoEnvio(false), []);
   /**
    * Com o teclado aberto, a barra compacta sai da frente: no telemóvel, o
    * teclado e a barra juntos deixavam uma tira de ecrã para o campo onde ela
@@ -7642,6 +7646,20 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   // PDF sem a foto escolhida dura para sempre.
   const canSend =
     podeEnviar(doc as ProposalDoc, money.gross, contextoDoBotao) && fotosPorConfirmar === 0;
+  /**
+   * O que o botão principal do «Rever e enviar» faz (ver «O BOTÃO QUE GUIA»,
+   * na barra): quando a ÚNICA falta que trava é ver o PDF final, guia esse
+   * passo em vez de ficar apagado.
+   */
+  const soFaltaVerOPdf =
+    fotosPorConfirmar === 0 &&
+    faltasDoEnvio.filter((f) => f.trava).length === 1 &&
+    faltasDoEnvio.some((f) => f.trava && f.id === "visto");
+  const modoDoBotao: "ver" | "confirmar" | "enviar" = soFaltaVerOPdf
+    ? pdfVistoAgora
+      ? "confirmar"
+      : "ver"
+    : "enviar";
   /**
    * Quantas traduções faltam em cada secção, para o índice.
    *
@@ -11225,6 +11243,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   pedir as duas coisas. O servidor confere a mesma chave. */}
             <div
               data-testid="ver-antes-de-enviar"
+              data-campo="pdf-visto"
               className="mt-4 flex flex-col items-start gap-2 rounded-xl border border-[var(--bo-hairline-strong)] bg-[var(--bo-tinta-3)] px-3 py-3"
             >
               <p className="bo-eyebrow text-[var(--bo-text-muted)]">Antes de enviar</p>
@@ -11799,7 +11818,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                 e enviar». O selector da língua fica encostado ao «Descarregar»,
                 como ela pediu (ver o comentário lá dentro), e é o mesmo estado
                 do selector do corpo do passo — mudar um muda o outro. */}
-            {busy !== "send" && (
+            {busy !== "send" && barraCompacta && (
               <>
                 {/* ══════════════════════════════════════════════════════════════
                     A LÍNGUA ESCOLHE-SE EM CIMA DO BOTÃO QUE GERA
@@ -11843,18 +11862,16 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     />
                   }
                 >
-                  {barraCompacta && (
-                    <div className="flex flex-col gap-1.5">
-                      <p className="bo-eyebrow text-[var(--bo-text-muted)]">Por onde segue</p>
-                      <Segmented
-                        size="sm"
-                        ariaLabel="Por onde segue (em baixo)"
-                        value={canal}
-                        onChange={escolherCanal}
-                        options={OPCOES_DO_CANAL}
-                      />
-                    </div>
-                  )}
+                  <div className="flex flex-col gap-1.5">
+                    <p className="bo-eyebrow text-[var(--bo-text-muted)]">Por onde segue</p>
+                    <Segmented
+                      size="sm"
+                      ariaLabel="Por onde segue (em baixo)"
+                      value={canal}
+                      onChange={escolherCanal}
+                      options={OPCOES_DO_CANAL}
+                    />
+                  </div>
                   <Segmented
                     size="sm"
                     ariaLabel="Idioma da proposta"
@@ -12007,47 +12024,118 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                       serviria: o toast conta o que ACONTECEU, e isto conta o que
                       vai acontecer — tem de estar à vista antes de se carregar.
                       `aria-live` porque o número muda com o selector ao lado. */}
-                  {idiomaDoPdf === "en" &&
-                    (() => {
-                      /*
-                       * As duas contas, e as duas frases.
-                       *
-                       * «Vai sair em português» é verdade sobre um campo VAZIO e é
-                       * falso sobre um desactualizado — esse tem inglês e vai sair
-                       * em inglês, só que no inglês errado. Duas coisas com dois
-                       * remédios: uma traduz-se, a outra relê-se.
-                       */
-                      const faltam = camposPorTraduzir(doc as ProposalDoc);
-                      const velhas = camposPorRever(doc as ProposalDoc).filter(
-                        (c) => c.estado === "desactualizado",
-                      );
-                      if (faltam.length === 0 && velhas.length === 0) return null;
-                      const primeiro = faltam[0] ?? velhas[0];
-                      return (
-                        <p
-                          aria-live="polite"
-                          className="w-full text-right text-[11px] leading-snug text-[var(--bo-aviso)]"
-                        >
-                          {faltam.length > 0 &&
-                            (faltam.length === 1
-                              ? "1 campo ainda não tem versão inglesa — vai sair em português."
-                              : `${faltam.length} campos ainda não têm versão inglesa — vão sair em português.`)}{" "}
-                          {velhas.length > 0 &&
-                            (velhas.length === 1
-                              ? "1 tradução ficou para trás do português."
-                              : `${velhas.length} traduções ficaram para trás do português.`)}{" "}
-                          <button
-                            type="button"
-                            onClick={() => irParaCampo(primeiro.campo, "en")}
-                            className={`font-medium underline underline-offset-2 ${ESTADO} ${PRESSAO}`}
-                          >
-                            Ver quais
-                          </button>
-                        </p>
-                      );
-                    })()}
+                  {idiomaDoPdf === "en" && (
+                    <AvisoDasTraducoes
+                      doc={doc as ProposalDoc}
+                      onVer={(campo) => irParaCampo(campo, "en")}
+                    />
+                  )}
                 </ControlosDoEnvio>
               </>
+            )}
+            {/* ══════════════════════════════════════════════════════════════════
+                NO ECRÃ LARGO, UMA LINHA SÓ (14/10, «melhora isto drasticamente»)
+                ══════════════════════════════════════════════════════════════════
+
+                Era um cartão de três andares: a frase do inglês, «Vai para…»,
+                a caixa vermelha do que falta e o canal por baixo de tudo. Ela
+                escolheu «uma linha só»: a pastilha do estado (a MESMA do
+                telemóvel) abre um painel com o que a caixa dizia, e ao lado
+                ficam a língua, o canal só com os logótipos e o PDF. Os nomes
+                que se ouvem são os de sempre — «Idioma da proposta», «Por onde
+                segue (em baixo)», «Descarregar PDF» —, só o que se VÊ encolhe. */}
+            {busy !== "send" && !barraCompacta && (
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="inline-flex">
+                  <PastilhaDoEnvio
+                    ref={pastilhaDoEnvio}
+                    aberta={painelDoEnvio}
+                    faltas={faltasDoEnvio}
+                    fotosPorConfirmar={fotosPorConfirmar}
+                    idioma={idiomaDoPdf}
+                    onAbrir={() => setPainelDoEnvio((v) => !v)}
+                  />
+                </span>
+                <PainelDoEnvio
+                  aberto={painelDoEnvio}
+                  onFechar={fecharPainelDoEnvio}
+                  ancora={pastilhaDoEnvio}
+                >
+                  <PorqueNaoDaParaEnviar
+                    naFolha
+                    faltas={faltasDoEnvio}
+                    fotosPorConfirmar={fotosPorConfirmar}
+                    emailDoCliente={quote.email}
+                    onIr={(f) => {
+                      setPainelDoEnvio(false);
+                      irParaAFalta(f.seccao, f.campo);
+                    }}
+                  />
+                  <p className="text-[11px] leading-snug text-foreground/50">
+                    {RESSALVA_DO_INGLES}
+                  </p>
+                  {idiomaDoPdf === "en" && (
+                    <AvisoDasTraducoes
+                      doc={doc as ProposalDoc}
+                      onVer={(campo) => {
+                        setPainelDoEnvio(false);
+                        irParaCampo(campo, "en");
+                      }}
+                      alinhar="esquerda"
+                    />
+                  )}
+                </PainelDoEnvio>
+                <Segmented
+                  size="sm"
+                  ariaLabel="Idioma da proposta"
+                  value={idiomaDoPdf}
+                  onChange={setIdiomaDoPdf}
+                  options={[
+                    { value: "pt", label: "PT", ariaLabel: "Português" },
+                    {
+                      value: "en",
+                      label: "EN",
+                      ariaLabel:
+                        "Inglês — o documento, o email ao cliente e a página onde ele responde saem em inglês; os campos que preencheste, incluindo a data do evento, ficam como os escreveste",
+                    },
+                  ]}
+                />
+                <Segmented
+                  size="sm"
+                  ariaLabel="Por onde segue (em baixo)"
+                  value={canal}
+                  onChange={escolherCanal}
+                  options={OPCOES_DO_CANAL.map((o) => ({
+                    value: o.value,
+                    label: "",
+                    icon: o.icon,
+                    ariaLabel: o.label,
+                  }))}
+                />
+                {busy === "preview" ? (
+                  <EmCurso
+                    emLinha
+                    titulo={idiomaDoPdf === "en" ? "A gerar o PDF em inglês…" : "A gerar o PDF…"}
+                    estimadoMs={tempoEstimado(totalDeFotos, amostras)}
+                  />
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => preview({ rascunho: temErros })}
+                    disabled={busy !== null}
+                    aria-label={temErros ? "Descarregar rascunho" : "Descarregar PDF"}
+                    title={
+                      temErros
+                        ? "Há erros por resolver em «Rever e enviar». O PDF final fica disponível quando a lista estiver sem erros; o rascunho sai com «RASCUNHO» no rodapé."
+                        : "Descarregar o PDF"
+                    }
+                    iconLeft={<span aria-hidden="true">↓</span>}
+                  >
+                    {temErros ? "Rascunho" : "PDF"}
+                  </Button>
+                )}
+              </div>
             )}
             {/* ── ENQUANTO ESTÁ A IR ──────────────────────────────────────
                 «Ao enviar a proposta quero que haja uma animação que eu perceba
@@ -12217,23 +12305,50 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                  andares para uma frase de uma linha («barras muito mais
                  finas»). Quando há faltas, a caixa que as explica quebra para
                  cima sozinha (`flex-wrap`) — aí a altura é a mensagem. */
-              <div className="ml-auto flex flex-col items-end gap-2">
-                <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
-                  {barraCompacta ? (
-                    <PastilhaDoEnvio
-                      faltas={faltasDoEnvio}
-                      fotosPorConfirmar={fotosPorConfirmar}
-                      idioma={idiomaDoPdf}
-                      onAbrir={() => setFolhaDoEnvio(true)}
-                    />
-                  ) : (
-                    <PorqueNaoDaParaEnviar
-                      faltas={faltasDoEnvio}
-                      fotosPorConfirmar={fotosPorConfirmar}
-                      emailDoCliente={quote.email}
-                      onIr={(f) => irParaAFalta(f.seccao, f.campo)}
-                    />
-                  )}
+              <div className="ml-auto flex items-center gap-x-3">
+                {barraCompacta && (
+                  <PastilhaDoEnvio
+                    faltas={faltasDoEnvio}
+                    fotosPorConfirmar={fotosPorConfirmar}
+                    idioma={idiomaDoPdf}
+                    onAbrir={() => setFolhaDoEnvio(true)}
+                  />
+                )}
+                {/* ── O BOTÃO QUE GUIA (14/10) ──────────────────────────────
+                    Quando a ÚNICA coisa que falta é ver o PDF final, o botão
+                    deixa de estar apagado e passa a ser esse passo: «Ver o PDF
+                    final» descarrega-o; depois «Está certo — enviar» regista
+                    que foi visto e confirmado (o mesmo `confirmarPdfVisto` da
+                    caixa do corpo do passo, que continua lá) e abre a pergunta
+                    de sempre. Com outra falta qualquer fica apagado e diz
+                    porquê; com tudo pronto, envia. */}
+                {modoDoBotao === "ver" ? (
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    onClick={() => void preview()}
+                    disabled={busy !== null}
+                    iconRight={<span aria-hidden="true">↓</span>}
+                    aria-label={barraCompacta ? "Ver o PDF final" : undefined}
+                  >
+                    {barraCompacta ? "Ver o PDF" : "Ver o PDF final"}
+                  </Button>
+                ) : modoDoBotao === "confirmar" ? (
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    onClick={() => {
+                      confirmarPdfVisto(true);
+                      perguntaDoEnvioDesde.current = performance.now();
+                      setConfirmSend(true);
+                    }}
+                    disabled={busy !== null}
+                    iconRight={<span aria-hidden="true">→</span>}
+                    aria-label={barraCompacta ? "Está certo — enviar" : undefined}
+                  >
+                    {barraCompacta ? "Enviar" : "Está certo — enviar"}
+                  </Button>
+                ) : (
                   <Button
                     size="sm"
                     variant="primary"
@@ -12243,15 +12358,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     }}
                     disabled={busy !== null || !canSend}
                     /**
-                     * ── O BOTÃO DIZ O QUE FALTA, E NÃO UMA LISTA DECORADA ──────
-                     *
-                     * Isto dizia «Preenche clientes, referência e um total maior
-                     * que 0» — os três bloqueios que existiam quando foi escrito.
-                     * Passaram a ser oito, e uma frase fixa que nomeia três deles
-                     * é pior do que uma genérica: manda procurar no sítio errado.
-                     *
-                     * Agora sai do MESMO sítio que trava o botão, portanto não
-                     * pode discordar dele.
+                     * ── O BOTÃO DIZ O QUE FALTA ────────────────────────────
+                     * Sai do MESMO sítio que trava o botão, portanto não pode
+                     * discordar dele. A lista inteira, com os saltos, está na
+                     * pastilha ao lado.
                      */
                     title={
                       canSend
@@ -12269,22 +12379,6 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                   >
                     {barraCompacta ? "Enviar" : "Gerar e enviar ao cliente"}
                   </Button>
-                </div>
-                {/* ── «POR ONDE SEGUE» TAMBÉM AQUI, DEBAIXO DO BOTÃO (14/10) ───
-                  Pedido dela: a escolha do canal também na barra de baixo,
-                  por baixo de «Gerar e enviar ao cliente», que é onde o dedo
-                  está quando se decide. É o MESMO estado do topo do passo — mudar
-                  num muda o outro. O nome que se ouve diz «em baixo» para o
-                  leitor de ecrã não ouvir dois controlos iguais. No telemóvel
-                  vive na folha «Antes de enviar», como o resto da barra. */}
-                {!barraCompacta && (
-                  <Segmented
-                    size="sm"
-                    ariaLabel="Por onde segue (em baixo)"
-                    value={canal}
-                    onChange={escolherCanal}
-                    options={OPCOES_DO_CANAL}
-                  />
                 )}
               </div>
             )}
@@ -14664,4 +14758,53 @@ function retratoDoPdf(doc: unknown, idioma: string): string {
     return v;
   };
   return `${idioma}|${JSON.stringify(canonico(doc))}`;
+}
+
+/** O que muda em inglês — a mesma frase na folha do telemóvel e no painel da pastilha. */
+const RESSALVA_DO_INGLES =
+  "Em inglês sai a moldura do documento — rótulos, textos da casa, condições, a data e o tipo de evento. Da tua prosa sai em inglês o que estiver nas caixas «EN»; o que ficar em branco sai em português. Os valores continuam à portuguesa (1.234,56 €).";
+
+/**
+ * O QUE FALTA TRADUZIR, DITO ANTES DO CLIQUE.
+ *
+ * As duas contas, e as duas frases: «vai sair em português» é verdade sobre um
+ * campo VAZIO e é falso sobre um desactualizado — esse tem inglês, só que no
+ * inglês errado. Uma traduz-se, a outra relê-se. Vive aqui para a folha do
+ * telemóvel e o painel do ecrã largo dizerem o mesmo.
+ */
+function AvisoDasTraducoes({
+  doc,
+  onVer,
+  alinhar = "direita",
+}: {
+  doc: ProposalDoc;
+  onVer: (campo: CampoPublicado) => void;
+  alinhar?: "direita" | "esquerda";
+}) {
+  const faltam = camposPorTraduzir(doc);
+  const velhas = camposPorRever(doc).filter((c) => c.estado === "desactualizado");
+  if (faltam.length === 0 && velhas.length === 0) return null;
+  const primeiro = faltam[0] ?? velhas[0];
+  return (
+    <p
+      aria-live="polite"
+      className={`w-full ${alinhar === "direita" ? "text-right" : "text-left"} text-[11px] leading-snug text-[var(--bo-aviso)]`}
+    >
+      {faltam.length > 0 &&
+        (faltam.length === 1
+          ? "1 campo ainda não tem versão inglesa — vai sair em português."
+          : `${faltam.length} campos ainda não têm versão inglesa — vão sair em português.`)}{" "}
+      {velhas.length > 0 &&
+        (velhas.length === 1
+          ? "1 tradução ficou para trás do português."
+          : `${velhas.length} traduções ficaram para trás do português.`)}{" "}
+      <button
+        type="button"
+        onClick={() => onVer(primeiro.campo)}
+        className={`font-medium underline underline-offset-2 ${ESTADO} ${PRESSAO}`}
+      >
+        Ver quais
+      </button>
+    </p>
+  );
 }

@@ -105,6 +105,12 @@ export interface EmCursoProps {
   /** Um «Parar», quando parar é possível e seguro. */
   aoParar?: () => void;
   rotuloDoParar?: string;
+  /**
+   * Numa linha só, sem cartão: o ponto, a frase e a barra ao lado. É a forma
+   * das barras finas (o «Rever e enviar» no ecrã largo, 14/10), onde um cartão
+   * de três linhas partia a barra em duas. As notas não cabem e não se dizem.
+   */
+  emLinha?: boolean;
   className?: string;
 }
 
@@ -117,6 +123,7 @@ export function EmCurso({
   notaDemorada,
   aoParar,
   rotuloDoParar = "Parar",
+  emLinha = false,
   className,
 }: EmCursoProps) {
   const decorrido = useDecorrido();
@@ -126,6 +133,37 @@ export function EmCurso({
     : avancoDaEspera(decorrido, estimadoMs ?? 0);
   const demorada = !sabida && !!notaDemorada && esperaDemorada(decorrido, estimadoMs ?? 0);
   const temBarra = sabida || (estimadoMs ?? 0) > 0;
+
+  if (emLinha) {
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        className={cn(
+          "flex min-w-0 items-center gap-2 text-xs font-medium text-sage-600",
+          className,
+        )}
+      >
+        <span
+          aria-hidden="true"
+          className="h-1.5 w-1.5 shrink-0 rounded-full bg-sage-600 motion-safe:animate-pulse"
+        />
+        <span className="min-w-0 truncate">{titulo}</span>
+        {temBarra && (
+          <span
+            aria-hidden="true"
+            className="block h-1 w-20 shrink-0 overflow-hidden rounded-full bg-sage-600/15"
+          >
+            <span
+              data-barra="preenchimento"
+              className={`block h-full w-full origin-left rounded-full bg-sage-600 ${PROGRESSO}`}
+              style={{ transform: `scaleX(${avanco})` }}
+            />
+          </span>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div
