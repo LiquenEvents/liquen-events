@@ -76,14 +76,17 @@ export function destinatarioDoEnvio(email: string | undefined | null): Destinata
     return {
       endereco: "",
       valido: false,
-      aviso: "Este pedido não tem email de cliente: a proposta fica guardada, mas não sai.",
+      // Desde a B1 do documento dela, sem email a proposta por email nem chega
+      // a ser gravada: o botão trava. O que fica por dizer é o remédio.
+      aviso:
+        "Este pedido não tem email de cliente: por email não sai — escolhe «WhatsApp» ou acrescenta o email no pedido.",
     };
   }
   if (!PARECE_EMAIL.test(endereco)) {
     return {
       endereco,
       valido: false,
-      aviso: `«${endereco}» não tem forma de email: a proposta fica guardada, mas não sai.`,
+      aviso: `«${endereco}» não tem forma de email: por email não sai — corrige-o no pedido ou escolhe «WhatsApp».`,
     };
   }
   if (eEnderecoDaCasa(endereco)) {

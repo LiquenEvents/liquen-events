@@ -2214,9 +2214,10 @@ describe("POST /api/orcamento/[id]/proposta-doc — a validade fica congelada", 
   });
 
   it("uma data escrita à mão continua a mandar", async () => {
-    await POST(sendReq(baseDoc({ totalAmount: 3000, validUntil: "2027-01-31" })), { params });
-    expect(created.last!.doc?.validUntil).toBe("2027-01-31");
-    expect(created.last!.validUntil).toBe("2027-01-31");
+    // Uma data longe no futuro: uma que já passou trava o envio (B1, mais abaixo).
+    await POST(sendReq(baseDoc({ totalAmount: 3000, validUntil: "2099-01-31" })), { params });
+    expect(created.last!.doc?.validUntil).toBe("2099-01-31");
+    expect(created.last!.validUntil).toBe("2099-01-31");
   });
 
   it("o prazo escrito no estúdio é respeitado (controlo positivo)", async () => {
@@ -2445,5 +2446,100 @@ describe("POST /api/orcamento/[id]/proposta-doc — só pelo WhatsApp", () => {
     expect(sendMail).toHaveBeenCalledTimes(1);
     expect(j.emailed).toBe(true);
     expect(j.repetido).toBeUndefined();
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * B1 — O QUE TRAVA NO ESTÚDIO TAMBÉM TRAVA NA ROTA
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * «Já saiu um PDF sem orçamento e sem condições, e nada no ecrã o impediu.» O
+ * botão desligado é uma porta do lado do ecrã; um estúdio antigo noutra aba
+ * passava por cima. A rota recusa ANTES de desenhar e antes de qualquer email.
+ */
+describe("POST /api/orcamento/[id]/proposta-doc — B1: o envio recusa uma proposta com erros", () => {
+  beforeEach(() => {
+    vi.mocked(renderStoredEditorialPdfWithReport).mockClear();
+    vi.mocked(sendMail).mockClear();
+  });
+
+  const recusa = async (doc: Record<string, unknown>, extra: Record<string, unknown> = {}) => {
+    const res = await POST(sendReq(doc, extra), { params });
+    const j = (await res.json()) as { error?: string; faltas?: { id: string }[] };
+    return { status: res.status, ids: (j.faltas ?? []).map((f) => f.id), error: j.error ?? "" };
+  };
+
+  it.each([
+    ["valor", baseDoc({ totalAmount: 0 })],
+    ["data", baseDoc({ totalAmount: 3000, eventDate: "" })],
+    ["validade", baseDoc({ totalAmount: 3000, validUntil: "2020-01-31" })],
+    ["condicoes", baseDoc({ totalAmount: 3000, condicoesGerais: [] })],
+  ])("sem %s, 422 — e não desenha nem envia nada", async (id, doc) => {
+    const r = await recusa(doc);
+    expect(r.status).toBe(422);
+    expect(r.ids).toContain(id);
+    expect(r.error).toMatch(/não pode seguir/);
+    expect(renderStoredEditorialPdfWithReport).not.toHaveBeenCalled();
+    expect(sendMail).not.toHaveBeenCalled();
+  });
+
+  it("sem email no pedido, um envio por email é recusado", async () => {
+    const { getQuote } = await import("@/lib/quotes-store");
+    vi.mocked(getQuote).mockResolvedValueOnce({ id: "q1", email: "", status: "pendente" } as never);
+    const r = await recusa(baseDoc({ totalAmount: 3000 }));
+    expect(r.status).toBe(422);
+    expect(r.ids).toEqual(["email"]);
+  });
+
+  it("…mas só pelo WhatsApp passa: é o caso normal de um pedido por telefone", async () => {
+    const { getQuote } = await import("@/lib/quotes-store");
+    vi.mocked(getQuote).mockResolvedValueOnce({ id: "q1", email: "", status: "pendente" } as never);
+    const res = await POST(sendReq(baseDoc({ totalAmount: 3000 }), { porEmail: false }), {
+      params,
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it("a pré-visualização não trava: é onde ela vê o que falta", async () => {
+    const res = await POST(previewReq(baseDoc({ totalAmount: 0, eventDate: "" })), { params });
+    expect(res.status).toBe(200);
+  });
+});
+
+describe("POST /api/orcamento/[id]/proposta-doc — B1: o rascunho", () => {
+  beforeEach(() => vi.mocked(renderStoredEditorialPdfWithReport).mockClear());
+
+  const pedir = (corpo: Record<string, unknown>) =>
+    POST(
+      new Request("https://liquen.test/api/orcamento/q1/proposta-doc", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(corpo),
+      }) as unknown as NextRequest,
+      { params },
+    );
+
+  it("na pré-visualização, desenha marcado e o nome do ficheiro di-lo", async () => {
+    const res = await pedir({ mode: "preview", doc: baseDoc({ totalAmount: 0 }), rascunho: true });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Disposition")).toContain("proposta-preview-rascunho.pdf");
+    expect(vi.mocked(renderStoredEditorialPdfWithReport).mock.calls[0][2]).toEqual({
+      rascunho: true,
+    });
+  });
+
+  it("sem o pedido, o PDF não leva marca nenhuma", async () => {
+    await pedir({ mode: "preview", doc: baseDoc({ totalAmount: 3000 }) });
+    expect(vi.mocked(renderStoredEditorialPdfWithReport).mock.calls[0][2]).toEqual({
+      rascunho: false,
+    });
+  });
+
+  it("um ENVIO nunca sai marcado, mesmo que o peçam", async () => {
+    await pedir({ mode: "send", doc: baseDoc({ totalAmount: 3000 }), rascunho: true });
+    for (const chamada of vi.mocked(renderStoredEditorialPdfWithReport).mock.calls) {
+      expect(chamada[2]).toEqual({ rascunho: false });
+    }
   });
 });
