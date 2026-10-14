@@ -139,9 +139,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       .toLowerCase();
     const ficheiro = `horario-${limpo || "evento"}${q.date ? `-${q.date}` : ""}.pdf`;
 
-    return new NextResponse(Buffer.from(bytes), {
+    const corpo = Buffer.from(bytes);
+    return new NextResponse(corpo, {
       headers: {
         "Content-Type": "application/pdf",
+        // O tamanho à frente deixa o browser contar o que já chegou — é o que
+        // faz a barra do back office ser verdadeira em vez de uma estimativa.
+        "Content-Length": String(corpo.byteLength),
         "Content-Disposition": `attachment; filename="${ficheiro}"`,
         "Cache-Control": "no-store",
       },

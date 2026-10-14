@@ -1,5 +1,6 @@
 import "server-only";
 import sharp from "sharp";
+import { criarCachePorBytes } from "@/lib/cache-por-bytes";
 import {
   MOOD_BOARD_MAX_IMAGES,
   type MoodBoard,
@@ -281,8 +282,8 @@ async function resolveImages(
    */
   const buscar = async (ref: string, caixa: CaixaPdf | null): Promise<Resolvida | null> => {
     if (opcoes.originais) {
-      const bytes = await bytesDoOriginal(ref);
-      return bytes ? { ref, bytes: await reduzirParaEditorial(bytes), original: true } : null;
+      const reduzida = await fotoEditorial(ref, bytesDoOriginal);
+      return reduzida ? { ref, bytes: reduzida, original: true } : null;
     }
     if (!caixa) return buscarCapa(ref);
     const alvo = pixelsForBox(caixa.w, caixa.h, "collage");
@@ -628,6 +629,58 @@ export async function renderStoredProposalDocPdfWithReport(
  */
 const LADO_EDITORIAL = 1800;
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A FOTOGRAFIA JÁ REDUZIDA FICA EM MEMÓRIA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Cada desenho ia buscar o ORIGINAL de cada fotografia ao armazenamento (2 a
+ * 3 MB) e reduzia-o a 1 800 px com o `sharp` — outra vez, a cada descarga, a
+ * cada envio, para os mesmíssimos bytes. Numa proposta de sessenta fotos é a
+ * maior parte do tempo de um desenho que não seja o primeiro.
+ *
+ * Guarda-se a versão reduzida (umas centenas de KB) pelo caminho da foto. É
+ * honesto por construção: o caminho de uma fotografia nesta casa nunca muda de
+ * conteúdo (ver `cache-das-fotos.ts`: `<pasta>/<uuid>.jpg`, e trocar uma foto
+ * grava um caminho novo). Só os caminhos do armazenamento entram — um
+ * `data:` ou um endereço assinado não são chaves que valha a pena guardar.
+ *
+ * O tecto é por bytes (~64 MB, umas duzentas fotos) e esquece primeiro o que
+ * se usou há mais tempo. Uma foto que falhou não fica: a falha é passageira.
+ */
+const fotosEditoriais = criarCachePorBytes<Buffer>({
+  tecto: 64 * 1024 * 1024,
+  maximoPorEntrada: 4 * 1024 * 1024,
+  tamanho: (b) => b.length,
+});
+
+function guardavel(ref: string): boolean {
+  return !!ref && !ref.startsWith("data:") && !/^https?:\/\//i.test(ref) && ref.includes("/");
+}
+
+async function fotoEditorial(
+  ref: string,
+  original: (ref: string) => Promise<Buffer | null>,
+): Promise<Buffer | null> {
+  const guardar = guardavel(ref);
+  if (guardar) {
+    const ja = fotosEditoriais.ler(ref);
+    if (ja) return ja;
+  }
+  const bytes = await original(ref);
+  if (!bytes) return null;
+  const reduzida = await reduzirParaEditorial(bytes);
+  // Só se guarda o que o `sharp` conseguiu reduzir: se falhou, `reduzirParaEditorial`
+  // devolve os bytes como vieram, e esses podem ser de 10 MB.
+  if (guardar && reduzida !== bytes) fotosEditoriais.guardar(ref, reduzida);
+  return reduzida;
+}
+
+/** Só para os testes. */
+export function esvaziarFotosEditoriais(): void {
+  fotosEditoriais.esvaziar();
+}
+
 async function reduzirParaEditorial(bytes: Buffer): Promise<Buffer> {
   try {
     return await sharp(bytes, { failOn: "none" })
@@ -676,8 +729,8 @@ export async function renderStoredEditorialPdfWithReport(
  * se deixar ler: o estúdio mostra o centro e não promete nada.
  */
 export async function focoAutomaticoDaCapa(ref: string): Promise<Foco | null> {
-  const bytes = await fetchProposalImageBytes(ref);
-  if (!bytes) return null;
+  const reduzida = await fotoEditorial(ref, fetchProposalImageBytes);
+  if (!reduzida) return null;
   const { w, h } = pixeisDaCaixa(FOLHA.w, FOLHA.h, LADO_PAGINA, 1.7);
-  return focoAutomatico(await reduzirParaEditorial(bytes), w, h);
+  return focoAutomatico(reduzida, w, h);
 }

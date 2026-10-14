@@ -21,6 +21,7 @@ import { eur, eurDocumento } from "@/lib/money";
 import { createProposal, updateProposal, listProposalsForQuote } from "@/lib/proposals-store";
 import { renderStoredEditorialPdfWithReport } from "@/lib/proposal-doc-render";
 import { chaveDoPdf } from "@/lib/proposal-pdf-cache";
+import { chaveDaVersao, pdfFinalDaVersao, type RelatorioDoPdf } from "@/lib/proposal-preview-cache";
 import { guardarPdfDaProposta } from "@/lib/proposal-pdf-guardado";
 import { enderecoDoPdfDaProposta } from "@/lib/proposta-link-curto";
 import {
@@ -436,7 +437,26 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // O rascunho só existe na pré-visualização: um envio nunca sai marcado.
     const rascunho = mode === "preview" && body?.rascunho === true;
-    let relatorio = await renderStoredEditorialPdfWithReport(doc, idioma, { rascunho });
+    /**
+     * O PDF FINAL de uma versão desenha-se uma vez: o «Descarregar o PDF
+     * final», o que o estúdio prepara em segundo plano e o envio a seguir são
+     * o mesmo documento, e o segundo e o terceiro saem da memória. O rascunho
+     * desenha-se sempre. Ver `proposal-preview-cache.ts`.
+     */
+    let relatorio: RelatorioDoPdf;
+    // Saiu da memória? O estúdio aprende a estimativa da espera com o tempo de
+    // cada geração, e um PDF que veio pronto ensinava-lhe que desenhar leva um
+    // segundo.
+    let pdfDaMemoria = false;
+    if (rascunho) {
+      relatorio = await renderStoredEditorialPdfWithReport(doc, idioma, { rascunho });
+    } else {
+      const versao = await pdfFinalDaVersao(chaveDaVersao(chaveDoQueChegou, doc.validUntil), () =>
+        renderStoredEditorialPdfWithReport(doc, idioma, { rascunho }),
+      );
+      relatorio = versao.relatorio;
+      pdfDaMemoria = versao.daMemoria;
+    }
 
     /**
      * ════════════════════════════════════════════════════════════════════════
@@ -515,6 +535,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           // A chave do que se está a ver — só no PDF FINAL. O rascunho não
           // conta como visto: é o PDF que ainda não pode seguir.
           ...(rascunho ? {} : { "X-Chave-Do-Pdf": chaveDoQueChegou }),
+          ...(pdfDaMemoria ? { "X-Pdf-Da-Memoria": "1" } : {}),
         },
       });
     }
@@ -1860,6 +1881,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       // o PDF não passa pelo browser, e sem esta linha o envio não ensinava
       // nada à estimativa.
       pdfBytes: pdfBuffer.byteLength,
+      ...(pdfDaMemoria ? { pdfDaMemoria } : {}),
       // Só viaja quando NÃO foi guardado: uma resposta normal não ganha nada
       // com um `docSaved:true` a mais, e quem falha tem de sair pelo nome.
       ...(docSaved ? {} : { docSaved, docError }),

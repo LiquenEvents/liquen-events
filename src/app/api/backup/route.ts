@@ -322,7 +322,12 @@ export async function GET(request: NextRequest) {
   }
   try {
     const payload = await buildBackupPayload();
-    const corpo = JSON.stringify(payload, null, 2);
+    /**
+     * Sem espaços: é o mesmo JSON (o restauro lê-o igual — há teste a prová-lo),
+     * mais pequeno, e por isso mais depressa no telemóvel. Quem o quiser ler à
+     * mão abre-o num editor que o arruma.
+     */
+    const corpo = JSON.stringify(payload);
 
     /**
      * Uma cópia descarregada à mão CONTA como cópia.
@@ -358,6 +363,9 @@ export async function GET(request: NextRequest) {
     return new NextResponse(corpo, {
       headers: {
         "Content-Type": "application/json",
+        // O tamanho à frente: é o que deixa o back office mostrar quanto da
+        // cópia já chegou, em vez de um botão parado.
+        "Content-Length": String(Buffer.byteLength(corpo, "utf8")),
         "Content-Disposition": `attachment; filename="liquen-backup-${hojeNoEstudio()}.json"`,
       },
     });
