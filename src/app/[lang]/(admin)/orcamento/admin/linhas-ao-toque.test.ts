@@ -34,13 +34,14 @@ const ler = (f: string) => readFileSync(join(RAIZ, f), "utf8");
 
 describe("as linhas de lista com alvo de toque empilham", () => {
   it.each([
-    [
-      "Guioes.tsx",
-      "alvo-toque block w-full rounded-[var(--bo-raio-conteudo)] border p-3 text-left",
-    ],
+    /* As Timelines deixaram de ter linhas próprias (14/10): a lista passou aos
+       cartões do mapa de mesas, que vivem em `ListaDeEventos.tsx`. O cartão diz
+       o seu `display` (`flex`, com o selo do dia ao lado e o texto empilhado
+       numa coluna lá dentro) — é isso que o `.alvo-toque` não pode desfazer. */
+    ["ListaDeEventos.tsx", "bo-card alvo-toque group flex h-full w-full min-w-0"],
     ["Propostas.tsx", "alvo-toque block min-w-0 flex-1 text-left"],
     ["BibliotecaServicos.tsx", "alvo-toque block w-full rounded-lg"],
-  ])("%s diz `block` na linha", (ficheiro, classe) => {
+  ])("%s diz o `display` da linha", (ficheiro, classe) => {
     expect(ler(ficheiro)).toContain(classe);
   });
 });
