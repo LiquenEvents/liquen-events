@@ -519,7 +519,7 @@ test.describe("Back office — mobile", () => {
       /**
        * O ESTÚDIO SÓ EXISTE DEPOIS DE SE ESCOLHER O CLIENTE.
        *
-       * "Fazer proposta" abre num escolhedor ("Passo 1 de 2 — Para quem é a
+       * "Fazer proposta" abre num escolhedor ("Para quem é a
        * proposta?"); o estúdio, que é onde vive quase todo o formulário, só é
        * desenhado a seguir. Medir só o escolhedor dava um passo VERDE sobre um
        * ecrã que não é o que se usa — e foi exactamente o que aconteceu: o

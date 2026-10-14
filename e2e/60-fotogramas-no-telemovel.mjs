@@ -951,18 +951,18 @@ const painelDoPedido = (page) => page.locator(".fixed.z-50.max-w-md").first();
 /** Leva ao estúdio de propostas do primeiro pedido da lista. */
 async function irParaEstudio(page) {
   const jaLa = await page
-    .getByRole("button", { name: /^1 Conteúdo$/ })
+    .getByRole("button", { name: /^1 Evento\b/ })
     .first()
     .isVisible()
     .catch(() => false);
   if (jaLa) {
     // Voltar ao primeiro passo, para o cenário partir sempre do mesmo sítio.
-    await tocar(page, page.getByRole("button", { name: /^1 Conteúdo$/ }).first());
+    await tocar(page, page.getByRole("button", { name: /^1 Evento\b/ }).first());
     await dormir(700);
     return;
   }
   await irParaPedidos(page);
-  const passo1 = page.getByRole("button", { name: /^1 Conteúdo$/ }).first();
+  const passo1 = page.getByRole("button", { name: /^1 Evento\b/ }).first();
   // Duas tentativas. Um toque num cartão que chegou ao ecrã há um instante nem
   // sempre pega — a lista acabou de se desenhar e o `onClick` do React pode não
   // estar ligado ainda —, e uma espera longa a seguir a um toque perdido é uma
@@ -1141,7 +1141,13 @@ async function irADestino(page, nome) {
     return;
   }
   await abrirColunaDeDestinos(page);
-  await tocar(page, page.locator('nav[aria-label="Navegação do back office"]').getByRole("button", { name: rx }).first());
+  await tocar(
+    page,
+    page
+      .locator('nav[aria-label="Navegação do back office"]')
+      .getByRole("button", { name: rx })
+      .first(),
+  );
   await dormir(1600);
 }
 
@@ -1375,11 +1381,11 @@ const CENARIOS = [
     },
   },
   {
-    nome: "3a · estúdio: Conteúdo → Pré-visualizar",
+    nome: "3a · estúdio: Evento → Serviços",
     esperaMs: 700,
     async preparar(page) {
       await irParaEstudio(page);
-      this._passo = page.getByRole("button", { name: /^2 Pré-visualizar$/ }).first();
+      this._passo = page.getByRole("button", { name: /^2 Serviços\b/ }).first();
       await this._passo.waitFor({ timeout: 15_000 });
       await aVista(page, this._passo);
     },
@@ -1392,7 +1398,7 @@ const CENARIOS = [
     esperaMs: 700,
     async preparar(page) {
       await irParaEstudio(page);
-      await tocar(page, page.getByRole("button", { name: /^2 Pré-visualizar$/ }).first());
+      await tocar(page, page.getByRole("button", { name: /^2 Serviços\b/ }).first());
       await dormir(1200);
       this._passo = page.getByRole("button", { name: /^3 Enviar$/ }).first();
       await this._passo.waitFor({ timeout: 15_000 });

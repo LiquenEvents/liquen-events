@@ -47,6 +47,8 @@ export interface TextosEditoriais {
   grupos: Readonly<Record<Grupo, string>>;
   /** A linha do rodapé depois da marca: «Proposta de decoração». */
   rodapeModelo: (organizacao: boolean) => string;
+  /** A marca de um PDF descarregado com erros por resolver — à frente do rodapé. */
+  rascunho: string;
 
   // ── O que propomos ──
   /** «Seis serviços de decoração floral e decoração» — `grupo` é o título do
@@ -155,6 +157,7 @@ const PT: TextosEditoriais = {
     ambiente: "Ambiente",
   },
   rodapeModelo: (org) => (org ? "Proposta de organização" : "Proposta de decoração"),
+  rascunho: "RASCUNHO",
 
   tituloServicos: (n, grupo) => {
     // «Um serviço», no singular; e «um» e não «uma»: «serviço» é masculino.
@@ -211,6 +214,7 @@ const EN: TextosEditoriais = {
     ambiente: "Atmosphere",
   },
   rodapeModelo: (org) => (org ? "Planning proposal" : "Decoration proposal"),
+  rascunho: "DRAFT",
 
   // O nome do grupo é dela e fica em português; em inglês o título diz só
   // quantos são, que é o que se lê sem tradução.

@@ -54,7 +54,26 @@ async function openStudio(page: Page, quoteId: string): Promise<void> {
  * mede aqui é o rascunho a seguir para outro dispositivo, e para isso é preciso
  * escrever num campo — que é o que ela faria depois de abrir a secção.
  */
+/** Em que dos cinco passos do estúdio (A2) vive cada secção. */
+const PASSO_DA_SECCAO: Record<string, number> = {
+  evento: 1,
+  capas: 1,
+  servicos: 2,
+  moodboards: 3,
+  cronograma: 3,
+  orcamento: 4,
+  total: 4,
+};
+
+async function irAoPassoDa(page: Page, id: string) {
+  await page
+    .getByRole("navigation", { name: "Passos da proposta" })
+    .getByRole("button", { name: new RegExp(`^${PASSO_DA_SECCAO[id] ?? 1}`) })
+    .click({ timeout: 20000 });
+}
+
 async function abrirSeccao(page: Page, id: string) {
+  await irAoPassoDa(page, id);
   const cartao = page.locator(`#seccao-${id}`);
   await expect(cartao).toBeVisible({ timeout: 20000 });
   const dobra = cartao.locator("[aria-expanded]").first();
@@ -74,6 +93,7 @@ async function abrirSeccao(page: Page, id: string) {
  * botões que ela usaria.
  */
 async function primeiraLinhaDosServicos(page: Page) {
+  await irAoPassoDa(page, "servicos");
   const seccao = page.locator("#seccao-servicos");
   const titulo = page.getByLabel("Título do grupo 1", { exact: true });
   if ((await titulo.count()) === 0) {
