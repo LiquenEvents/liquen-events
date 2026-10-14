@@ -83,7 +83,10 @@ export interface LinhaDoCartao {
 export interface DadosDoPedidoParaAEquipa {
   /** `cid:` do logótipo. */
   logo: string;
+  /** O que vai em grande: o casal, ou quem escreveu (ver `quem-pede.ts`). */
   nome: string;
+  /** Quem escreveu, quando não é um dos noivos: uma linha por baixo do nome. */
+  feitoPor?: string | null;
   /** «sexta, 6 nov 2026», ou o intervalo de um evento de vários dias. */
   data: string;
   fimDeSemana: boolean;
@@ -96,6 +99,8 @@ export interface DadosDoPedidoParaAEquipa {
   /** O lembrete de responder depressa — o do pedido urgente, quando o é. */
   lembrete: string;
   primeiroNome: string;
+  /** Para onde vai a resposta a este email (o email do pedido), se o houver. */
+  respostaPara?: string;
   pedido: LinhaDoCartao[];
   contacto: LinhaDoCartao[];
   notas: string;
@@ -225,7 +230,12 @@ ${ESTILO_DO_EMAIL}
   <tr><td align="center" class="pad" style="padding:48px 56px 0;">
     <p class="accent" style="margin:0 0 12px;font-size:17px;line-height:21px;font-weight:600;color:#4d6650;">Novo pedido de orçamento</p>
     <h1 class="h1 t1" style="margin:0;font-size:40px;line-height:44px;font-weight:600;letter-spacing:-0.3px;color:#1d1d1f;">${esc(d.nome)}</h1>
-  </td></tr>
+${
+  d.feitoPor
+    ? `    <p class="t2" style="margin:10px 0 0;font-size:17px;line-height:23px;color:#6e6e73;">Pedido feito por ${esc(d.feitoPor)}</p>
+`
+    : ""
+}  </td></tr>
 
   <!-- 3. A DATA, EM DESTAQUE: é ela que decide se o trabalho cabe na agenda -->
   <tr><td align="center" class="pad" style="padding:20px 56px 0;">
@@ -249,7 +259,7 @@ ${notas}  <!-- 8. RODAPÉ -->
   <tr><td class="pad" style="padding:32px 56px 44px;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
       <tr><td class="line" style="border-top:1px solid #d2d2d7;padding-top:18px;">
-        <p class="t2" style="margin:0;font-size:12px;line-height:16px;color:#6e6e73;">Também pode responder a este email — a resposta vai direta para ${esc(d.primeiroNome)}.</p>
+        <p class="t2" style="margin:0;font-size:12px;line-height:16px;color:#6e6e73;">Também pode responder a este email — ${d.feitoPor && d.respostaPara ? `a resposta vai para ${esc(d.respostaPara)}` : `a resposta vai direta para ${esc(d.primeiroNome)}`}.</p>
         <p class="t3" style="margin:8px 0 0;font-size:12px;line-height:16px;color:#86868b;">Ref. ${esc(d.referencia)} · ${esc(d.quando)}</p>
       </td></tr>
     </table>

@@ -156,3 +156,37 @@ describe("os botões, nos três casos", () => {
     }
   });
 });
+
+/**
+ * 14/10: «Maria Silva» em grande num pedido da Luana e do Afonso. Quando quem
+ * escreveu não é um dos noivos, vai o casal em grande, quem escreveu numa
+ * linha por baixo, e o rodapé diz para que endereço vai a resposta (e não
+ * «direta para Maria», que não se sabe se é dela).
+ */
+describe("quem pede e quem se casa", () => {
+  const COM_CASAL: DadosDoPedidoParaAEquipa = {
+    ...PEDIDO,
+    nome: "Luana Silva & Afonso Duarte",
+    feitoPor: "Maria Silva",
+    primeiroNome: "Maria",
+    respostaPara: "casal@exemplo.pt",
+  };
+
+  it("o casal vai em grande e quem escreveu numa linha por baixo", () => {
+    const html = htmlDoPedidoParaAEquipa(COM_CASAL);
+    expect(html).toMatch(/<h1[^>]*>Luana Silva &amp; Afonso Duarte<\/h1>/);
+    expect(html).toContain("Pedido feito por Maria Silva");
+  });
+
+  it("o rodapé diz o endereço da resposta, e não o nome de quem escreveu", () => {
+    const html = htmlDoPedidoParaAEquipa(COM_CASAL);
+    expect(html).toContain("a resposta vai para casal@exemplo.pt");
+    expect(html).not.toContain("direta para Maria");
+  });
+
+  it("sem ninguém a mais, fica como sempre", () => {
+    const html = htmlDoPedidoParaAEquipa(PEDIDO);
+    expect(html).not.toContain("Pedido feito por");
+    expect(html).toContain("a resposta vai direta para Ana");
+  });
+});

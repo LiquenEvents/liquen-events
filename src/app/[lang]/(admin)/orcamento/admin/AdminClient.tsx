@@ -23,6 +23,7 @@ import { dataCurta } from "@/lib/data-curta";
 import { razaoDaRecusa, porqueFalhou, porqueRebentou } from "@/lib/porque-falhou";
 import type { LeituraFalhada } from "@/lib/porque-nao-leu";
 import type { Quote, QuoteSummary, QuoteStatus, ActivityEntry } from "@/lib/orcamento/types";
+import { quemPedeEOCasal } from "@/lib/orcamento/quem-pede";
 import type { RecentQuote } from "./CommandPalette";
 import { AvisoDeArmazenamento } from "./AvisoDeArmazenamento";
 import { formatPrice } from "@/lib/orcamento/pricing";
@@ -7084,7 +7085,7 @@ export default function AdminClient({
                               id="detail-drawer-title"
                               ref={detailTitleRef}
                               tabIndex={-1}
-                              title={selected.name}
+                              title={quemPedeEOCasal(selected).titulo}
                               /* line-clamp (not truncate): a global `h1,h2,h3 {
                                text-wrap: balance }` is unlayered and overrides
                                Tailwind's layered `truncate`, so a long name would
@@ -7092,8 +7093,16 @@ export default function AdminClient({
                                Clamp to 2 lines with an ellipsis instead. */
                               className="line-clamp-2 break-words font-display text-xl leading-tight text-[var(--bo-text)] focus:outline-none sm:text-2xl"
                             >
-                              {selected.name}
+                              {quemPedeEOCasal(selected).titulo}
                             </h2>
+                            {/* Quem escreveu, quando não é um dos noivos (14/10:
+                                «Maria Silva» em grande num pedido da Luana e do
+                                Afonso). Ver `quem-pede.ts`. */}
+                            {quemPedeEOCasal(selected).feitoPor && (
+                              <p className="mt-0.5 text-xs text-[var(--bo-text-muted)]">
+                                Pedido feito por {quemPedeEOCasal(selected).feitoPor}
+                              </p>
+                            )}
                             <div className="mt-1.5 flex flex-wrap items-center gap-2.5">
                               {statusBadge(selected.status)}
                               <span
