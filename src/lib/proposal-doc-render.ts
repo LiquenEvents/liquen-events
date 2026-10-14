@@ -655,9 +655,10 @@ async function reduzirParaEditorial(bytes: Buffer): Promise<Buffer> {
 export async function renderStoredEditorialPdfWithReport(
   doc: ProposalDoc,
   idioma: IdiomaDaProposta = IDIOMA_POR_OMISSAO,
+  opcoes: { rascunho?: boolean } = {},
 ): Promise<{ pdf: Buffer<ArrayBuffer>; missingImages: number; truncations: DocTruncation[] }> {
   const withDefaults = withProposalDefaults(doc);
   const { doc: resolved, missing } = await resolveImages(withDefaults, { originais: true });
-  const { bytes, truncations, undrawnImages } = await renderEditorialPdf(resolved, idioma);
+  const { bytes, truncations, undrawnImages } = await renderEditorialPdf(resolved, idioma, opcoes);
   return { pdf: Buffer.from(bytes), missingImages: missing + undrawnImages, truncations };
 }

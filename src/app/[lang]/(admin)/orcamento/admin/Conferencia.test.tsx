@@ -30,7 +30,8 @@ const doc = (over: Partial<ProposalDoc> = {}): ProposalDoc =>
     totalText: "12.000,00 € + IVA",
     budgetItems: [],
     serviceGroups: [{ letter: "a)", title: "Decoração Floral", items: [] }],
-    moodBoards: [{ images: ["board/1.jpg"] }],
+    // Com título e nota: um tema mudo é um aviso (B1).
+    moodBoards: [{ title: "Cerimónia", annotation: "Arco de flores.", images: ["board/1.jpg"] }],
     coverImages: ["capa/1.jpg", "capa/2.jpg"],
     // As duas folhas do fecho, PREENCHIDAS. Sem elas este documento sai com
     // duas folhas em branco no meio — e desde o achado F-13 a conferência

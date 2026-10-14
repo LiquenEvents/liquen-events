@@ -66,12 +66,24 @@ interface Props {
    * texto.
    */
   onIr?: (v: Verificacao) => void;
+  /** Por onde segue, e o email do pedido — sem eles o email não se verifica. */
+  canal?: "email" | "whatsapp" | "ambos";
+  emailDoCliente?: string;
 }
 
-export default function Conferencia({ doc, quote, quotes = [], totalBruto, idioma, onIr }: Props) {
+export default function Conferencia({
+  doc,
+  quote,
+  quotes = [],
+  totalBruto,
+  idioma,
+  onIr,
+  canal,
+  emailDoCliente,
+}: Props) {
   const verificacoes = useMemo(
-    () => conferir({ doc, quote, historico: quotes, totalBruto, idioma }),
-    [doc, quote, quotes, totalBruto, idioma],
+    () => conferir({ doc, quote, historico: quotes, totalBruto, idioma, canal, emailDoCliente }),
+    [doc, quote, quotes, totalBruto, idioma, canal, emailDoCliente],
   );
   const reparos = temReparos(verificacoes);
   const travam = verificacoes.filter((x) => x.trava).length;
