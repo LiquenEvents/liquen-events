@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useRef } from "react";
+import { useId, useRef } from "react";
+import { useAlturaDoConteudo } from "./ui/altura-do-conteudo";
 
 /**
  * O QUE SE SABE E NÃO SE ESCREVE AO CLIENTE.
@@ -60,12 +61,8 @@ export default function NotasInternas({
    */
   const id = useId();
 
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 320)}px`;
-  }, [valor]);
+  // Cresce até 320 px, e só se mede quando se vê — ver `ui/altura-do-conteudo.ts`.
+  useAlturaDoConteudo(ref, valor, { maximo: 320 });
 
   return (
     <div

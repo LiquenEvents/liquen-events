@@ -1,6 +1,7 @@
 "use client";
 
-import { useLayoutEffect, useRef } from "react";
+import { useRef } from "react";
+import { useAlturaDoConteudo } from "./ui/altura-do-conteudo";
 import { chaveDoCampo, type CampoDeTexto } from "@/lib/proposal-ortografia";
 import { ESTADO, PRESSAO } from "./ui/movimento";
 
@@ -43,14 +44,8 @@ import { ESTADO, PRESSAO } from "./ui/movimento";
  */
 function TextareaQueCresce(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
   const ref = useRef<HTMLTextAreaElement | null>(null);
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.height = "auto";
-    // As bordas somam-se ao `scrollHeight` — ver a mesma conta, e a medição que
-    // a obrigou, no `CampoQueCresce` do `ServicesEditor`.
-    el.style.height = `${el.scrollHeight + (el.offsetHeight - el.clientHeight)}px`;
-  }, [props.value]);
+  // Só se mede quando se vê — ver `ui/altura-do-conteudo.ts`.
+  useAlturaDoConteudo(ref, props.value);
   return <textarea {...props} ref={ref} rows={1} />;
 }
 
