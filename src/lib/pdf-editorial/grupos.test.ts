@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { agrupar, grupoDoTema } from "./grupos";
+import { agrupar, capitulos, grupoDoTema } from "./grupos";
 import { primeirosNomes } from "./textos";
 
 describe("o grupo lê-se do nome do tema", () => {
@@ -50,5 +50,21 @@ describe("os primeiros nomes do título", () => {
   it("sem «&» não inventa um casal", () => {
     expect(primeirosNomes("João Barros e Cunha", "pt")).toBeNull();
     expect(primeirosNomes("Quinta do Vale, Lda.", "pt")).toBeNull();
+  });
+});
+
+describe("os capítulos: casamento pelo dia, o resto pelo mood board", () => {
+  const temas = [{ title: "Bar" }, { title: "Arco de abóboras" }, { title: "Mesas" }];
+
+  it("fora dos casamentos, cada mood board é um capítulo, pela ordem dela", () => {
+    const c = capitulos(temas, (t) => t, false);
+    expect(c.map((x) => x.chave)).toEqual(["tema-1", "tema-2", "tema-3"]);
+    expect(c.every((x) => x.grupo === null)).toBe(true);
+    expect(c.map((x) => x.itens[0].title)).toEqual(["Bar", "Arco de abóboras", "Mesas"]);
+  });
+
+  it("num casamento, continuam os capítulos do dia", () => {
+    const c = capitulos(temas, (t) => t, true);
+    expect(c.map((x) => x.grupo)).toEqual(["cerimonia", "cocktail", "jantar"]);
   });
 });

@@ -268,9 +268,20 @@ const EN: TextosDoEmailDaProposta = {
  * pode devolver `undefined` e fazer sair um email com buracos onde deviam estar
  * o assunto e o botão.
  */
-export function textosDoEmailDaProposta(idioma: IdiomaDaProposta): TextosDoEmailDaProposta {
+export function textosDoEmailDaProposta(
+  idioma: IdiomaDaProposta,
+  casamento = true,
+): TextosDoEmailDaProposta {
   const escolhida = ehIdiomaDaProposta(idioma) ? idioma : IDIOMA_POR_OMISSAO;
-  return escolhida === "en" ? EN : PT;
+  if (escolhida === "en") return EN;
+  // «O vosso dia» é de um casamento. Num restaurante, numa empresa, numa festa,
+  // é «o vosso evento» — que é o que o inglês sempre disse.
+  if (casamento) return PT;
+  return {
+    ...PT,
+    intro: PT.intro.replace("o vosso dia", "o vosso evento"),
+    introEmTexto: PT.introEmTexto.replace("o vosso dia", "o vosso evento"),
+  };
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

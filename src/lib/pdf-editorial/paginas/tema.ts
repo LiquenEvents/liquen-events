@@ -71,7 +71,7 @@ export async function tema(ctx: Contexto, d: DadosDoTema): Promise<PDFPage> {
     d.fotos.map((f) => f.aspecto),
     d.numero % 2 === 0,
   );
-  const sobre = `${ctx.te.inspiracao} · ${d.grupo}`;
+  const sobre = d.grupo ? `${ctx.te.inspiracao} · ${d.grupo}` : ctx.te.inspiracao;
 
   if (c.tipo === "texto") {
     const x0 = d.painel ? PAINEL_DO_TEXTO.w + 56 : MARGEM;

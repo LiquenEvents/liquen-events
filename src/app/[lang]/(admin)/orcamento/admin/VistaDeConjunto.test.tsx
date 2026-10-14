@@ -171,6 +171,29 @@ describe("VistaDeConjunto: reordenar", () => {
     expect(onMover).toHaveBeenCalledWith(1, 0);
   });
 
+  it("fora de um casamento (cada mood board é um capítulo), as setas continuam a mover", () => {
+    const boards = [board({ title: "Bar" }), board({ title: "Arco de abóboras" })];
+    const doc = { ...docCom(boards), eventType: "Halloween" } as ProposalDoc;
+    const onMover = vi.fn();
+    render(
+      <VistaDeConjunto
+        doc={doc}
+        ordem={[0, 1]}
+        urls={{ "a.jpg": "/a.jpg" }}
+        aspetos={{ "a.jpg": 1.5 }}
+        onFechar={vi.fn()}
+        onMover={onMover}
+        onSaltar={vi.fn()}
+        onIrParaSeccao={vi.fn()}
+      />,
+    );
+    const pos =
+      planoDaProposta(doc).findIndex((p) => p.tipo === "tema" && p.titulo === "Arco de abóboras") +
+      1;
+    fireEvent.click(screen.getByLabelText(`Mover a página ${pos} para trás`));
+    expect(onMover).toHaveBeenCalledWith(1, 0);
+  });
+
   it("salta por cima de um tema que não sai", () => {
     const boards = [
       board({ title: "Mesa do bolo" }),

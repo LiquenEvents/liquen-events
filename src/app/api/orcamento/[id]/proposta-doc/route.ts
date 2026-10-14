@@ -47,6 +47,7 @@ import {
 import { resolverLigacaoDaProposta } from "@/lib/email-ligacao-reservada";
 import { listarEnvios, registarEnvio } from "@/lib/envios-de-proposta";
 import { log } from "@/lib/logger";
+import { eCasamento } from "@/lib/proposal-evento";
 
 /** Os erros do estúdio que a rota também recusa — ver «O QUE TRAVA NO ESTÚDIO». */
 const TRAVAM_NO_SERVIDOR: ReadonlySet<string> = new Set([
@@ -1238,7 +1239,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
               // estúdio, e não o `quote.name` — que é quem escreveu o pedido e
               // pode ser a mãe da noiva ou uma wedding planner. É a mesma escolha
               // que o texto da casa aqui em baixo já fazia.
-              nome: String(doc.clientNames ?? "").trim(),
+              //
+              // Fora de um casamento, o cliente é um restaurante ou uma empresa
+              // («Tasca do Pão e Vinho» virava «Tasca e Vinho» no `{cliente_nome}`):
+              // aí saúda-se a pessoa que escreveu o pedido.
+              nome: eCasamento(doc.eventType)
+                ? String(doc.clientNames ?? "").trim()
+                : String(quote.name ?? "").trim() || String(doc.clientNames ?? "").trim(),
               link: acceptUrl,
               valor: eurDocumento(money.gross),
               ...(String(doc.eventDate ?? "").trim()
@@ -1259,7 +1266,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
      *
      * O português é, palavra por palavra, o que sempre saiu daqui.
      */
-    const t = textosDoEmailDaProposta(idioma);
+    const t = textosDoEmailDaProposta(idioma, eCasamento(doc.eventType));
     /**
      * Quem assina é quem carregou em «Enviar», não a casa. O nome que vai para
      * a protecção é o do DOCUMENTO (o casal), que é quem lê este email — e não

@@ -219,6 +219,33 @@ export async function GET(request: NextRequest) {
     });
 
     /**
+     * ── SEM EMAIL, NÃO HÁ CÓPIA — E ENTÃO NADA SE APAGA ──────────────────
+     *
+     * O `sendMail` não lança quando o email não sai (SMTP por configurar, conta
+     * bloqueada, servidor que recusou): devolve `sent: false`. E o resto deste
+     * trabalho seguia como se a cópia tivesse saído — carimbava «há cópia»,
+     * aplicava a retenção dos 12 meses e esvaziava a Reciclagem. É exactamente
+     * o contrário da promessa escrita mais abaixo: «nada é apagado sem estar
+     * dentro da cópia desse mesmo dia».
+     *
+     * Por isso pára aqui: sem carimbo, sem retenção, sem Reciclagem, sem
+     * aquecimento. O que havia para apagar fica para o dia em que a cópia sair.
+     * O 502 faz o trabalho aparecer como falhado na Vercel, e o painel continua
+     * a dizer há quanto tempo não há cópia — que é a verdade. (SEG-2 do
+     * `docs/PLANO-SITE-E-GALERIA.md`.)
+     */
+    if (!sent) {
+      log.error("cron backup: o email da cópia NÃO saiu — nada foi apagado hoje", undefined, {
+        dia,
+        bytes: comprimido.byteLength,
+      });
+      return NextResponse.json(
+        { ok: false, sent: false, dia, error: "O email da cópia não saiu." },
+        { status: 502 },
+      );
+    }
+
+    /**
      * O carimbo vai DEPOIS do envio, nunca antes: ele diz «existe uma cópia
      * fora daqui», e prometê-lo antes de o email sair era a mesma mentira que
      * este sistema já apanhou uma vez noutro sítio — dizer «guardado» sobre

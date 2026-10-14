@@ -225,6 +225,29 @@ como recomendação.
 - os restos do slideshow saem dos textos;
 - o preto e as durações passam a tokens.
 
+> **GAL-1, GAL-3 e GAL-9 — FEITAS a 11/10/2026** (ramo `feat/galeria-abrir`).
+> Verificadas com `next start` a 1340×768, 1440×900 e 390×844, fotograma a
+> fotograma, e com movimento reduzido. Onde a execução se afastou do texto:
+>
+> - **o voo dura 350 ms** e não «cerca de 300»: é o `DUR_VISTA_MS` da casa (o
+>   degrau de «troca um ecrã»), para não haver um número novo;
+> - **«abrir já não desloca a página por trás» não era do site.** O salto de
+>   54–84 px vinha da ferramenta de medição: o clique do Playwright rola a
+>   miniatura para fora da `scroll-padding-top` (144 px) antes de clicar. Com
+>   um clique de rato a sério a página não se mexe — medido, ao abrir e ao
+>   fechar. Ficou na mesma o `preventScroll` ao devolver o foco;
+> - **o fundo é discreto de propósito:** 35 % da cor da foto no centro, a cair
+>   para quase preto, para o branco dos controlos ficar acima de 7:1 mesmo
+>   numa foto branca;
+> - **a dica do teclado** passou a «← → navegar · f ecrã inteiro · esc
+>   fechar»: só aparece com rato, portanto o «deslize no telemóvel» deixou de
+>   ter a quem falar;
+> - **a navegação entre fotos** mantém o esbatimento de sempre. Do 2×2 para uma
+>   satélite vêem-se ~200 ms de fundo antes da foto, porque a satélite guarda
+>   uma miniatura mais pequena do que a que o visualizador pede; antes, a foto
+>   anterior tapava isto por baixo (era a dupla exposição). Fica para a 2.ª
+>   parte, com o GAL-2.
+
 **GAL-10 · Saber que fotografias vendem** · P · impacto **médio**
 - Contar as fotos abertas, as navegações, os «Ver o casamento», as partilhas e
   os guardados. Só com consentimento, como o resto do site.
@@ -792,7 +815,7 @@ e entram aqui quando o repositório fechar.
 |---|---|---|
 | 1 | **SEG-1** fechar o código e apagar do histórico a foto retirada *(precisa do «sim» dela)* | P |
 | 2 | **SEG-2** a cópia diária não apaga sem cópia | P |
-| 3 | **GAL-1 + GAL-3 + GAL-9** abrir sem mancha, crescer da miniatura, fundo com a cor da foto, correcções rápidas | M |
+| 3 | **GAL-1 + GAL-3 + GAL-9** abrir sem mancha, crescer da miniatura, fundo com a cor da foto, correcções rápidas — **feito a 11/10** | M |
 | 4 | **DES-1 + PED-2** o aviso deixa de tapar títulos e botões; «Orçamento» no cabeçalho do telemóvel | P |
 | 5 | **TXT-6** dados legais, Livro de Reclamações, declaração de acessibilidade *(dados dela)* | P |
 | 6 | **TXT-5 + TXT-4 + NAV-1 + NAV-4 + NAV-6** `llms.txt`, botões, rodapé, letra, contraste | P |
