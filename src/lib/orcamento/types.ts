@@ -1,4 +1,5 @@
 import type { RespostaDeEscolha } from "../proposta-escolhas";
+import type { MapaDeMesas } from "./mapa-de-mesas";
 
 export type EventCategory = "empresas" | "particulares";
 
@@ -467,6 +468,9 @@ export interface Quote extends QuoteFormData {
   followUpAt?: string;
   /** RSVP / guest list for the event. */
   guestList?: Guest[];
+  /** O mapa de mesas do evento: mesas, elementos da sala e quem se senta onde.
+      As regras vivem em `mapa-de-mesas.ts`; as pessoas vêm da `guestList`. */
+  mapaDeMesas?: MapaDeMesas;
   /**
    * ════════════════════════════════════════════════════════════════════════
    * O QUE O CASAL ESCOLHEU NA PÁGINA DA PROPOSTA
@@ -538,6 +542,7 @@ export interface Quote extends QuoteFormData {
  */
 export const CAMPOS_SO_DO_DETALHE = [
   "guestList",
+  "mapaDeMesas",
   "checklist",
   "productionPlan",
   "timeline",

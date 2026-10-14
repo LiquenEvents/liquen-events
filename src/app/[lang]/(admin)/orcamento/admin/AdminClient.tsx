@@ -176,6 +176,7 @@ import {
   Material,
   Temas,
   Guioes,
+  MapaDeMesas,
   ClientMessenger,
   EventChecklist,
   EventMaterial,
@@ -4547,6 +4548,7 @@ export default function AdminClient({
     reciclagem: "Reciclagem",
     "fazer-proposta": "Fazer proposta",
     guioes: "Timelines",
+    mesas: "Mapa de mesas",
     tarefas: "Tarefas",
     fornecedores: "Fornecedores",
     inventario: "Inventário",
@@ -4598,6 +4600,8 @@ export default function AdminClient({
        «Timelines» já o diz — a frase que estava aqui explicava o que é uma
        timeline a quem já está dentro da secção das timelines. */
     guioes: "",
+    // Como as Timelines: o título já diz o que é.
+    mesas: "",
     /* ── A DESCRIÇÃO DAS TAREFAS SAIU ─────────────────────────────────
        «A hierarquia do cabeçalho está invertida: "Organização interna da
        equipa" acima do título, em cinzento pequeno.» [APPLE] A regra é
@@ -6306,6 +6310,34 @@ export default function AdminClient({
           {view === "guioes" && (
             <div className={`${VIEW_WRAP} view-in`}>
               <Guioes
+                carregarPedido={async (id) => {
+                  const actual = quotes.find((q) => q.id === id);
+                  if (!actual) {
+                    return {
+                      ok: false as const,
+                      porque: "Este evento já não está na lista de pedidos. Recarrega a página.",
+                    };
+                  }
+                  const r = await comPedidoInteiro(actual);
+                  return r.ok
+                    ? { ok: true as const, quote: r.quote }
+                    : { ok: false as const, porque: r.porque };
+                }}
+                onQuoteAtualizado={(q) => {
+                  setQuotes((prev) => prev.map((x) => (x.id === q.id ? q : x)));
+                  setSelected((prev) => (prev?.id === q.id ? q : prev));
+                }}
+              />
+            </div>
+          )}
+
+          {/* ── Mapa de mesas ──
+              O mesmo caminho das Timelines: a vista recebe o `comPedidoInteiro`
+              (a lista só tem resumos, e o mapa e os convidados vivem no pedido
+              inteiro) e devolve o pedido gravado para a lista ficar em dia. */}
+          {view === "mesas" && (
+            <div className={`${VIEW_WRAP} view-in`}>
+              <MapaDeMesas
                 carregarPedido={async (id) => {
                   const actual = quotes.find((q) => q.id === id);
                   if (!actual) {

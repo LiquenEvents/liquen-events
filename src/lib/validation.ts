@@ -361,6 +361,52 @@ const activityEntrySchema = z.object({
   summary: trimmed(1000),
 });
 
+/**
+ * O mapa de mesas (`lib/orcamento/mapa-de-mesas.ts`). Os tectos são os de lá; as
+ * coordenadas são centímetros de sala e podem ser negativas (arrastar para
+ * cima ou para a esquerda da primeira mesa é legítimo).
+ */
+const coordenada = z.number().finite().min(-20000).max(20000);
+const mapaDeMesasSchema = z.object({
+  versao: z.literal(1),
+  mesas: z
+    .array(
+      z.object({
+        id: entityId,
+        nome: trimmed(60),
+        forma: z.enum(["redonda", "comprida", "quadrada"]),
+        x: coordenada,
+        y: coordenada,
+        rodada: z.boolean().optional(),
+        lugares: z.number().int().min(1).max(40),
+      }),
+    )
+    .max(150),
+  elementos: z
+    .array(
+      z.object({
+        id: entityId,
+        tipo: z.enum(["noivos", "pista", "palco", "buffet", "bar", "outro"]),
+        nome: trimmed(60),
+        x: coordenada,
+        y: coordenada,
+        largura: z.number().finite().min(20).max(5000),
+        altura: z.number().finite().min(20).max(5000),
+      }),
+    )
+    .max(40),
+  lugares: z
+    .record(
+      z.string().max(140),
+      z.object({
+        convidadoId: entityId,
+        n: z.number().int().min(1).max(1000),
+        nome: trimmed(120).optional(),
+      }),
+    )
+    .refine((r) => Object.keys(r).length <= 150 * 40, "Demasiados lugares."),
+});
+
 export const quoteUpdateSchema = z
   .object({
     status: z.enum(["pendente", "em_revisao", "cotado", "aceite", "rejeitado"]),
@@ -386,6 +432,7 @@ export const quoteUpdateSchema = z
     tags: z.array(trimmed(60)).max(100),
     followUpAt: shortDate.nullish(),
     guestList: z.array(guestSchema).max(5000),
+    mapaDeMesas: mapaDeMesasSchema,
     activityLog: z.array(activityEntrySchema).max(5000),
     // Append-only variant: the server merges these onto the STORED log, so two
     // tools writing at once can't overwrite each other's entries.

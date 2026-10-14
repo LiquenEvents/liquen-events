@@ -535,6 +535,65 @@ describe("PATCH /api/orcamento/[id] — o estado segue o que se registou", () =>
     expect(gravado()).toMatchObject({ folhaDaTimeline: folha });
   });
 
+  /**
+   * O MAPA DE MESAS (14/10). Declarado na lista do que a rota aceita E no
+   * esquema — sem os dois, o PATCH respondia 200 e não gravava nada, como já
+   * aconteceu com a folha do guião aqui em cima.
+   */
+  it("grava o mapa de mesas", async () => {
+    authed.ok = true;
+    const mapa = {
+      versao: 1,
+      mesas: [{ id: "m1", nome: "Mesa 1", forma: "redonda", x: 200, y: 200, lugares: 8 }],
+      elementos: [
+        {
+          id: "e1",
+          tipo: "pista",
+          nome: "Pista de dança",
+          x: 600,
+          y: 300,
+          largura: 500,
+          altura: 400,
+        },
+      ],
+      lugares: { "m1:0": { convidadoId: "g1", n: 1 } },
+    };
+    const res = await PATCH(req("PATCH", { mapaDeMesas: mapa }), ctx("LIQ-1"));
+    expect(res.status).toBe(200);
+    expect(gravado()).toMatchObject({ mapaDeMesas: mapa });
+  });
+
+  it("recusa um mapa de mesas fora das regras", async () => {
+    authed.ok = true;
+    const mapa = {
+      versao: 1,
+      mesas: [{ id: "m1", nome: "Mesa 1", forma: "oval", x: 0, y: 0, lugares: 99 }],
+      elementos: [],
+      lugares: {},
+    };
+    const res = await PATCH(req("PATCH", { mapaDeMesas: mapa }), ctx("LIQ-1"));
+    expect(res.status).toBe(400);
+    expect(store.update).not.toHaveBeenCalled();
+  });
+
+  it("o mapa de mesas mudado noutro sítio dá 409, com o que lá está", async () => {
+    authed.ok = true;
+    const noServidor = { versao: 1, mesas: [], elementos: [], lugares: {} };
+    store.override = { mapaDeMesas: noServidor };
+    const deManha = {
+      versao: 1,
+      mesas: [{ id: "m9", nome: "Mesa 9", forma: "quadrada", x: 0, y: 0, lugares: 4 }],
+      elementos: [],
+      lugares: {},
+    };
+    const res = await PATCH(
+      req("PATCH", { mapaDeMesas: deManha, base: { mapaDeMesas: deManha } }),
+      ctx("LIQ-1"),
+    );
+    expect(res.status).toBe(409);
+    expect((await res.json()).current.mapaDeMesas).toEqual(noServidor);
+  });
+
   it("apagar a referência do contrato não desfaz nada", async () => {
     authed.ok = true;
     store.override = { status: "aceite", contractRef: "2026-042" };

@@ -170,6 +170,28 @@ const SEM_AFUNDAR: { ficheiro: string; marca: string; porque: string }[] = [
     porque: "linha de tabela — `scale` num table-row desalinha as colunas",
   },
 
+  // ── AS PEÇAS DO MAPA DE MESAS ───────────────────────────────────────────
+  // São `<g>` de um SVG: um `scale` num `<g>` encolhe à volta da ORIGEM DA
+  // SALA, e não da peça — a mesa saltava em direcção ao canto em vez de
+  // afundar. A resposta ao dedo destas peças é o próprio arrasto (seguem o
+  // dedo desde o primeiro píxel depois do limiar) e o traço que se acende ao
+  // escolher.
+  {
+    ficheiro: "orcamento/admin/mesas/Sala.tsx",
+    marca: "data-alvo={`mesa|",
+    porque: "mesa no SVG — o `scale` de um `<g>` é à volta da origem da sala",
+  },
+  {
+    ficheiro: "orcamento/admin/mesas/Sala.tsx",
+    marca: "data-alvo={`elemento|",
+    porque: "elemento da sala no SVG — o mesmo",
+  },
+  {
+    ficheiro: "orcamento/admin/mesas/Sala.tsx",
+    marca: "data-alvo={`lugar|",
+    porque: "cadeira no SVG — o mesmo",
+  },
+
   // ── COM DONO NOUTRA RONDA (`AdminClient.tsx`) ───────────────────────────
   // Relatados, não corrigidos: o ficheiro estava entregue a outra pessoa.
   // Os dois primeiros são véus; os dois `<label>` só travam a bolha; os dois

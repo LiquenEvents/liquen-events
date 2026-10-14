@@ -179,6 +179,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     // ecrã dos Guiões. Faltavam aqui: o PATCH respondia 200 e não gravava nada,
     // e o PDF do guião nunca as via. O esquema já as declarava.
     "folhaDaTimeline",
+    // O mapa de mesas (ecrã «Mapa de mesas»). Declarado também no
+    // `quoteUpdateSchema` — sem os dois, gravava em silêncio coisa nenhuma.
+    "mapaDeMesas",
   ];
   const picked: Record<string, unknown> = {};
   for (const key of allowed) {
@@ -262,6 +265,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     "guestList",
     "timeline",
     "eventSuppliers",
+    // Duas pessoas a arrumar as mesas do mesmo evento: a segunda não pisa a
+    // primeira — recebe 409 e o ecrã aplica o gesto por cima do que encontrou.
+    "mapaDeMesas",
   ] as const;
   const aConferir = COLECCOES_INTEIRAS.filter((campo) => campo in picked && campo in base);
 

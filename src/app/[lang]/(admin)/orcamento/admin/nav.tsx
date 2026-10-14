@@ -16,6 +16,7 @@ export type View =
   | "acompanhamento"
   | "fazer-proposta"
   | "guioes"
+  | "mesas"
   | "tarefas"
   | "fornecedores"
   | "inventario"
@@ -62,6 +63,7 @@ const TODAS: Record<View, true> = {
   acompanhamento: true,
   "fazer-proposta": true,
   guioes: true,
+  mesas: true,
   tarefas: true,
   fornecedores: true,
   inventario: true,
@@ -154,6 +156,9 @@ export const CORE_NAV: View[] = [
  */
 export const MORE_NAV: View[] = [
   "guioes",
+  // O mapa de mesas é o par dos guiões: os dois são o evento visto por dentro,
+  // e os dois saem em papel para a equipa no dia.
+  "mesas",
   "contratos",
   "material",
   "temas",
@@ -332,6 +337,28 @@ export const NAV: { id: View; label: string; icon: ReactNode }[] = [
         <rect x="8" y="5" width="12" height="4" rx="1" />
         <rect x="8" y="15" width="7" height="4" rx="1" />
         <path d="M4 7h4M4 17h4" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    id: "mesas",
+    label: "Mapa de mesas",
+    /* Uma mesa redonda vista de cima, com quatro cadeiras: é a peça que o ecrã
+       arruma. Não se confunde com nenhum dos outros destinos. */
+    icon: (
+      <svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      >
+        <circle cx="12" cy="12" r="4.5" />
+        <circle cx="12" cy="3.5" r="1.6" />
+        <circle cx="12" cy="20.5" r="1.6" />
+        <circle cx="3.5" cy="12" r="1.6" />
+        <circle cx="20.5" cy="12" r="1.6" />
       </svg>
     ),
   },
