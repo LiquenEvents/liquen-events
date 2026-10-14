@@ -146,6 +146,7 @@ import { SETA_DA_GAVETA, useGaveta } from "./ui/gaveta";
 import { MoreMenu } from "./MoreMenu";
 import { varrerDerivadasEmFundo } from "./varrer-derivadas";
 import { varrerAquecimentoEmFundo } from "./varrer-aquecimento";
+import ComPropostasParaContas from "./ComPropostasParaContas";
 import SafeImage from "@/components/SafeImage";
 import {
   faltaADataDoEvento,
@@ -6109,56 +6110,71 @@ export default function AdminClient({
           {/* ── Overview ── */}
           {view === "overview" && (
             <div className={`${VIEW_WRAP} view-in`}>
-              <Overview
-                quotes={activeQuotes}
-                userName={userName}
-                onOpen={openQuote}
-                onGoStats={() => setView("estatisticas")}
-                onGo={(v) => setView(v)}
-                onNew={() => setNewQuoteOpen(true)}
-                // Marcar «Ganho» na lista «à espera de resposta» da Visão Geral
-                // grava no servidor; sem isto, a lista continuava a mostrar o
-                // pedido pendurado e o ecrã ficava a dizer o contrário.
-                onQuoteAtualizado={marcarDesfecho}
-                falhaDeLeitura={quotes.length === 0 ? falhaDosPedidos : null}
-                aoTentarDeNovo={() => void revalidarPedidos()}
-                arquivados={archivedCount}
-                onVerArquivados={verArquivados}
-              />
+              <ComPropostasParaContas>
+                {(propostas) => (
+                  <Overview
+                    quotes={activeQuotes}
+                    propostas={propostas}
+                    userName={userName}
+                    onOpen={openQuote}
+                    onGoStats={() => setView("estatisticas")}
+                    onGo={(v) => setView(v)}
+                    onNew={() => setNewQuoteOpen(true)}
+                    // Marcar «Ganho» na lista «à espera de resposta» da Visão Geral
+                    // grava no servidor; sem isto, a lista continuava a mostrar o
+                    // pedido pendurado e o ecrã ficava a dizer o contrário.
+                    onQuoteAtualizado={marcarDesfecho}
+                    falhaDeLeitura={quotes.length === 0 ? falhaDosPedidos : null}
+                    aoTentarDeNovo={() => void revalidarPedidos()}
+                    arquivados={archivedCount}
+                    onVerArquivados={verArquivados}
+                  />
+                )}
+              </ComPropostasParaContas>
             </div>
           )}
 
           {/* ── Pipeline (Kanban) ── */}
           {view === "kanban" && (
             <div className={`${VIEW_WRAP} view-in`}>
-              <Kanban
-                quotes={activeQuotes}
-                onOpen={openQuote}
-                userName={userName}
-                onStatusChange={(id, status) => {
-                  setQuotes((prev) => prev.map((q) => (q.id === id ? { ...q, status } : q)));
-                  setSelected((prev) => (prev && prev.id === id ? { ...prev, status } : prev));
-                }}
-                falhaDeLeitura={quotes.length === 0 ? falhaDosPedidos : null}
-                aoTentarDeNovo={() => void revalidarPedidos()}
-                onNovoPedido={() => setNewQuoteOpen(true)}
-                arquivados={archivedCount}
-                onVerArquivados={verArquivados}
-              />
+              <ComPropostasParaContas>
+                {(propostas) => (
+                  <Kanban
+                    quotes={activeQuotes}
+                    propostas={propostas}
+                    onOpen={openQuote}
+                    userName={userName}
+                    onStatusChange={(id, status) => {
+                      setQuotes((prev) => prev.map((q) => (q.id === id ? { ...q, status } : q)));
+                      setSelected((prev) => (prev && prev.id === id ? { ...prev, status } : prev));
+                    }}
+                    falhaDeLeitura={quotes.length === 0 ? falhaDosPedidos : null}
+                    aoTentarDeNovo={() => void revalidarPedidos()}
+                    onNovoPedido={() => setNewQuoteOpen(true)}
+                    arquivados={archivedCount}
+                    onVerArquivados={verArquivados}
+                  />
+                )}
+              </ComPropostasParaContas>
             </div>
           )}
 
           {/* ── Clientes ── */}
           {view === "clientes" && (
             <div className={`${VIEW_WRAP} view-in`}>
-              <Clientes
-                quotes={activeQuotes}
-                onOpen={openQuote}
-                /* Só quando a lista está mesmo vazia: com pedidos no ecrã, uma
-                   falha da leitura INICIAL já não é o que se está a ver. */
-                falhaDeLeitura={quotes.length === 0 ? falhaDosPedidos : null}
-                aoTentarDeNovo={() => void revalidarPedidos()}
-              />
+              <ComPropostasParaContas>
+                {(propostas) => (
+                  <Clientes
+                    quotes={activeQuotes}
+                    propostas={propostas}
+                    onOpen={openQuote}
+                    /* Só quando a lista está mesmo vazia: com pedidos no ecrã, uma
+                       falha da leitura INICIAL já não é o que se está a ver. */
+                    falhaDeLeitura={quotes.length === 0 ? falhaDosPedidos : null}
+                    aoTentarDeNovo={() => void revalidarPedidos()}
+                  />
+                )}
+              </ComPropostasParaContas>
             </div>
           )}
 
@@ -6278,7 +6294,9 @@ export default function AdminClient({
           {/* ── Estatísticas ── */}
           {view === "estatisticas" && (
             <div className={`${VIEW_WRAP} view-in`}>
-              <StatsDashboard quotes={activeQuotes} />
+              <ComPropostasParaContas>
+                {(propostas) => <StatsDashboard quotes={activeQuotes} propostas={propostas} />}
+              </ComPropostasParaContas>
               {/* Os casamentos fechados que têm de voltar à Meta. Vive aqui e
                   não nas Definições porque é uma leitura de desempenho, e
                   porque é neste ecrã que ela olha para o que a publicidade

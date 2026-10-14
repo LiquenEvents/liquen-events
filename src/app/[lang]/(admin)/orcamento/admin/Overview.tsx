@@ -17,7 +17,11 @@ import { useInscricaoNoRegisto, type ResultadoDoEcra } from "./registo-de-gravac
 import { useAnular } from "./ui/anular";
 import PerguntaDeDesfecho from "./PerguntaDeDesfecho";
 import { DIAS_ATE_PERGUNTAR, aEsperaDeResposta, totalPendurado } from "@/lib/orcamento/desfecho";
-import { contractedAmounts } from "@/lib/orcamento/dossier";
+import {
+  propostasPorPedido,
+  valorDoPedido,
+  type PropostaParaContas,
+} from "@/lib/orcamento/dinheiro-dos-pedidos";
 import { A_ESPERAR_RESPOSTA, esperaEmPalavras } from "@/lib/orcamento/espera";
 import type { LeituraFalhada } from "@/lib/porque-nao-leu";
 import { AvisoDeFalha } from "./AvisoDeFalha";
@@ -1073,6 +1077,11 @@ function AEsperaDeResposta({
 
 interface Props {
   quotes: Quote[];
+  /**
+   * As propostas, para a conta do dinheiro (`dinheiro-dos-pedidos.ts`): a taxa
+   * de IVA que o cliente viu. Sem elas, conta-se como antes.
+   */
+  propostas?: PropostaParaContas[];
   userName: string;
   onOpen: (q: Quote) => void;
   onGoStats: () => void;
@@ -1241,6 +1250,7 @@ function MaisDoPainel({ children }: { children: React.ReactNode }) {
 
 export default function Overview({
   quotes,
+  propostas,
   userName,
   onOpen,
   onGoStats,
@@ -1311,6 +1321,8 @@ export default function Overview({
       eventsThisWeek = 0;
     const byStatus: Record<string, number> = {};
     const months = Array.from({ length: 6 }, () => 0);
+    const porPedido = propostasPorPedido(propostas);
+    const valorDe = (q: Quote) => valorDoPedido(q, porPedido.get(q.id)).comIva;
 
     for (const q of quotes) {
       byStatus[q.status] = (byStatus[q.status] ?? 0) + 1;
@@ -1329,14 +1341,16 @@ export default function Overview({
        * unidade») e em `PaymentsPanel.tsx» («deixava o "Em falta" errado em
        * ~23%»). Este era o ecrã que faltava — e é o primeiro que ela abre.
        *
-       * `contractedAmounts` é a mesma cascata que o dossier, os lembretes e o
-       * painel de pagamentos já usam: proposta > preço cotado > estimativa,
-       * sempre devolvida com IVA. Sem proposta à mão aqui, o ramo do
-       * `quotedPrice` deriva o bruto pela taxa efectiva do pedido.
+       * ── E TÊM DE SER OS MESMOS DAS PROPOSTAS ─────────────────────────────
+       * Pedido dela (14/10): «num sítio diz uma coisa noutro diz outra». A
+       * conta passou a ser UMA, em `dinheiro-dos-pedidos.ts`, e é a das
+       * Propostas, das Estatísticas, do Kanban e dos Clientes: manda o estado
+       * que ela dá ao pedido; o valor é o preço final com a taxa da proposta
+       * que seguiu (ou, sem preço, o total dela).
        */
-      const contratado = q.quotedPrice != null ? contractedAmounts(q).gross : 0;
-      if (q.status === "cotado" && q.quotedPrice) pipeline += contratado;
-      if (q.status === "aceite" && q.quotedPrice) won += contratado;
+      const contratado = valorDe(q);
+      if (q.status === "cotado") pipeline += contratado;
+      if (q.status === "aceite") won += contratado;
       for (const p of q.payments ?? []) {
         if (p.paid) received += p.amount;
         else outstanding += p.amount;
@@ -1353,7 +1367,7 @@ export default function Overview({
       if (monthsBack >= 0 && monthsBack < 6) months[5 - monthsBack]++;
 
       // Won revenue attributed to the month the deal was last touched (accepted).
-      if (q.status === "aceite" && q.quotedPrice) {
+      if (q.status === "aceite" && contratado > 0) {
         const wd = new Date(q.lastUpdated ?? q.submittedAt);
         const wKey = `${wd.getFullYear()}-${wd.getMonth()}`;
         if (wKey === thisMonthKey) wonThisMonth += contratado;
@@ -1401,15 +1415,13 @@ export default function Overview({
     /**
      * O denominador do valor médio é quem TEM preço, não quem foi ganho.
      *
-     * `won` só soma os aceites com `quotedPrice` preenchido; dividir pelo total
+     * `won` só soma os aceites com valor (`valorDe`); dividir pelo total
      * de aceites metia no denominador casamentos que não entraram no
      * numerador, e o «valor médio por evento ganho» saía sistematicamente
      * abaixo da verdade — mais abaixo quanto mais pedidos ganhos estivessem
      * por preencher, que é precisamente quando o número é mais consultado.
      */
-    const acceptedComPreco = quotes.filter(
-      (q) => q.status === "aceite" && q.quotedPrice != null,
-    ).length;
+    const acceptedComPreco = quotes.filter((q) => q.status === "aceite" && valorDe(q) > 0).length;
     const avgTicket = acceptedComPreco > 0 ? won / acceptedComPreco : 0;
     // `billed` é o total REGISTADO (recebido + a receber) das linhas de
     // pagamento — nunca leu o livro de facturas, nem quando ele existia. O nome
@@ -1429,7 +1441,12 @@ export default function Overview({
      * mais. É a lista do dinheiro pendurado — ver `DIAS_ATE_PERGUNTAR` para o
      * porquê dos sete dias.
      */
-    const semResposta = aEsperaDeResposta(quotes, now);
+    // Com IVA, como o quadrado «À espera» lá em cima: a lista mostrava o preço
+    // SEM IVA ao lado de um total COM IVA, e as duas somas não batiam.
+    const semResposta = aEsperaDeResposta(quotes, now).map((l) => ({
+      ...l,
+      valor: valorDe(l.quote),
+    }));
 
     return {
       thisMonth,
@@ -1459,7 +1476,7 @@ export default function Overview({
       byStatus,
       funnelMax: Math.max(1, ...FUNNEL.map((f) => byStatus[f.id] ?? 0)),
     };
-  }, [quotes]);
+  }, [quotes, propostas]);
 
   /**
    * ── A SAUDAÇÃO E A DATA TAMBÉM SÃO RELÓGIO ────────────────────────────────

@@ -41,7 +41,7 @@ const CODIGO = semComentarios(FONTE);
 
 /** O bloco dos quatro números, do rótulo da secção até ao aviso a seguir. */
 function bloco(): string {
-  const i = CODIGO.indexOf("Por pedido · conta-se a proposta mais recente");
+  const i = CODIGO.indexOf("Por pedido · conta o estado que deste ao pedido");
   expect(i, "não encontrei o bloco dos números das Propostas").toBeGreaterThan(-1);
   const fim = CODIGO.indexOf("porEnviar > 0", i);
   expect(fim, "o vizinho a seguir mudou — actualiza este localizador").toBeGreaterThan(i);
