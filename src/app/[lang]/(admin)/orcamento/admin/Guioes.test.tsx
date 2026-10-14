@@ -417,7 +417,51 @@ describe("Timelines — abrir e editar", () => {
       await vi.advanceTimersByTimeAsync(25);
     }
     expect(gravados, "a escolha do modelo não chegou a gravar").toHaveLength(1);
+    // A timeline aberta ocupa a vista (14/10): volta-se à lista para a ver.
+    await user.click(screen.getByRole("button", { name: "Voltar aos eventos" }));
     const linha = screen.getByRole("button", { name: /Carla e Diogo/ });
     expect(within(linha).queryByText("Sem timeline")).toBeNull();
+  });
+});
+
+/**
+ * A lista em cartões, com o desenho do mapa de mesas (14/10): o próximo
+ * evento à cabeça, a procura, e abrir um evento ocupa a vista inteira.
+ */
+describe("Timelines — a lista em cartões", () => {
+  it("o próximo evento vem à cabeça, num cartão à parte", async () => {
+    montar();
+    await screen.findByRole("button", { name: /Beatriz e Tomás/ });
+    const proximo = screen.getByText("Próximo evento").closest("button")!;
+    expect(proximo.getAttribute("aria-label")).toContain("Beatriz e Tomás");
+  });
+
+  it("o cartão diz quantos momentos tem, e um evento sem timeline di-lo", async () => {
+    montar();
+    const pronto = await screen.findByRole("button", { name: /Ana e Rui/ });
+    expect(within(pronto).getByText(/2 momentos · 09:00–12:00/)).toBeTruthy();
+    expect(within(linhaDe("Carla e Diogo")).getByText("Sem timeline")).toBeTruthy();
+  });
+
+  it("a procura filtra pelo nome ou pelo local", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    montar();
+    await screen.findByRole("button", { name: /Ana e Rui/ });
+    await user.type(screen.getByRole("searchbox", { name: "Procurar eventos" }), "sobral");
+    await waitFor(() => expect(screen.queryByRole("button", { name: /Ana e Rui/ })).toBeNull());
+    expect(screen.getByRole("button", { name: /Beatriz e Tomás/ })).toBeTruthy();
+  });
+
+  it("abrir ocupa a vista; «Eventos» volta à lista, com o cartão marcado", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    montar();
+    await user.click(await screen.findByRole("button", { name: /Ana e Rui/ }));
+    await waitFor(() => expect(screen.getByText("Cronograma do Dia")).toBeTruthy());
+    expect(screen.queryByRole("button", { name: /Carla e Diogo/ })).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Voltar aos eventos" }));
+    const cartao = await screen.findByRole("button", { name: /Ana e Rui/ });
+    expect(cartao.getAttribute("aria-current")).toBe("true");
+    expect(screen.queryByText("Cronograma do Dia")).toBeNull();
   });
 });

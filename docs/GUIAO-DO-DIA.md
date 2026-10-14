@@ -72,6 +72,17 @@ gratuita.
 
 ## O DESENHO
 
+> **14/10 — a lista em cartões, como a do mapa de mesas.** Ela pediu: «aquilo
+> que fizeste em termos de design no mapa de mesas faz a mesma coisa para o
+> timelines». A lista passou a cartões com o dia em grande, quanto falta, o
+> próximo evento à cabeça e uma procura; cada cartão diz «N momentos · início–fim»
+> e as pastilhas dos avisos. A fita do dia saiu do cartão (escolha dela:
+> «avisos sim, fita não»). Abrir um evento **ocupa a vista**, com «← Eventos»
+> para voltar (escolha dela), e o gesto de voltar faz o mesmo. O desenho da
+> lista vive em `admin/ListaDeEventos.tsx`, que o mapa de mesas e as Timelines
+> usam os dois — uma lista de eventos, não duas. O que está aqui em baixo sobre
+> a lista ao lado do guião e a régua em cada linha descreve o desenho anterior.
+
 ### A régua deitada é o objecto central
 
 A régua do `EventTimeline` é **vertical**, é onde se edita, e cada bloco tem
