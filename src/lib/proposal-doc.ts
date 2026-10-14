@@ -21,15 +21,16 @@ export type ImageData = string;
 /** Taxa de IVA por omissão (23% — taxa normal em Portugal continental). */
 export const DEFAULT_VAT_RATE = 0.23;
 
-/** Dias de validade por omissão de uma proposta enviada. */
 /**
  * Validade de uma proposta, em dias.
  *
- * Eram 30, e a proposta que a Líquen fazia à mão dizia 60. Decisão dela: fica
- * 60, o que os casais dela já viram. Continua a poder ser mudado por proposta
- * (`validUntilDays`) — isto é só o ponto de partida.
+ * Eram 30, depois 60 (o que a proposta feita à mão dizia). A 14/10 ela
+ * escreveu: «a validação das propostas é 90 dias atenção». Continua a poder
+ * ser mudado por proposta (`validUntilDays`, ou uma data fixa em
+ * `validUntil`) — isto é só o ponto de partida. As propostas já enviadas têm a
+ * data gravada e não mudam.
  */
-export const DEFAULT_VALID_DAYS = 60;
+export const DEFAULT_VALID_DAYS = 90;
 
 /**
  * Com quantos dias de antecedência o casal tem de fechar o número de pessoas.

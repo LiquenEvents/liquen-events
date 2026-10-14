@@ -3,7 +3,7 @@ import { PDFDocument, PDFPage } from "pdf-lib";
 import sharp from "sharp";
 import { withProposalDefaults, type ProposalDoc } from "@/lib/proposal-doc";
 import { renderEditorialPdf } from "./montar";
-import { listasQueNaoSaem, ordemDoDesenho, planoDaProposta } from "./plano";
+import { listasQueNaoSaem, ordemDoDesenho, planoDaProposta, servicosDoDocumento } from "./plano";
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -217,5 +217,21 @@ describe("as listas que não saem", () => {
   });
   it("com o texto da casa não falta nada", () => {
     expect(listasQueNaoSaem(doc())).toEqual([]);
+  });
+});
+
+describe("um grupo só com título (o «b)» de 14/10)", () => {
+  it("sai como um cartão, ao lado das linhas do grupo anterior", () => {
+    const doc = withProposalDefaults({
+      template: "decoracao",
+      clientNames: "TESTE",
+      serviceGroups: [
+        { id: "g1", letter: "a)", title: "Decoração Floral", items: [{ id: "i1", label: "Arco" }] },
+        { id: "g2", letter: "b)", title: "Montagem", items: [] },
+        { id: "g3", letter: "c)", title: "Transporte", items: [{ id: "i3", label: "  " }] },
+        { id: "g4", letter: "d)", title: "  ", items: [] },
+      ],
+    } as never);
+    expect(servicosDoDocumento(doc).map((s) => s.nome)).toEqual(["Arco", "Montagem", "Transporte"]);
   });
 });

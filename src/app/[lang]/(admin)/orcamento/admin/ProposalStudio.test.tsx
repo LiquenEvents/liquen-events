@@ -1377,7 +1377,7 @@ describe("pontos de decoração escolhidos no pedido", () => {
   it("um pedido sem escolhas abre o estúdio como sempre abriu", async () => {
     renderCom(quote);
     // Um grupo vazio à espera de ser escrito — nada semeado.
-    const grupo = await screen.findByPlaceholderText("Decoração Floral de Casamento");
+    const grupo = await screen.findByPlaceholderText("Escreve aqui o título do grupo");
     expect((grupo as HTMLInputElement).value).toBe("");
   });
 });

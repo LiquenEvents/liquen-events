@@ -380,3 +380,41 @@ describe("o nome do serviço cabe todo", () => {
     expect(document.activeElement).toBe(linha(2));
   });
 });
+
+/**
+ * O GRUPO «b)» SÓ COM TÍTULO (14/10).
+ *
+ * Palavras dela: «se nós escrevermos apenas o ponto b como título ele não
+ * aparece». A captura mostrava o «b)» com «Decoração Floral de Casamento» a
+ * cinzento — o exemplo do campo, com o campo VAZIO. Um grupo só com título sai
+ * (como um cartão, ver `plano.test.ts`); o que não sai é um grupo sem nada.
+ */
+describe("grupo só com título", () => {
+  const doisGrupos = (tituloB: string): ServiceGroup[] => [
+    { id: "g1", letter: "a)", title: "Decoração Floral", items: [{ id: "i1", label: "Arco" }] },
+    { id: "g2", letter: "b)", title: tituloB, items: [] },
+  ];
+
+  it("o campo vazio pede o título, sem um exemplo que pareça escrito", () => {
+    render(<Host initial={doisGrupos("")} />);
+    const titulo = screen.getByLabelText("Título do grupo 2") as HTMLTextAreaElement;
+    expect(titulo.value).toBe("");
+    expect(titulo.placeholder).toBe("Escreve aqui o título do grupo");
+    expect(screen.queryByPlaceholderText("Decoração Floral de Casamento")).toBeNull();
+  });
+
+  it("um grupo vazio diz que ainda não entra; escrever só o título chega", async () => {
+    render(<Host initial={doisGrupos("")} />);
+    expect(screen.getByTestId("grupo-vazio-1").textContent).toMatch(/b\).*só entra na\s+proposta/);
+    expect(screen.queryByTestId("grupo-vazio-0")).toBeNull();
+    const user = userEvent.setup();
+    await user.click(screen.getByLabelText("Título do grupo 2"));
+    await user.keyboard("Montagem");
+    expect((screen.getByLabelText("Título do grupo 2") as HTMLTextAreaElement).value).toBe(
+      "Montagem",
+    );
+    // Sem linhas, e sem aviso: o grupo já sai assim.
+    expect(screen.queryByLabelText(/^Linha \d+ do grupo 2$/)).toBeNull();
+    expect(screen.queryByTestId("grupo-vazio-1")).toBeNull();
+  });
+});

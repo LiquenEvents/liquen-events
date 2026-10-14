@@ -257,7 +257,8 @@ describe("proposal-doc — resolveValidUntil", () => {
     // 13/08/2026 00:30 em Lisboa (WEST, UTC+1) — ainda 12/08 em UTC.
     const madrugadaDeVerao = new Date("2026-08-12T23:30:00Z");
     expect(resolveValidUntil({ validUntilDays: 60 }, madrugadaDeVerao)).toBe("2026-10-12");
-    expect(resolveValidUntil({}, madrugadaDeVerao)).toBe("2026-10-12");
+    // Sem dias escritos, os 90 da casa (decisão dela de 14/10).
+    expect(resolveValidUntil({}, madrugadaDeVerao)).toBe("2026-11-11");
   });
 
   it("no Inverno (Lisboa == UTC) a mesma hora dá o mesmo dia de sempre", () => {

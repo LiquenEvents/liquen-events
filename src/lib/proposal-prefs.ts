@@ -9,9 +9,9 @@ import { DEFAULT_VALID_DAYS } from "./proposal-doc";
  * valor por omissão configurável, para eu não escrever 30 sempre».
  *
  * ── Porque é que não é uma constante ──────────────────────────────────────
- * `DEFAULT_VALID_DAYS` está no código, e hoje vale 60 — a decisão dela, que é
- * o que as propostas feitas à mão diziam aos casais («esta proposta é válida
- * por 60 dias»). Mudar a política da casa para outro número não pode obrigar a
+ * `DEFAULT_VALID_DAYS` está no código, e hoje vale 90 — a decisão dela de
+ * 14/10 (antes eram 60, o que as propostas feitas à mão diziam aos casais).
+ * Mudar a política da casa para outro número não pode obrigar a
  * um commit e a um deploy: na prática nunca mudaria, e ela continuaria a
  * corrigir o campo à mão em todas as propostas. Daí a preferência guardada,
  * que ganha à constante.
