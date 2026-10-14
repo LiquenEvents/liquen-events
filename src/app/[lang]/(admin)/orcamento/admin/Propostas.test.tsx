@@ -415,13 +415,13 @@ describe("Propostas — a que ficou por enviar", () => {
     expect(document.body.textContent?.replace(/\s/g, "")).toContain("4920,00€");
   });
 
-  it("não entra no valor enviado aos clientes nem na taxa de aceitação", async () => {
+  it("não entra no «À espera de resposta» nem na taxa de aceitação", async () => {
     desenhar();
     await waitFor(() => expect(screen.getByText("Maria & Zé")).toBeTruthy());
-    const valorEnviado = screen
-      .getByText("Valor enviado aos clientes")
+    const aEspera = screen
+      .getByText("À espera de resposta")
       .previousElementSibling?.textContent?.replace(/\s/g, "");
-    expect(valorEnviado).toBe("0€");
+    expect(aEspera).toBe("0€");
     // Zero de zero oferecidas: contá-la baixava a taxa por uma avaria do
     // servidor de correio, que não é a resposta de ninguém.
     expect(screen.getByText("Propostas aceites").previousElementSibling?.textContent).toBe("0%");
@@ -650,11 +650,23 @@ describe("Propostas — duas propostas para o mesmo pedido", () => {
     expect(screen.getByText("Todas · 2")).toBeTruthy();
   });
 
-  it("o valor enviado continua a contar o pedido uma vez", async () => {
-    desenhar();
+  it("o «À espera de resposta» conta o pedido uma vez", async () => {
+    // O dinheiro é o do PEDIDO (pedido dela de 14/10): em «Proposta enviada»,
+    // ao preço final com a taxa da proposta que seguiu.
+    const pedido = {
+      id: "q-mesmo",
+      name: "Ana & Bruno",
+      status: "cotado",
+      quotedPrice: 12500,
+    } as unknown as Quote;
+    render(
+      <ToastProvider>
+        <Propostas quotes={[pedido]} onOpenQuote={() => {}} onQuoteUpdated={() => {}} />
+      </ToastProvider>,
+    );
     await waitFor(() => expect(screen.getAllByText("Ana & Bruno").length).toBeGreaterThan(0));
     const valor = screen
-      .getByText("Valor enviado aos clientes")
+      .getByText("À espera de resposta")
       .previousElementSibling?.textContent?.replace(/\s/g, "");
     // 15 375 €, e nunca 30 750 €.
     expect(valor).toBe("15375€");

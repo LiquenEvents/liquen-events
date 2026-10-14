@@ -9,7 +9,11 @@ import { useAnular } from "./ui/anular";
 import { reporEstadoDoPedido } from "./anular-estado";
 import { eur0 as eur } from "@/lib/money";
 import type { ActivityEntry } from "@/lib/orcamento/types";
-import { contractedAmounts } from "@/lib/orcamento/dossier";
+import {
+  propostasPorPedido,
+  valorDoPedido,
+  type PropostaParaContas,
+} from "@/lib/orcamento/dinheiro-dos-pedidos";
 import { Card, EmptyState } from "./ui";
 import { porqueFalhou, porqueRebentou, type Falha } from "@/lib/porque-falhou";
 import type { LeituraFalhada } from "@/lib/porque-nao-leu";
@@ -64,6 +68,8 @@ interface CardProps {
   /** A aterragem acabou; o quadro pode esquecer qual foi o cartão. */
   aoAterrar: () => void;
   todayKey: string;
+  /** O valor do pedido, com IVA, já feito pela conta única (`valorDoPedido`). */
+  valor: number;
   onOpen: (q: Quote) => void;
   onDragStart: (id: string) => void;
   onDragEnd: () => void;
@@ -96,6 +102,7 @@ const KanbanCard = memo(function KanbanCard({
   aterrar,
   aoAterrar,
   todayKey,
+  valor,
   onOpen,
   onDragStart,
   onDragEnd,
@@ -206,13 +213,12 @@ const KanbanCard = memo(function KanbanCard({
         </div>
       )}
       <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-[var(--bo-hairline)]">
-        {q.quotedPrice ? (
+        {valor > 0 ? (
           // Com IVA, para bater com o «Total» da coluna e os KPIs do topo —
           // o mesmo cartão não pode mostrar um número numa unidade e a coluna
-          // que o soma noutra.
-          <span className="text-sage-600 text-xs font-semibold">
-            {eur(contractedAmounts(q).gross)}
-          </span>
+          // que o soma noutra. Vem de cima, já feito pela conta única
+          // (`valorDoPedido`), para o cartão e a coluna nunca se separarem.
+          <span className="text-sage-600 text-xs font-semibold">{eur(valor)}</span>
         ) : (
           <span className="text-foreground/40 text-[10px]">Sem valor</span>
         )}
@@ -308,6 +314,11 @@ const KanbanCard = memo(function KanbanCard({
 
 interface Props {
   quotes: Quote[];
+  /**
+   * As propostas, para a conta do dinheiro (`dinheiro-dos-pedidos.ts`): a taxa
+   * de IVA que o cliente viu. Sem elas, conta-se como antes.
+   */
+  propostas?: PropostaParaContas[];
   onOpen: (q: Quote) => void;
   onStatusChange: (id: string, status: QuoteStatus) => void;
   userName?: string;
@@ -340,6 +351,7 @@ interface Props {
 
 export default function Kanban({
   quotes,
+  propostas,
   onOpen,
   onStatusChange,
   userName,
@@ -552,6 +564,17 @@ export default function Kanban({
     setOverCol(null);
   }, []);
 
+  /**
+   * O valor de cada pedido, com IVA — a conta única de `dinheiro-dos-pedidos.ts`,
+   * a mesma da Visão Geral e das Propostas. Feito uma vez por mudança de
+   * pedidos, e lido pelo cartão, pela coluna e pelo resumo, para os três nunca
+   * se desencontrarem.
+   */
+  const valores = useMemo(() => {
+    const porPedido = propostasPorPedido(propostas);
+    return new Map(quotes.map((q) => [q.id, valorDoPedido(q, porPedido.get(q.id)).comIva]));
+  }, [quotes, propostas]);
+
   const summary = useMemo(() => {
     let proposta = 0;
     let ganho = 0;
@@ -566,9 +589,10 @@ export default function Kanban({
        * COM IVA, via `computeEventMetrics().contracted`) mostrava dois números
        * do mesmo negócio ~23% desencontrados — o IVA inteiro. Mesma cascata já
        * usada em `Reminders.tsx`, `PaymentsPanel.tsx`, `Overview.tsx` e
-       * `StatsDashboard.tsx`: `contractedAmounts(q).gross`.
+       * `StatsDashboard.tsx` — desde 14/10, a conta única de
+       * `dinheiro-dos-pedidos.ts` (`valores`, acima).
        */
-      const contratado = q.quotedPrice != null ? contractedAmounts(q).gross : 0;
+      const contratado = valores.get(q.id) ?? 0;
       if (q.status === "cotado") proposta += contratado;
       if (q.status === "aceite") {
         ganho += contratado;
@@ -584,7 +608,7 @@ export default function Kanban({
       active,
       winRate: decided > 0 ? Math.round((accepted / decided) * 100) : 0,
     };
-  }, [quotes]);
+  }, [quotes, valores]);
 
   const quadroVazio = quotes.length === 0;
   // Com a leitura em baixo, os quatro números do topo são zeros inventados: a
@@ -687,10 +711,7 @@ export default function Kanban({
           const items = byStatus[col.id] ?? [];
           // Mesma cascata do resumo acima — total da coluna COM IVA, não o
           // «Preço final (sem IVA)» somado directo.
-          const value = items.reduce(
-            (s, q) => s + (q.quotedPrice != null ? contractedAmounts(q).gross : 0),
-            0,
-          );
+          const value = items.reduce((s, q) => s + (valores.get(q.id) ?? 0), 0);
           return (
             <div
               key={col.id}
@@ -736,6 +757,7 @@ export default function Kanban({
                     aterrar={aterrouId === q.id}
                     aoAterrar={esqueceAterragem}
                     todayKey={chaveDeHoje}
+                    valor={valores.get(q.id) ?? 0}
                     onOpen={handleOpen}
                     onDragStart={handleDragStart}
                     onDragEnd={handleDragEnd}

@@ -4,7 +4,12 @@ import { tintaDoRotulo } from "./status-meta";
 import { useMemo, useState } from "react";
 import type { Quote, QuoteStatus } from "@/lib/orcamento/types";
 import { CATEGORIES, EVENT_TYPES_BY_CATEGORY } from "@/lib/orcamento/data";
-import { computeEventMetrics, contractedAmounts } from "@/lib/orcamento/dossier";
+import { computeEventMetrics } from "@/lib/orcamento/dossier";
+import {
+  propostasPorPedido,
+  valorDoPedido,
+  type PropostaParaContas,
+} from "@/lib/orcamento/dinheiro-dos-pedidos";
 import { downloadCsv, quotesToCsvRows, paymentsToCsvRows, dateStamp } from "./export";
 import { eur0 as eur } from "@/lib/money";
 import { Button, Card, EmptyState, Segmented } from "./ui";
@@ -354,7 +359,17 @@ const PERIOD_LABELS: Record<Period, string> = {
   "3m": "3 meses",
 };
 
-export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
+export default function StatsDashboard({
+  quotes,
+  propostas,
+}: {
+  quotes: Quote[];
+  /**
+   * As propostas, para a conta do dinheiro (`dinheiro-dos-pedidos.ts`): a taxa
+   * de IVA que o cliente viu. Sem elas, conta-se como antes.
+   */
+  propostas?: PropostaParaContas[];
+}) {
   const [period, setPeriod] = useState<Period>("all");
 
   const filteredQuotes = useMemo(() => {
@@ -372,6 +387,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
   const stats = useMemo(() => {
     const now = new Date();
     const total = filteredQuotes.length;
+    const porPedido = propostasPorPedido(propostas);
 
     const byStatus: Record<string, number> = {};
     const byCategory: Record<string, number> = {};
@@ -442,11 +458,12 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
        * A casa já tinha corrigido este mesmo erro em `Reminders.tsx`,
        * `PaymentsPanel.tsx` e `Overview.tsx`. `contractedAmounts` é a mesma
        * cascata: proposta > preço cotado > estimativa, sempre devolvida com
-       * IVA. Sem proposta à mão aqui, o ramo do `quotedPrice` deriva o bruto
+       * IVA. Desde 14/10 é a conta única de `dinheiro-dos-pedidos.ts`, a mesma
+       * da Visão Geral e das Propostas — o ramo do `quotedPrice` deriva o bruto
        * pela taxa efectiva do pedido — nunca uma conta nova.
        */
-      const contratado = q.quotedPrice != null ? contractedAmounts(q).gross : 0;
-      if (q.quotedPrice) {
+      const contratado = valorDoPedido(q, porPedido.get(q.id)).comIva;
+      if (contratado > 0) {
         if (q.status === "cotado") pipelineSum += contratado;
         if (q.status === "aceite") {
           wonSum += contratado;
@@ -459,7 +476,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
       const idx = monthIndex.get(`${sd.getFullYear()}-${sd.getMonth()}`);
       if (idx !== undefined) {
         months[idx].value++;
-        if (q.status === "aceite" && q.quotedPrice) months[idx].revenue += contratado;
+        if (q.status === "aceite") months[idx].revenue += contratado;
       }
 
       // Response time: submitted → first reply (or last update)
@@ -664,7 +681,7 @@ export default function StatsDashboard({ quotes }: { quotes: Quote[] }) {
         .sort((a, b) => b.value - a.value)
         .slice(0, 8),
     };
-  }, [filteredQuotes]);
+  }, [filteredQuotes, propostas]);
 
   if (quotes.length === 0) {
     return (

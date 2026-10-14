@@ -17,7 +17,11 @@ import {
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import type { LeituraFalhada } from "@/lib/porque-nao-leu";
 import { eur0 as eur } from "@/lib/money";
-import { contractedAmounts } from "@/lib/orcamento/dossier";
+import {
+  propostasPorPedido,
+  valorDoPedido,
+  type PropostaParaContas,
+} from "@/lib/orcamento/dinheiro-dos-pedidos";
 import { metaFor, tintaDoRotulo } from "./status-meta";
 import { ESTADO, PRESSAO } from "./ui/movimento";
 
@@ -80,6 +84,8 @@ interface Client {
   phone: string;
   company: string;
   quotes: Quote[];
+  /** O valor de cada pedido deste cliente, com IVA — a conta única (`valorDoPedido`). */
+  valores: Map<string, number>;
   totalWon: number;
   totalPipeline: number;
   wonCount: number;
@@ -94,6 +100,11 @@ interface Client {
 
 interface Props {
   quotes: Quote[];
+  /**
+   * As propostas, para a conta do dinheiro (`dinheiro-dos-pedidos.ts`): a taxa
+   * de IVA que o cliente viu. Sem elas, conta-se como antes.
+   */
+  propostas?: PropostaParaContas[];
   onOpen: (q: Quote) => void;
   /**
    * ── «SEM CLIENTES AINDA» É UMA AFIRMAÇÃO, E ESTE ECRÃ NÃO A SABE FAZER ──
@@ -114,7 +125,13 @@ interface Props {
   aoTentarDeNovo?: () => void;
 }
 
-export default function Clientes({ quotes, onOpen, falhaDeLeitura, aoTentarDeNovo }: Props) {
+export default function Clientes({
+  quotes,
+  propostas,
+  onOpen,
+  falhaDeLeitura,
+  aoTentarDeNovo,
+}: Props) {
   const [search, setSearch] = useState("");
   // Defer the search term so the O(n) aggregate-and-filter over the full lead
   // history (and the row reconcile) runs off the keystroke: the input stays
@@ -136,6 +153,7 @@ export default function Clientes({ quotes, onOpen, falhaDeLeitura, aoTentarDeNov
   // um `toLowerCase()` por campo, por cliente, POR TECLA.
   const aggregated = useMemo(() => {
     const map = new Map<string, Client>();
+    const porPedido = propostasPorPedido(propostas);
     for (const q of quotes) {
       const key = (q.email || q.phone || q.name).toLowerCase();
       if (!map.has(key)) {
@@ -146,6 +164,7 @@ export default function Clientes({ quotes, onOpen, falhaDeLeitura, aoTentarDeNov
           phone: q.phone,
           company: q.company,
           quotes: [],
+          valores: new Map(),
           totalWon: 0,
           totalPipeline: 0,
           wonCount: 0,
@@ -164,15 +183,17 @@ export default function Clientes({ quotes, onOpen, falhaDeLeitura, aoTentarDeNov
        * desalinhava «Ganho» e «Pipeline» dos clientes com a «Receita
        * contratada» das Estatísticas (sempre COM IVA) em ~23%, o IVA inteiro.
        * Mesma cascata já usada em `Reminders.tsx`, `PaymentsPanel.tsx`,
-       * `Overview.tsx`, `StatsDashboard.tsx` e `Kanban.tsx`.
+       * `Overview.tsx`, `StatsDashboard.tsx` e `Kanban.tsx` — desde 14/10, a
+       * conta única de `dinheiro-dos-pedidos.ts`, que é a dos outros ecrãs.
        */
-      const contratado = q.quotedPrice != null ? contractedAmounts(q).gross : 0;
-      if (q.status === "aceite" && q.quotedPrice) {
+      const contratado = valorDoPedido(q, porPedido.get(q.id)).comIva;
+      c.valores.set(q.id, contratado);
+      if (q.status === "aceite" && contratado > 0) {
         c.totalWon += contratado;
         c.wonCount++;
       }
       if (q.status === "rejeitado") c.rejectedCount++;
-      if (q.status === "cotado" && q.quotedPrice) c.totalPipeline += contratado;
+      if (q.status === "cotado") c.totalPipeline += contratado;
       const latestAt = q.lastUpdated ?? q.submittedAt;
       if (+new Date(latestAt) > +new Date(c.lastAt)) {
         c.lastAt = latestAt;
@@ -188,7 +209,7 @@ export default function Clientes({ quotes, onOpen, falhaDeLeitura, aoTentarDeNov
       c.haystack = [c.name, c.email, c.phone, c.company].filter(Boolean).join(" ").toLowerCase();
     }
     return list;
-  }, [quotes]);
+  }, [quotes, propostas]);
 
   const clients = useMemo(() => {
     let list = aggregated;
@@ -478,7 +499,7 @@ function Avatar({ c }: { c: Client }) {
  * Um número só, e o que ele é: o ganho quando já há ganho, senão o pipeline
  * (dito por extenso, «pipeline», porque um número sozinho não diz se já entrou
  * ou se ainda é esperança). Os dois vêm COM IVA, como o resto da casa — ver a
- * cascata em `contractedAmounts`.
+ * conta única em `dinheiro-dos-pedidos.ts`.
  */
 function Dinheiro({ c }: { c: Client }) {
   if (c.totalWon > 0)
@@ -842,11 +863,11 @@ function FichaDoCliente({ c, onOpen }: { c: Client; onOpen: (q: Quote) => void }
                 )}
               </div>
               <div className="text-right shrink-0">
-                {q.quotedPrice ? (
+                {(c.valores.get(q.id) ?? 0) > 0 ? (
                   // Com IVA — para bater com o «Ganho»/«Pipeline»
-                  // do cliente ali em cima, que somam o mesmo campo.
+                  // do cliente ali em cima, que somam o mesmo valor.
                   <span className="text-sage-600 text-xs font-medium">
-                    {eur(contractedAmounts(q).gross)}
+                    {eur(c.valores.get(q.id) ?? 0)}
                   </span>
                 ) : q.priceBreakdown?.total ? (
                   <span className="text-[var(--bo-text-faint)] text-xs">

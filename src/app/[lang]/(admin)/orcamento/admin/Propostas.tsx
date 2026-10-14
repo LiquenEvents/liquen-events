@@ -18,6 +18,7 @@ import {
   type LugarNoCliente,
 } from "@/lib/orcamento/propostas-do-mesmo-cliente";
 import { casaComAProcura } from "@/lib/procura";
+import { contasDosPedidos } from "@/lib/orcamento/dinheiro-dos-pedidos";
 import { dataCurta } from "@/lib/data-curta";
 import { useAccoesDaPropostaEnviada } from "./accoesDaPropostaEnviada";
 import { useAnular } from "./ui/anular";
@@ -505,40 +506,32 @@ export default function Propostas({
       if (!cur || +new Date(p.createdAt) > +new Date(cur.createdAt)) latestByQuote.set(key, p);
     }
     const unique = [...latestByQuote.values()];
-    let totalSent = 0;
-    let totalWon = 0;
-    let won = 0;
-    let pending = 0;
     // Geradas mas por enviar: o email não saiu, o cliente não recebeu nada.
-    let porEnviar = 0;
-    for (const p of unique) {
-      if (p.status === "enviada" || p.status === "aceite") totalSent += p.total;
-      if (p.status === "aceite") {
-        totalWon += p.total;
-        won += 1;
-      }
-      if (p.status === "enviada") pending += 1;
-      if (p.status === "rascunho") porEnviar += 1;
-    }
     const porEnviarLista = unique.filter((p) => p.status === "rascunho");
-    // O denominador são as propostas OFERECIDAS. Uma que nunca saiu de casa não
-    // pode ser aceite nem recusada — contá-la baixava a taxa de aceitação por
-    // uma falha do servidor de correio, que não é uma resposta de ninguém.
-    const oferecidas = unique.filter((p) => p.status !== "rascunho").length;
-    const acceptRate = oferecidas ? Math.round((won / oferecidas) * 100) : 0;
+    const porEnviar = porEnviarLista.length;
+    /**
+     * ── O DINHEIRO É O DOS PEDIDOS, COMO NA VISÃO GERAL ─────────────────────
+     * Pedido dela (14/10): «num sítio diz uma coisa noutro diz outra». Este
+     * ecrã somava as PROPOSTAS pelo estado delas (e o «enviado» juntava as
+     * aceites); a Visão Geral somava os PEDIDOS pelo estado que ela lhes deu.
+     * Ela escolheu: manda o estado do pedido. As contas são as de
+     * `dinheiro-dos-pedidos.ts`, as mesmas da Visão Geral, das Estatísticas,
+     * do Kanban e dos Clientes — com estas propostas para a taxa de IVA.
+     */
+    const contas = contasDosPedidos(quotes ?? [], proposals);
     // Quantos PEDIDOS distintos têm proposta. É o denominador de tudo o que
     // está aqui em cima, e passou a estar no ecrã — ver a nota dos KPIs.
     return {
-      totalSent,
-      totalWon,
-      acceptRate,
-      pending,
+      aEspera: contas.aEspera.valor,
+      totalWon: contas.ganho.valor,
+      acceptRate: contas.taxaDeFecho,
+      pending: contas.aEspera.n,
       porEnviar,
       porEnviarLista,
       pedidos: unique.length,
     };
-  }, [proposals]);
-  const { totalSent, totalWon, acceptRate, pending, porEnviar, porEnviarLista, pedidos } = stats;
+  }, [proposals, quotes]);
+  const { aEspera, totalWon, acceptRate, pending, porEnviar, porEnviarLista, pedidos } = stats;
   /** O pedido de uma proposta, se este ecrã souber abri-lo. */
   const pedidoDa = (p: Proposal) => (onOpenQuote ? quotesById.get(p.quoteId) : undefined);
   const soUmPorEnviar = porEnviarLista.length === 1 ? pedidoDa(porEnviarLista[0]) : undefined;
@@ -684,7 +677,7 @@ export default function Propostas({
       */}
       <div style={{ "--cena": 1 } as React.CSSProperties} className="bo-cena flex flex-col gap-2">
         <p className="bo-eyebrow text-foreground/40">
-          Por pedido · conta-se a proposta mais recente de cada um
+          Por pedido · conta o estado que deste ao pedido, como na Visão Geral
         </p>
         {/* ══════════════════════════════════════════════════════════════════
             UM NÚMERO MANDA, OS OUTROS TRÊS ACOMPANHAM
@@ -718,13 +711,12 @@ export default function Propostas({
           </Card>
           <div className="grid grid-cols-3 gap-2 sm:gap-3">
             {[
-              // O rótulo fica INTEIRO. Encurtei-o para «Enviado aos clientes» por
-              // caber melhor em três colunas, e dois testes caíram — os que
-              // guardam que este valor não conta a proposta por enviar e não
-              // conta o mesmo pedido duas vezes. Tinham razão em cair: o rótulo
-              // é como ela chama ao número, e encurtá-lo por causa da largura é
-              // deixar a coluna decidir o vocabulário.
-              { v: eur(totalSent), l: "Valor enviado aos clientes" },
+              // «À espera de resposta» substituiu o «Valor enviado aos
+              // clientes» (14/10): esse juntava o que já fora ganho, e não
+              // batia com nenhum número da Visão Geral. Este é o MESMO número
+              // que lá se chama «À espera» — os pedidos em «Proposta enviada».
+              { v: eur(aEspera), l: "À espera de resposta" },
+              // Dos pedidos que ganhaste, perdeste ou têm resposta pendente.
               { v: `${acceptRate}%`, l: "Propostas aceites" },
               { v: String(pedidos), l: "Pedidos com proposta" },
             ].map((k) => (
