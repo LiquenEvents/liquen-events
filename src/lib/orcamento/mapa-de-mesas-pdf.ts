@@ -9,6 +9,7 @@ import { diaPorExtenso } from "@/lib/data-curta";
 import {
   CADEIRA,
   cadeiras,
+  alargarSala,
   caixaDaSala,
   chaveDoLugar,
   contas,
@@ -255,7 +256,8 @@ function desenharSala(
   const chao = 40;
   const largura = LARGURA - MARGEM * 2;
   const altura = topo - chao;
-  const sala = caixaDaSala(mapa);
+  // No máximo 0,35 pt por cm: uma mesa sozinha não enche a folha (14/10).
+  const sala = alargarSala(caixaDaSala(mapa), largura / 0.35, altura / 0.35);
   const s = Math.min(largura / sala.largura, altura / sala.altura);
   // A sala ao centro da área livre.
   const x0 = MARGEM + (largura - sala.largura * s) / 2;

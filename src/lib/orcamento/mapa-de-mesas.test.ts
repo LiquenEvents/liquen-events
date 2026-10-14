@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Guest } from "./types";
 import {
+  alargarSala,
+  caixaDaSala,
   acrescentarLugares,
   apagarMesa,
   cadeiras,
@@ -286,5 +288,22 @@ describe("o ecrã de trabalho (14/10): duplicar, alinhar, anular e refazer", () 
     expect(nomeCurto("Maria Gomes")).toBe("Maria");
     expect(nomeCurto("Família Silva 2/4")).toBe("Silva 2");
     expect(nomeCurto("Bartolomeuzinho")).toBe("Bartolome…");
+  });
+});
+
+describe("a sala começa grande (14/10)", () => {
+  it("uma mesa sozinha fica numa sala do tamanho pedido, com ela ao centro", () => {
+    const m = novaMesa(mapaVazio(), "redonda", "m1").mapa;
+    const so = caixaDaSala(m);
+    const grande = alargarSala(so, 2600, 1600);
+    expect(grande.largura).toBe(2600);
+    expect(grande.altura).toBe(1600);
+    expect(grande.x + grande.largura / 2).toBeCloseTo(so.x + so.largura / 2);
+    expect(grande.y + grande.altura / 2).toBeCloseTo(so.y + so.altura / 2);
+  });
+
+  it("uma sala que já é maior do que o mínimo fica igual", () => {
+    const c = { x: -100, y: -50, largura: 4000, altura: 2500 };
+    expect(alargarSala(c, 2600, 1600)).toBe(c);
   });
 });

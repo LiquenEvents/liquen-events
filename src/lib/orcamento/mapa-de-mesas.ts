@@ -254,6 +254,33 @@ export function caixaDaSala(mapa: MapaDeMesas): {
   return { x: x0 - m, y: y0 - m, largura: x1 - x0 + 2 * m, altura: y1 - y0 + 2 * m };
 }
 
+/**
+ * A sala com pelo menos `largura` × `altura` cm, crescida à volta do centro.
+ *
+ * Pedido dela (14/10): «quando adicionamos pela primeira vez uma mesa fica
+ * estranho porque a mesa fica enorme para o espaço super pequeno… coloca como
+ * predefinido já um espaço grande». A caixa continua a encaixar no que existe
+ * (`caixaDaSala`); quem a desenha é que decide o tamanho mínimo da sala que
+ * se vê, pela escala máxima a que uma mesa pode aparecer — no ecrã, pelo
+ * tamanho do quadro; no PDF, pelo da folha.
+ */
+export function alargarSala<C extends { x: number; y: number; largura: number; altura: number }>(
+  caixa: C,
+  largura: number,
+  altura: number,
+): C {
+  const w = Math.max(caixa.largura, largura);
+  const h = Math.max(caixa.altura, altura);
+  if (w === caixa.largura && h === caixa.altura) return caixa;
+  return {
+    ...caixa,
+    x: caixa.x - (w - caixa.largura) / 2,
+    y: caixa.y - (h - caixa.altura) / 2,
+    largura: w,
+    altura: h,
+  };
+}
+
 // ─── AS PESSOAS ─────────────────────────────────────────────────────────────
 
 /** Toda a gente da lista, desdobrada, sem os recusados. */
