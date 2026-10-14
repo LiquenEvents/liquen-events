@@ -1,19 +1,23 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useDeferredValue, useMemo, useRef, useState } from "react";
 import type { Quote } from "@/lib/orcamento/types";
 import type { ResumoDeGuiao } from "@/lib/orcamento/guioes";
 import { diaPorExtenso } from "@/lib/data-curta";
-import { Button, EmptyState, Segmented } from "./ui";
+import { casaComAProcura } from "@/lib/procura";
+import { EmptyState, Segmented } from "./ui";
 import { ESTADO, PRESSAO } from "./ui/movimento";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { SkeletonList } from "./Skeleton";
 import { useCachedList } from "./useCachedList";
+import { useCamadaDeHistoria } from "./useCamadaDeHistoria";
+import { useTrincoDeScroll } from "./useTrincoDeScroll";
+import { eventCountdown } from "./util";
 import EditorDoMapa from "./mesas/EditorDoMapa";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
- * O MAPA DE MESAS — O ECRÃ
+ * O MAPA DE MESAS — A LISTA DOS EVENTOS, E A PORTA PARA O ECRÃ DE TRABALHO
  * ════════════════════════════════════════════════════════════════════════════
  *
  * Pedido dela (14/10), com a captura de um «Mapa de Mesas». As decisões dela e
@@ -25,7 +29,19 @@ import EditorDoMapa from "./mesas/EditorDoMapa";
  * ecrãs do dia do evento não podem ter duas ideias do que é um evento. O
  * pedido abre-se inteiro (`carregarPedido`, que é o `comPedidoInteiro` do
  * `AdminClient`): o mapa e os convidados vivem no pedido, e a lista só traz
- * resumos.
+ * resumos — mais o estado do mapa de cada um (`mesas`), que a rota conta.
+ *
+ * ── A LISTA (a segunda captura dela: «melhora isto aqui também») ──────────
+ * Eram cartões brancos largos com o nome e a data e mais nada. Cada cartão
+ * passou a dizer o que se precisa para escolher sem abrir: o dia em grande
+ * (como na Agenda), quanto falta, e em que pé está o mapa — «Sem mapa» ou
+ * «8 mesas · 64/74 sentados», com a barra. O próximo evento vem à cabeça, e
+ * há uma procura.
+ *
+ * ── O ECRÃ INTEIRO ────────────────────────────────────────────────────────
+ * Abrir um evento põe o editor por cima de tudo (`EditorDoMapa`). O gesto de
+ * voltar do telemóvel e o Escape fecham-no (`useCamadaDeHistoria`), e o fundo
+ * não rola por baixo (`useTrincoDeScroll`).
  */
 
 interface Props {
@@ -36,6 +52,21 @@ interface Props {
 }
 
 type Ambito = "fechados" | "todos";
+
+const MESES_CURTOS = [
+  "jan",
+  "fev",
+  "mar",
+  "abr",
+  "mai",
+  "jun",
+  "jul",
+  "ago",
+  "set",
+  "out",
+  "nov",
+  "dez",
+];
 
 function IconeDeMesa() {
   return (
@@ -57,18 +88,152 @@ function IconeDeMesa() {
   );
 }
 
+/** O dia em grande, como na Agenda: o número, o mês, e o ano quando não é este. */
+function SeloDoDia({ data, grande = false }: { data: string; grande?: boolean }) {
+  const d = new Date(`${data}T12:00:00`);
+  const outroAno = d.getFullYear() !== new Date().getFullYear();
+  return (
+    <div
+      aria-hidden="true"
+      className={`flex shrink-0 flex-col items-center justify-center rounded-xl bg-[var(--bo-accent-lavagem)] text-[var(--bo-accent)] ${
+        grande ? "h-20 w-20" : "h-16 w-14"
+      }`}
+    >
+      <span className={`font-light leading-none tabular-nums ${grande ? "text-4xl" : "text-2xl"}`}>
+        {d.getDate()}
+      </span>
+      <span className="mt-1 text-[11px] uppercase tracking-wide">
+        {MESES_CURTOS[d.getMonth()]}
+        {outroAno && <span className="ml-0.5">’{String(d.getFullYear()).slice(2)}</span>}
+      </span>
+    </div>
+  );
+}
+
+/** Em que pé está o mapa deste evento. */
+function EstadoDoMapa({ mesas }: { mesas: ResumoDeGuiao["mesas"] }) {
+  if (!mesas || mesas.mesas === 0) {
+    return <span className="text-xs text-[var(--bo-text-muted)]">Sem mapa ainda</span>;
+  }
+  const parte = mesas.pessoas > 0 ? Math.min(1, mesas.sentados / mesas.pessoas) : 0;
+  const completo = mesas.pessoas > 0 && mesas.sentados >= mesas.pessoas;
+  return (
+    <span className="flex min-w-0 flex-1 items-center gap-2">
+      <span
+        className={`min-w-0 truncate text-xs tabular-nums ${completo ? "text-[var(--bo-accent)]" : "text-[var(--bo-text-muted)]"}`}
+      >
+        {mesas.mesas} {mesas.mesas === 1 ? "mesa" : "mesas"} · {mesas.sentados}/{mesas.pessoas}{" "}
+        sentados
+      </span>
+      <span
+        aria-hidden="true"
+        className="h-1 w-12 shrink-0 overflow-hidden rounded-full bg-[var(--bo-tinta-8)]"
+      >
+        <span
+          className="block h-full rounded-full bg-[var(--bo-accent)]"
+          style={{ width: `${Math.round(parte * 100)}%` }}
+        />
+      </span>
+    </span>
+  );
+}
+
+function CartaoDoEvento({
+  g,
+  aAbrir,
+  onAbrir,
+  destaque = false,
+}: {
+  g: ResumoDeGuiao;
+  aAbrir: boolean;
+  onAbrir: () => void;
+  destaque?: boolean;
+}) {
+  const falta = eventCountdown(g.data);
+  const detalhe = [g.evento, g.local].filter(Boolean).join(" · ");
+  return (
+    <button
+      type="button"
+      onClick={onAbrir}
+      aria-busy={aAbrir}
+      aria-label={`${g.cliente}, ${diaPorExtenso(g.data)}${detalhe ? `, ${detalhe}` : ""}`}
+      className={`bo-card alvo-toque group flex h-full w-full min-w-0 items-center gap-4 text-left hover:border-[var(--bo-hairline-strong)] hover:shadow-[var(--bo-sombra-erguida)] ${
+        destaque ? "p-5" : "p-4"
+      } ${ESTADO} ${PRESSAO}`}
+    >
+      <SeloDoDia data={g.data} grande={destaque} />
+      <span className="flex min-w-0 flex-1 flex-col gap-1">
+        {destaque && <span className="bo-eyebrow text-[var(--bo-accent)]">Próximo evento</span>}
+        <span
+          className={`truncate font-medium text-[var(--bo-text)] ${destaque ? "text-lg" : "text-base"}`}
+        >
+          {g.cliente}
+        </span>
+        <span className="truncate text-xs text-[var(--bo-text-muted)]">
+          {[diaPorExtenso(g.data), detalhe].filter(Boolean).join(" · ")}
+        </span>
+        <span className="mt-1 flex min-w-0 items-center gap-3">
+          {falta && (
+            <span
+              className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] ${
+                falta.tone === "today" || falta.tone === "soon"
+                  ? "bg-[var(--bo-aviso-lavagem)] text-[var(--bo-aviso)]"
+                  : "bg-[var(--bo-tinta-6)] text-[var(--bo-text-muted)]"
+              }`}
+            >
+              {falta.label}
+            </span>
+          )}
+          {aAbrir ? (
+            <span className="text-xs text-[var(--bo-text-muted)]">A abrir…</span>
+          ) : (
+            <EstadoDoMapa mesas={g.mesas} />
+          )}
+        </span>
+      </span>
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        aria-hidden="true"
+        className="shrink-0 text-[var(--bo-text-faint)] group-hover:text-[var(--bo-text-muted)]"
+      >
+        <path d="M9 5l7 7-7 7" />
+      </svg>
+    </button>
+  );
+}
+
 export default function MapaDeMesas({ carregarPedido, onQuoteAtualizado }: Props) {
   const lista = useCachedList<{ guioes: ResumoDeGuiao[] }>("guioes", "/api/guioes");
   const [ambito, setAmbito] = useState<Ambito>("fechados");
+  const [procura, setProcura] = useState("");
+  const procuraAdiada = useDeferredValue(procura);
   const [pedido, setPedido] = useState<Quote | null>(null);
   const [aAbrir, setAAbrir] = useState<string | null>(null);
   const [falha, setFalha] = useState<string | null>(null);
   const abertaRef = useRef<string | null>(null);
 
+  function fechar() {
+    abertaRef.current = null;
+    setPedido(null);
+    // A lista volta a ler: o mapa que se acabou de fazer muda o cartão.
+    lista.refresh();
+  }
+  useTrincoDeScroll(!!pedido);
+  useCamadaDeHistoria(!!pedido, fechar);
+
   const eventos = useMemo(() => {
     const todos = [...(lista.data?.guioes ?? [])].sort((a, b) => a.data.localeCompare(b.data));
-    return ambito === "todos" ? todos : todos.filter((g) => g.aceite);
-  }, [lista.data, ambito]);
+    const doAmbito = ambito === "todos" ? todos : todos.filter((g) => g.aceite);
+    const t = procuraAdiada.trim().toLowerCase();
+    return t
+      ? doAmbito.filter((g) => casaComAProcura(t, [g.cliente, g.local, g.evento]))
+      : doAmbito;
+  }, [lista.data, ambito, procuraAdiada]);
   const contagens = useMemo(
     () => ({
       fechados: (lista.data?.guioes ?? []).filter((g) => g.aceite).length,
@@ -77,10 +242,18 @@ export default function MapaDeMesas({ carregarPedido, onQuoteAtualizado }: Props
     [lista.data],
   );
 
+  /** O próximo evento (hoje ou depois), que vai à cabeça num cartão maior. */
+  const proximo = useMemo(() => {
+    const d = new Date();
+    const hoje = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    return eventos.find((g) => g.data >= hoje) ?? null;
+  }, [eventos]);
+
   const porMes = useMemo(() => {
     const anoActual = new Date().getFullYear();
     const grupos: { mes: string; eventos: ResumoDeGuiao[] }[] = [];
     for (const g of eventos) {
+      if (g.id === proximo?.id) continue;
       const d = new Date(`${g.data}T12:00:00`);
       const nome = d.toLocaleDateString("pt-PT", { month: "long" });
       const cap = nome.charAt(0).toUpperCase() + nome.slice(1);
@@ -90,7 +263,7 @@ export default function MapaDeMesas({ carregarPedido, onQuoteAtualizado }: Props
       else grupos.push({ mes, eventos: [g] });
     }
     return grupos;
-  }, [eventos]);
+  }, [eventos, proximo]);
 
   async function abrir(id: string) {
     abertaRef.current = id;
@@ -104,54 +277,49 @@ export default function MapaDeMesas({ carregarPedido, onQuoteAtualizado }: Props
     else setFalha(r.porque);
   }
 
-  if (pedido) {
-    const resumo = lista.data?.guioes.find((g) => g.id === pedido.id);
-    return (
-      <div className="flex flex-col gap-[var(--bo-gap-vista)]">
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              abertaRef.current = null;
-              setPedido(null);
-            }}
-          >
-            ← Eventos
-          </Button>
-          <h2 className="font-display text-xl text-[var(--bo-text)]">{pedido.name}</h2>
-          {resumo && (
-            <span className="text-sm text-[var(--bo-text-muted)]">
-              {[resumo.evento, diaPorExtenso(resumo.data), resumo.local]
-                .filter(Boolean)
-                .join(" · ")}
-            </span>
-          )}
-        </div>
+  const resumo = pedido ? lista.data?.guioes.find((g) => g.id === pedido.id) : undefined;
+
+  return (
+    <div className="flex flex-col gap-4">
+      {pedido && (
         <EditorDoMapa
           key={pedido.id}
           pedido={pedido}
+          resumo={{
+            evento: resumo?.evento,
+            quando: resumo ? diaPorExtenso(resumo.data) : undefined,
+            local: resumo?.local,
+          }}
+          onSair={fechar}
           onPedido={(q) => {
             setPedido(q);
             onQuoteAtualizado?.(q);
           }}
         />
-      </div>
-    );
-  }
+      )}
 
-  return (
-    <div className="flex flex-col gap-3">
-      <Segmented<Ambito>
-        ariaLabel="Que eventos mostrar"
-        size="sm"
-        value={ambito}
-        onChange={setAmbito}
-        options={[
-          { value: "fechados", label: `Fechados · ${contagens.fechados}` },
-          { value: "todos", label: `Todos os eventos · ${contagens.todos}` },
-        ]}
-      />
+      <div className="flex flex-wrap items-center gap-3">
+        <Segmented<Ambito>
+          ariaLabel="Que eventos mostrar"
+          size="sm"
+          value={ambito}
+          onChange={setAmbito}
+          options={[
+            { value: "fechados", label: `Fechados · ${contagens.fechados}` },
+            { value: "todos", label: `Todos os eventos · ${contagens.todos}` },
+          ]}
+        />
+        {contagens.todos > 0 && (
+          <input
+            type="search"
+            value={procura}
+            onChange={(e) => setProcura(e.target.value)}
+            placeholder="Procurar por nome ou local…"
+            aria-label="Procurar eventos"
+            className="bo-input h-10 min-w-0 flex-1 basis-56 rounded-full px-4 text-sm"
+          />
+        )}
+      </div>
       {falha && (
         <p role="alert" className="text-sm text-[var(--bo-perigo)]">
           {falha}
@@ -173,40 +341,52 @@ export default function MapaDeMesas({ carregarPedido, onQuoteAtualizado }: Props
           description="O mapa de mesas pertence a um evento marcado. Assim que um pedido tiver data, aparece aqui."
         />
       ) : eventos.length === 0 ? (
-        <EmptyState
-          icon={<IconeDeMesa />}
-          title="Ainda nenhum evento fechado"
-          description={`Os eventos entram aqui quando a proposta é aceite. Há ${contagens.todos} ${contagens.todos === 1 ? "evento" : "eventos"} com data noutros estados.`}
-          action={{ label: "Ver todos os eventos", onClick: () => setAmbito("todos") }}
-        />
+        procura.trim() ? (
+          <EmptyState
+            icon={<IconeDeMesa />}
+            title="Nenhum evento com esse nome"
+            description="Procura pelo nome do cliente, pelo tipo de evento ou pelo local."
+            action={{ label: "Limpar a procura", onClick: () => setProcura("") }}
+          />
+        ) : (
+          <EmptyState
+            icon={<IconeDeMesa />}
+            title="Ainda nenhum evento fechado"
+            description={`Os eventos entram aqui quando a proposta é aceite. Há ${contagens.todos} ${contagens.todos === 1 ? "evento" : "eventos"} com data noutros estados.`}
+            action={{ label: "Ver todos os eventos", onClick: () => setAmbito("todos") }}
+          />
+        )
       ) : (
-        <ul className="flex flex-col gap-2">
-          {porMes.map(({ mes, eventos: doMes }) => (
-            <li key={mes}>
-              <h2 className="bo-eyebrow px-1 py-1.5 text-[var(--bo-text-muted)]">{mes}</h2>
-              <ul className="mt-1 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {doMes.map((g) => (
-                  <li key={g.id}>
-                    <button
-                      type="button"
-                      onClick={() => void abrir(g.id)}
-                      aria-busy={aAbrir === g.id}
-                      className={`bo-card alvo-toque flex w-full flex-col items-start gap-0.5 p-3 text-left hover:bg-[var(--bo-tinta-6)] ${ESTADO} ${PRESSAO}`}
-                    >
-                      <span className="font-medium text-[var(--bo-text)]">{g.cliente}</span>
-                      <span className="text-xs text-[var(--bo-text-muted)]">
-                        {[g.evento, diaPorExtenso(g.data), g.local].filter(Boolean).join(" · ")}
-                      </span>
-                      {aAbrir === g.id && (
-                        <span className="text-xs text-[var(--bo-text-muted)]">A abrir…</span>
-                      )}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </li>
-          ))}
-        </ul>
+        <div className="flex flex-col gap-5">
+          {proximo && (
+            <div className="max-w-2xl">
+              <CartaoDoEvento
+                g={proximo}
+                destaque
+                aAbrir={aAbrir === proximo.id}
+                onAbrir={() => void abrir(proximo.id)}
+              />
+            </div>
+          )}
+          <ul className="flex flex-col gap-5">
+            {porMes.map(({ mes, eventos: doMes }) => (
+              <li key={mes}>
+                <h2 className="bo-eyebrow px-1 pb-2 text-[var(--bo-text-muted)]">{mes}</h2>
+                <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {doMes.map((g) => (
+                    <li key={g.id} className="min-w-0">
+                      <CartaoDoEvento
+                        g={g}
+                        aAbrir={aAbrir === g.id}
+                        onAbrir={() => void abrir(g.id)}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );

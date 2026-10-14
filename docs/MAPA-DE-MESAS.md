@@ -54,4 +54,21 @@ Pedido dela (14/10), com a captura de um «Mapa de Mesas»:
 | Vista «Lista» com «Mudar para…» — a alternativa inteira ao arrasto | **feito** |
 | Acrescentar um convidado daqui (grava na lista de convidados do pedido) | **feito** |
 | Apagar com «Anular» | **feito** |
-| Imprimir: o PDF com o desenho e a lista por mesa | **por fazer** (2.º PR) |
+| **O ecrã de trabalho (14/10, 2.ª volta):** a sala no ecrã inteiro, com a barra de cima de vidro, a lista de espera e o painel da peça a flutuar | **feito** |
+| «Adicionar ▾» com ícones: as três mesas e os seis elementos da sala | **feito** |
+| A barrinha junto da mesa escolhida: «− N lugares +», Rodar, Duplicar, Apagar — o «adicionar um lugar» dela, no desenho | **feito** |
+| Arrastar um convidado da lista para uma cadeira (ou para uma mesa: senta-o nos primeiros livres) | **feito** (computador; no telemóvel é tocar e tocar) |
+| Guias de alinhamento ao arrastar uma mesa ou um elemento (encaixa no centro de outra peça) | **feito** |
+| Anular e refazer, 50 passos (⌘Z, ⇧⌘Z; ⌘D duplica); o nome de uma mesa escrito é UM passo | **feito** |
+| De perto, o nome curto de cada pessoa debaixo da cadeira («Silva 2»); o selo «6/8» em cada mesa | **feito** |
+| A lista dos eventos: o dia em grande, quanto falta, «8 mesas · 64/74 sentados» com a barra, o próximo à cabeça, procura | **feito** |
+| Imprimir, descarregar e mandar por WhatsApp ou email (ela escolhe o contacto; no telemóvel, o PDF pelo «Partilhar») | **por fazer** (3.º PR) |
+
+**O que ficou de fora do ecrã de trabalho, e porquê:**
+- **O endereço não guarda o evento aberto** (`?evento=`). O gesto de voltar
+  já fecha o ecrã inteiro (`useCamadaDeHistoria`), e um segundo dono do
+  endereço a mexer na história desalinhava essa contagem — o `AdminClient`
+  explica o mesmo para as secções. Recarregar volta à lista.
+- **O resto do back office continua no leitor de ecrã por baixo do ecrã
+  inteiro** (está tapado, mas não `inert`). Pôr `inert` no cabeçalho e na
+  barra de destinos é mexer no `AdminClient`; fica anotado.

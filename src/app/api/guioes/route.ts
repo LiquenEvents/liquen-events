@@ -5,6 +5,7 @@ import { eventTagLabel } from "@/lib/orcamento/data";
 import { jsonWithEtag } from "@/lib/api-cache";
 import { log } from "@/lib/logger";
 import type { ResumoDeGuiao } from "@/lib/orcamento/guioes";
+import { contas, lerMapa } from "@/lib/orcamento/mapa-de-mesas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -90,6 +91,16 @@ export async function GET(request: NextRequest) {
         local: q.location ?? "",
         aceite: q.status === "aceite",
         momentos: q.timeline ?? [],
+        // O estado do mapa de mesas, para a lista do «Mapa de mesas» o dizer
+        // em cada cartão («8 mesas · 64/74») sem abrir o pedido. As contas são
+        // as do próprio mapa (`contas`), as mesmas que o editor mostra.
+        mesas: q.mapaDeMesas
+          ? (() => {
+              const mapa = lerMapa(q.mapaDeMesas);
+              const c = contas(mapa, q.guestList);
+              return { mesas: mapa.mesas.length, sentados: c.sentados, pessoas: c.total };
+            })()
+          : null,
       }));
 
     return jsonWithEtag(request, { guioes });

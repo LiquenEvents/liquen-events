@@ -25,6 +25,13 @@ import {
   sentarResto,
   TECTOS,
   type MapaDeMesas,
+  alinhar,
+  desfazer,
+  duplicarMesa,
+  historicoVazio,
+  nomeCurto,
+  refazer,
+  registar,
 } from "./mapa-de-mesas";
 
 const g = (id: string, name: string, party = 1, rsvp: Guest["rsvp"] = "confirmado"): Guest => ({
@@ -229,5 +236,55 @@ describe("mesas, elementos e contas", () => {
     m = sentarGrupo(m, lista, "a", "m1").mapa;
     m = levantar(m, "m1:0");
     expect(contas(m, lista)).toEqual({ sentados: 3, total: 4, lugares: 8, livres: 5 });
+  });
+});
+
+describe("o ecrã de trabalho (14/10): duplicar, alinhar, anular e refazer", () => {
+  it("duplicar dá uma mesa igual, vazia, ao lado, com o nome seguinte", () => {
+    let m = comMesas(["a", "comprida", 12]);
+    m = mudarMesa(m, "a", { rodada: true });
+    m = sentar(m, chaveDoLugar("a", 0), { convidadoId: "x", n: 1 });
+    const r = duplicarMesa(m, "a", "b");
+    expect(r.mesa).toMatchObject({ forma: "comprida", lugares: 12, rodada: true, nome: "Mesa 2" });
+    expect(r.mapa.lugares[chaveDoLugar("b", 0)]).toBeUndefined();
+    // Não nasce em cima da original.
+    const a = r.mapa.mesas[0];
+    expect(Math.hypot(r.mesa!.x - a.x, r.mesa!.y - a.y)).toBeGreaterThan(200);
+  });
+
+  it("alinhar encaixa no centro de outra peça e diz a guia", () => {
+    const m = comMesas(["a", "redonda", 8], ["b", "redonda", 8]);
+    const a = m.mesas[0];
+    const perto = alinhar(m, { tipo: "mesa", id: "b" }, a.x + 9, a.y + 400);
+    expect(perto).toMatchObject({ x: a.x, guiaX: a.x, guiaY: null });
+    const longe = alinhar(m, { tipo: "mesa", id: "b" }, a.x + 60, a.y + 400);
+    expect(longe.guiaX).toBeNull();
+    expect(longe.x).toBe(a.x + 60);
+  });
+
+  it("anular volta atrás, refazer volta à frente, e um gesto novo apaga o refazer", () => {
+    const m0 = mapaVazio();
+    const m1 = novaMesa(m0, "redonda", "a").mapa;
+    const m2 = novaMesa(m1, "quadrada", "b").mapa;
+    let h = registar(registar(historicoVazio(), m0), m1);
+    const d = desfazer(h, m2)!;
+    expect(d.mapa).toBe(m1);
+    const r = refazer(d.historico, d.mapa)!;
+    expect(r.mapa).toBe(m2);
+    h = registar(d.historico, d.mapa);
+    expect(refazer(h, m2)).toBeNull();
+    expect(desfazer(historicoVazio(), m0)).toBeNull();
+  });
+
+  it("guarda no máximo 50 passos", () => {
+    let h = historicoVazio();
+    for (let i = 0; i < 70; i++) h = registar(h, mapaVazio());
+    expect(h.passado).toHaveLength(50);
+  });
+
+  it("o nome curto debaixo da cadeira", () => {
+    expect(nomeCurto("Maria Gomes")).toBe("Maria");
+    expect(nomeCurto("Família Silva 2/4")).toBe("Silva 2");
+    expect(nomeCurto("Bartolomeuzinho")).toBe("Bartolome…");
   });
 });

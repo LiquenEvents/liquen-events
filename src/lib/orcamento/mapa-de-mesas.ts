@@ -596,6 +596,154 @@ export function novaMesa(
   return { mapa: { ...mapa, mesas: [...mapa.mesas, mesa] }, mesa };
 }
 
+/**
+ * Uma cópia da mesa — a forma, os lugares e a rotação, sem ninguém sentado —
+ * no sítio livre mais próximo. É o gesto de quem monta vinte mesas iguais.
+ */
+export function duplicarMesa(
+  mapa: MapaDeMesas,
+  mesaId: string,
+  id: string,
+): { mapa: MapaDeMesas; mesa: Mesa | null } {
+  const original = mapa.mesas.find((m) => m.id === mesaId);
+  if (!original || mapa.mesas.length >= TECTOS.mesas) return { mapa, mesa: null };
+  const d = dimensoes(original);
+  const passo = Math.max(d.largura, d.altura) + 2 * CADEIRA + 40;
+  const ocupado = (x: number, y: number) =>
+    [...mapa.mesas, ...mapa.elementos].some((o) => {
+      const od =
+        "forma" in o
+          ? dimensoes(o)
+          : { largura: (o as Elemento).largura, altura: (o as Elemento).altura };
+      const meio = (Math.max(od.largura, od.altura) + passo) / 2;
+      return Math.abs(o.x - x) < meio && Math.abs(o.y - y) < meio;
+    });
+  // Primeiro à direita, depois em baixo, à esquerda e em cima; só depois o
+  // varrimento da sala inteira.
+  const candidatos = [1, 2, 3].flatMap((k) => [
+    { x: original.x + passo * k, y: original.y },
+    { x: original.x, y: original.y + passo * k },
+    { x: original.x - passo * k, y: original.y },
+    { x: original.x, y: original.y - passo * k },
+  ]);
+  const perto = candidatos.find((c) => c.x > 0 && c.y > 0 && !ocupado(c.x, c.y));
+  const { x, y } = perto
+    ? { x: ajustar(perto.x), y: ajustar(perto.y) }
+    : sitioLivre(mapa, d.largura, d.altura);
+  const mesa: Mesa = {
+    id,
+    nome: proximoNome(mapa),
+    forma: original.forma,
+    x,
+    y,
+    lugares: original.lugares,
+    ...(original.rodada ? { rodada: true } : {}),
+  };
+  return { mapa: { ...mapa, mesas: [...mapa.mesas, mesa] }, mesa };
+}
+
+/** Quantos cm de distância ainda contam como «alinhado» ao arrastar. */
+export const IMAN_CM = 14;
+
+/**
+ * As guias de alinhamento de uma peça que está a ser arrastada: se o centro
+ * dela fica a menos de {@link IMAN_CM} do centro de outra (em X ou em Y),
+ * encaixa nessa linha, e o ecrã desenha a guia. Devolve a posição já
+ * encaixada e as linhas a desenhar.
+ */
+export function alinhar(
+  mapa: MapaDeMesas,
+  quem: { tipo: "mesa" | "elemento"; id: string },
+  x: number,
+  y: number,
+): { x: number; y: number; guiaX: number | null; guiaY: number | null } {
+  const outros = [
+    ...mapa.mesas.filter((m) => !(quem.tipo === "mesa" && m.id === quem.id)),
+    ...mapa.elementos.filter((e) => !(quem.tipo === "elemento" && e.id === quem.id)),
+  ];
+  let guiaX: number | null = null;
+  let guiaY: number | null = null;
+  let melhorX = IMAN_CM;
+  let melhorY = IMAN_CM;
+  for (const o of outros) {
+    const dx = Math.abs(o.x - x);
+    const dy = Math.abs(o.y - y);
+    if (dx <= melhorX) {
+      melhorX = dx;
+      guiaX = o.x;
+    }
+    if (dy <= melhorY) {
+      melhorY = dy;
+      guiaY = o.y;
+    }
+  }
+  return { x: guiaX ?? x, y: guiaY ?? y, guiaX, guiaY };
+}
+
+// ─── ANULAR E REFAZER ───────────────────────────────────────────────────────
+
+/** Quantos passos se guardam para trás. */
+export const PASSOS_PARA_TRAS = 50;
+
+export interface Historico {
+  /** Os mapas de antes, o mais recente no fim. */
+  passado: MapaDeMesas[];
+  /** Os mapas desfeitos, o mais recente no fim. */
+  futuro: MapaDeMesas[];
+}
+
+export const historicoVazio = (): Historico => ({ passado: [], futuro: [] });
+
+/** Um gesto novo: o mapa de antes vai para trás, e o que estava desfeito perde-se. */
+export function registar(h: Historico, antes: MapaDeMesas): Historico {
+  const passado = [...h.passado, antes];
+  return { passado: passado.slice(-PASSOS_PARA_TRAS), futuro: [] };
+}
+
+export function desfazer(
+  h: Historico,
+  actual: MapaDeMesas,
+): { historico: Historico; mapa: MapaDeMesas } | null {
+  const anterior = h.passado[h.passado.length - 1];
+  if (!anterior) return null;
+  return {
+    historico: { passado: h.passado.slice(0, -1), futuro: [...h.futuro, actual] },
+    mapa: anterior,
+  };
+}
+
+export function refazer(
+  h: Historico,
+  actual: MapaDeMesas,
+): { historico: Historico; mapa: MapaDeMesas } | null {
+  const seguinte = h.futuro[h.futuro.length - 1];
+  if (!seguinte) return null;
+  return {
+    historico: { passado: [...h.passado, actual], futuro: h.futuro.slice(0, -1) },
+    mapa: seguinte,
+  };
+}
+
+/**
+ * O nome curto que se escreve debaixo da cadeira, de perto: o primeiro nome de
+ * quem foi escrito à mão («Maria»), ou o apelido do grupo com o número da
+ * pessoa («Silva 2») — com as mesmas palavras que as iniciais deixam cair.
+ */
+export function nomeCurto(nome: string): string {
+  const numero = /(\d+)\/\d+$/.exec(nome.trim())?.[1];
+  const palavras = nome
+    .replace(/\d+\/\d+$/, "")
+    .split(/[\s&,+]+/)
+    .map((p) => p.trim())
+    .filter(
+      (p) => p && !/^(fam[ií]lia|fam\.|sr\.?|sra\.?|dr\.?|dra\.?|e|de|da|do|dos|das)$/i.test(p),
+    );
+  if (palavras.length === 0) return "";
+  const palavra = numero ? palavras[palavras.length - 1] : palavras[0];
+  const curta = palavra.length > 10 ? `${palavra.slice(0, 9)}…` : palavra;
+  return numero ? `${curta} ${numero}` : curta;
+}
+
 export function novoElemento(
   mapa: MapaDeMesas,
   tipo: TipoDeElemento,
