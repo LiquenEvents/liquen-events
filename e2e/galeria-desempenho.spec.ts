@@ -51,8 +51,8 @@ for (const ecra of ECRAS) {
     }) => {
       await page.goto("/galeria");
       await page.waitForLoadState("networkidle").catch(() => {});
-      // Descer dois ecrãs para haver mosaicos da grelha carregados, não só o
-      // mosaico-herói.
+      // Descer dois ecrãs para haver mosaicos da grelha carregados, não só a
+      // fila do topo.
       await page.mouse.wheel(0, ecra.altura * 2);
       await page.waitForTimeout(2500);
 
@@ -189,9 +189,9 @@ test("@galeria a grelha não salta: cada foto tem caixa antes de chegar", async 
     for (const t of document.querySelectorAll("[data-tile-idx]")) {
       const el = t as HTMLElement;
       /**
-       * As fotos 1 a 4 existem DUAS vezes no DOM — nos satélites do
-       * mosaico-herói (`hidden sm:block`) e no masonry (`sm:hidden`) — e o CSS
-       * esconde uma das cópias conforme o tamanho do ecrã. A que está
+       * As fotos 1 a 3 existem DUAS vezes no DOM — na fila do topo
+       * (`hidden sm:block`, `hidden md:block`, `hidden 2xl:block`) e no masonry
+       * (`sm:hidden`, …) — e o CSS esconde uma das cópias conforme o ecrã. A que está
        * escondida tem altura zero, e isso está certo: não é um mosaico sem
        * caixa, é um mosaico que não está a ser desenhado.
        */
@@ -199,11 +199,11 @@ test("@galeria a grelha não salta: cada foto tem caixa antes de chegar", async 
       /**
        * A célula tem de ter ALTURA sem depender da fotografia. Como lá chega é
        * indiferente, e há duas maneiras legítimas em uso: os mosaicos do
-       * masonry declaram `aspect-ratio` (a proporção real da foto), e os cinco
-       * do mosaico-herói recebem a altura das linhas da grelha
-       * (`h-[320px] sm:h-[480px]`). A primeira versão deste teste exigia
-       * `aspect-ratio` em todos e reprovava os cinco do herói — estava a
-       * verificar o MECANISMO em vez da propriedade.
+       * masonry declaram `aspect-ratio` (a proporção real da foto), e os da
+       * fila do topo também, com um `flex` proporcional a esse rácio (até
+       * 15/10 eram um mosaico de altura fixa, `h-[320px] sm:h-[480px]`). A
+       * primeira versão deste teste exigia `aspect-ratio` em todos e reprovava
+       * o mosaico — estava a verificar o MECANISMO em vez da propriedade.
        */
       if (el.getBoundingClientRect().height < 1) {
         maus.push(`mosaico ${el.dataset.tileIdx} sem altura reservada`);

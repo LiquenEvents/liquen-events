@@ -2,10 +2,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { cleanup, render, screen, fireEvent } from "@testing-library/react";
 import { readFileSync } from "node:fs";
+import { renderToString } from "react-dom/server";
 import { join } from "node:path";
 import GaleriaClient from "./GaleriaClient";
 import { PHOTOS } from "./photos-data";
-import { interleaveByCollection } from "./interleave";
+import { interleaveByCollection, razaoDe } from "./interleave";
+import { sizesDaFila } from "./gallery-srcset";
 import { aspectFor } from "@/lib/image-meta";
 import { pt } from "@/lib/i18n/pt";
 
@@ -136,10 +138,107 @@ describe("a galeria reserva o espaço das fotos antes de elas chegarem", () => {
     expect(gridTiles().every((t) => t.style.aspectRatio !== "")).toBe(true);
   });
 
-  it("o mosaico-herói tem altura fixa (não depende das fotos que lá estão)", () => {
+  it("a fila do topo reserva a altura desde o servidor: cada caixa tem o rácio da sua foto", () => {
+    // Era um mosaico de altura fixa (`h-[600px]`). A fila não tem altura
+    // escrita: cada caixa tem o `aspect-ratio` DA SUA foto e um `flex-grow`
+    // igual a esse rácio, e a altura sai da largura — que o servidor já sabe.
+    const pool = interleaveByCollection(photos, "");
+    const html = renderToString(<GaleriaClient photos={photos} dict={pt.galeria} />);
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const fila = [...doc.querySelectorAll<HTMLElement>('[data-tile-variant="hero"]')];
+    expect(fila).toHaveLength(4);
+    for (const t of fila) {
+      const idx = Number(t.dataset.tileIdx);
+      expect(t.style.aspectRatio.replace(/\s/g, "")).toBe(pool[idx].aspectRatio.replace(/\s/g, ""));
+    }
+    expect(fila[0].parentElement?.className).not.toMatch(/\bh-\[/);
+  });
+});
+
+/**
+ * NENHUMA FOTO DO TOPO É CORTADA (15/10). A queixa dela: uma foto ao alto (um
+ * casal à frente de uma capela) numa caixa deitada de 958×600 — via-se o céu.
+ * «As fotos têm que ser apresentadas de acordo com as suas dimensões.»
+ */
+describe("nenhuma foto do topo é cortada", () => {
+  const fila = () => [
+    ...document.querySelectorAll<HTMLElement>('[data-tile-idx][data-tile-variant="hero"]'),
+  ];
+
+  it("a largura de cada caixa é proporcional ao rácio da foto, e a altura igual em todas", () => {
+    // Numa linha flex com `flex: r 1 0%`, a largura é proporcional a r; com o
+    // `aspect-ratio` igual a r, a altura é largura ÷ r — a mesma para todas.
+    // Caixa com a forma da foto = nada recortado pelo `object-cover`.
     render(<GaleriaClient photos={photos} dict={pt.galeria} />);
-    const hero = document.querySelector('[data-tile-variant="hero"]')?.parentElement;
-    expect(hero?.className).toMatch(/h-\[\d+px\]/);
+    for (const t of fila()) {
+      const r = razaoDe(t.style.aspectRatio);
+      expect(Number(t.style.flexGrow)).toBeCloseTo(r, 6);
+      expect(t.style.flexBasis).toBe("0%");
+      expect(t.className).toContain("min-w-0");
+    }
+    expect(fila()[0].parentElement?.className).toMatch(/\bflex\b/);
+    expect(fila()[0].parentElement?.className).not.toMatch(/\bgrid\b/);
+  });
+
+  // Os quatro degraus: quantas fotos leva a fila, e que a grelha começa a seguir.
+  const DEGRAUS = [
+    { nome: "telemóvel", larg: 390, naFila: 1 },
+    { nome: "640–767", larg: 700, naFila: 2 },
+    { nome: "768–1535", larg: 1440, naFila: 3 },
+    { nome: "≥ 1536", larg: 1920, naFila: 4 },
+  ];
+  it.each(DEGRAUS)("$nome: a grelha começa depois da fila", ({ larg, naFila }) => {
+    stubMedia((q) => {
+      const m = /min-width:\s*(\d+)px/.exec(q);
+      return m ? larg >= Number(m[1]) : false;
+    });
+    render(<GaleriaClient photos={photos} dict={pt.galeria} />);
+    const naGrelha = new Set(gridTiles().map((t) => Number(t.dataset.tileIdx)));
+    for (let i = 1; i < naFila; i++) expect(naGrelha.has(i), `foto ${i}`).toBe(false);
+    if (naFila < 4) expect(naGrelha.has(naFila)).toBe(true);
+  });
+
+  it("o `sizes` de cada foto sai da forma das fotos da fila, e o preload pede o mesmo", () => {
+    // Um `sizes` fixo acertava na média e errava nas outras: a 1440 px, uma foto
+    // ao alto de 302 px recebia o ficheiro de 1024 em vez do de 640.
+    const pool = interleaveByCollection(photos, "");
+    const racios = pool.slice(0, 4).map((p) => razaoDe(p.aspectRatio));
+    render(<GaleriaClient photos={photos} dict={pt.galeria} />);
+    for (let i = 0; i < 4; i++) {
+      const fontes = [
+        ...document.querySelectorAll(`[data-tile-idx="${i}"][data-tile-variant="hero"] source`),
+      ];
+      expect(fontes.length).toBeGreaterThan(0);
+      for (const f of fontes) expect(f.getAttribute("sizes")).toBe(sizesDaFila(racios, i));
+    }
+    // A página faz a mesma conta, com as mesmas quatro primeiras.
+    const pagina = readFileSync(join(__dirname, "page.tsx"), "utf8");
+    expect(pagina).toContain("imageSizes={sizesDoDestaque}");
+    expect(pagina).toMatch(/sizesDoDestaque = sizesDaFila\(\s*ordemFinal\.slice\(0, 4\)/);
+  });
+
+  it("cada foto aparece UMA vez em qualquer largura: a fila e a grelha escondem-se ao contrário", () => {
+    // Antes da hidratação (`cols`/`fila` = 1) as fotos 1–3 existem na fila E na
+    // grelha; quem decide qual se vê é o CSS. Os pares têm de ser complementares.
+    render(<GaleriaClient photos={photos} dict={pt.galeria} />);
+    const esperado: Record<number, [string, string]> = {
+      1: ["hidden sm:block", "sm:hidden"],
+      2: ["hidden md:block", "md:hidden"],
+      3: ["hidden 2xl:block", "2xl:hidden"],
+    };
+    for (const [i, [naFila, naGrelha]] of Object.entries(esperado)) {
+      const f = document.querySelector<HTMLElement>(
+        `[data-tile-idx="${i}"][data-tile-variant="hero"]`,
+      );
+      const g = document
+        .querySelector<HTMLElement>(`[data-tile-idx="${i}"][data-tile-variant="grid"]`)
+        ?.closest(".g-reveal");
+      expect(f?.className).toContain(naFila);
+      expect(g?.className).toContain(naGrelha);
+    }
+    // O destaque está sempre na fila e nunca na grelha.
+    expect(fila()[0].className.split(/\s+/)).not.toContain("hidden");
+    expect(document.querySelector('[data-tile-idx="0"][data-tile-variant="grid"]')).toBeNull();
   });
 });
 

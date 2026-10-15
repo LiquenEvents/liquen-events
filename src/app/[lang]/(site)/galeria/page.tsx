@@ -15,11 +15,12 @@ import { pageMetadata } from "@/lib/page-metadata";
 import { getDictionary, normalizeLocale, localizeHref } from "@/lib/i18n";
 import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
 import { PHOTOS } from "./photos-data";
-import { interleaveByCollection } from "./interleave";
+import { interleaveByCollection, razaoDe } from "./interleave";
 import {
   CORTE_TELEMOVEL,
   ESCADA_ECRA_GRANDE,
   ESCADA_TELEMOVEL,
+  sizesDaFila,
   srcsetDaGaleria,
 } from "./gallery-srcset";
 import TILE_COLORS from "./tile-colors.json";
@@ -98,7 +99,7 @@ const blurSrc = new Set(ordemFinal.slice(0, BLUR_WINDOW).map((p) => p.src));
  * PRELOAD DA PRIMEIRA FOTOGRAFIA — E PORQUE É QUE ELE VOLTOU A SER PRECISO
  * ════════════════════════════════════════════════════════════════════════════
  *
- * O mosaico 2×2 do topo é a maior fotografia da página e a primeira que o
+ * O destaque, à cabeça da fila do topo, é a maior fotografia da página e a primeira que o
  * visitante vê. Enquanto foi desenhado por `next/image` com `priority`, o Next
  * emitia sozinho um `<link rel="preload">` para ele.
  *
@@ -115,10 +116,14 @@ const blurSrc = new Set(ordemFinal.slice(0, BLUR_WINDOW).map((p) => p.src));
  * preload e outro na etiqueta — ou seja, a fotografia duas vezes. É por isso
  * que estes valores saem das mesmas funções e não de literais copiados.
  */
-const SIZES_HERO = "(max-width: 640px) 100vw, 50vw";
 /** As da primeira janela, para os dados estruturados (ver o uso, abaixo). */
 const fotosDestacadas = ordemFinal.slice(0, 12);
 const primeira = ordemFinal[0];
+/** O mesmo `sizes` que o destaque leva na fila (ver `sizesDaFila`). */
+const sizesDoDestaque = sizesDaFila(
+  ordemFinal.slice(0, 4).map((p) => razaoDe(p.aspectRatio)),
+  0,
+);
 const preloads = primeira
   ? [
       { media: CORTE_TELEMOVEL, escada: ESCADA_TELEMOVEL },
@@ -231,7 +236,7 @@ export default async function GaleriaPage({ params }: { params: Promise<{ lang: 
           type="image/avif"
           media={l.media}
           imageSrcSet={l.srcSet}
-          imageSizes={SIZES_HERO}
+          imageSizes={sizesDoDestaque}
         />
       ))}
       <BreadcrumbJsonLd

@@ -277,6 +277,28 @@ como recomendação.
 > - **ficou de fora** a experiência das duas fotos ao alto lado a lado, que o
 >   texto marca como «para ela ver antes».
 
+> **Nenhuma foto é cortada — FEITO a 15/10/2026** (ramo `fix/galeria-sem-cortes`).
+> Fora da lista, a pedido dela, depois de ver uma foto ao alto (um casal à frente
+> de uma capela) numa caixa deitada de 958×600, só com o céu à vista: «as fotos
+> têm que ser apresentadas de acordo com as suas dimensões… torna o sistema
+> super inteligente para perceber isso e fazê-lo sozinho».
+>
+> - **O topo deixou de ser o mosaico 2×2.** Era uma grelha de altura fixa
+>   (320/480/600 px), em que a forma das caixas mudava com a largura e tudo era
+>   recortado. Medido com as fotos reais: as quatro satélites recebiam uma foto
+>   ao alto 87 % das vezes.
+> - **Agora é uma fila «justificada»** (`FotoDaFila` em `GaleriaClient.tsx`):
+>   - cada foto tem uma caixa com o SEU rácio e `flex: <rácio> 1 0%`, por isso
+>     todas ficam com a mesma altura e nenhuma é recortada;
+>   - é só CSS, e a altura fica reservada desde o servidor, sem salto;
+>   - **quantas entram depende da largura:** 1 no telemóvel, 2 a partir de 640 px,
+>     3 a partir de 768 px e 4 a partir de 1536 px. As restantes ficam na grelha.
+> - **O destaque é sempre uma foto deitada** (`comMosaico`). Se não houver
+>   nenhuma nas primeiras 24, procura-se na lista inteira; sem dados de análise,
+>   fica a mais deitada.
+> - **A grelha de baixo já usava a forma real de cada foto** e não mudou. O
+>   visualizador também não, porque mostra a foto inteira.
+
 **GAL-10 · Saber que fotografias vendem** · P · impacto **médio**
 - Contar as fotos abertas, as navegações, os «Ver o casamento», as partilhas e
   os guardados. Só com consentimento, como o resto do site.

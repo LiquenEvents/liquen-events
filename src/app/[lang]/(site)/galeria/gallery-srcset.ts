@@ -85,3 +85,28 @@ export function larguraEsperada(larguraCss: number, escada: readonly number[]): 
   const querido = larguraCss * 2;
   return escada.find((w) => w >= querido) ?? escada[escada.length - 1];
 }
+
+/**
+ * O `sizes` de cada foto da fila do topo (`FotoDaFila` em GaleriaClient),
+ * calculado da forma das fotos que lá estão — não de uma média.
+ *
+ * A fila tem 1, 2, 3 ou 4 fotos (a partir de 640, 768 e 1536 px) e cada uma
+ * ocupa `r ÷ Σr` da largura, com r a largura ÷ altura de cada foto. Um `sizes`
+ * fixo («25vw») acertava na média e errava nas outras: medido a 1440 px, uma
+ * foto ao alto de 302 px recebia o ficheiro de 1024 em vez do de 640.
+ *
+ * Num sítio só porque o preload da página (`page.tsx`) pede o destaque com o
+ * MESMO `sizes`: se divergirem, a foto descarrega-se duas vezes. As larguras em
+ * que uma foto não está na fila ficam de fora (está escondida e não carrega).
+ */
+export function sizesDaFila(racios: number[], idx: number): string {
+  const LIMITES = ["(max-width: 639px) ", "(max-width: 767px) ", "(max-width: 1535px) ", ""];
+  const partes: string[] = [];
+  LIMITES.forEach((limite, k) => {
+    const naFila = racios.slice(0, k + 1);
+    if (idx >= naFila.length) return;
+    const soma = naFila.reduce((a, r) => a + r, 0);
+    partes.push(`${limite}${Math.ceil((racios[idx] / soma) * 100)}vw`);
+  });
+  return partes.join(", ");
+}
