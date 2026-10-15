@@ -562,5 +562,21 @@
   }
 }
 
+/* ── O PULSO DE «ISTO ESTÁ A ACONTECER» ──────────────────────────────────────
+   O §8.2 do sistema de design: `opacity 1 → .45 → 1`, 1,2 s, infinito,
+   `--ease-in-out`. O ponto do `EmCurso` usava o `animate-pulse` do Tailwind
+   (2 s, até 0,5) — outro ritmo e outra profundidade, ou seja um segundo pulso
+   ao lado do da casa. A classe que o usa é a `PULSO` do `ui/movimento.ts`, com
+   o `motion-safe:` à frente: com movimento reduzido o ponto fica quieto. */
+@keyframes bo-pulso {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
 @custom-variant com-rato (@media (hover: hover) and (pointer: fine));
 @custom-variant sem-rato (@media not ((hover: hover) and (pointer: fine)));

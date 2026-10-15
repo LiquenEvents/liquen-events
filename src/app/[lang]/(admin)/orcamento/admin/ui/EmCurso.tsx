@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { avancoDaEspera, esperaDemorada } from "@/lib/espera-em-curso";
 import { cn } from "./cn";
-import { ESTADO, PRESSAO, PROGRESSO } from "./movimento";
+import { ESTADO, FIM_VISIVEL_MS, MOLA_DE_MARCAR, PRESSAO, PROGRESSO, PULSO } from "./movimento";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -78,6 +78,53 @@ export function useDecorrido(activo = true): number {
   return decorrido;
 }
 
+/**
+ * ── O FIM QUE SE VÊ ──────────────────────────────────────────────────────
+ *
+ * Quem chama montava o `EmCurso` enquanto esperava e desmontava-o quando a
+ * resposta chegava — e assim a barra NUNCA era vista a acabar: estava a 85% e
+ * desaparecia. Para quem olhava, era igual a ter desistido.
+ *
+ * Este hook diz quando mostrar e quando dizer «pronto»: enquanto `aCorrer`,
+ * mostra; quando passa a falso e correu BEM (`ok`), fica mais
+ * {@link FIM_VISIVEL_MS} com `concluido` — a barra cheia e o visto — e só
+ * depois sai. Quando correu mal sai logo: quem diz o erro é o aviso de erro,
+ * e uma barra cheia por cima de um erro era uma mentira.
+ *
+ * O estado anterior lê-se DURANTE o desenho (o padrão do React para «mudou a
+ * prop»), e não num efeito: assim o primeiro desenho depois da resposta já é o
+ * do «pronto», sem um fotograma vazio pelo meio.
+ */
+export function useFimVisivel(
+  aCorrer: boolean,
+  ok = true,
+): { mostrar: boolean; concluido: boolean } {
+  const [antes, setAntes] = useState(aCorrer);
+  const [fim, setFim] = useState(false);
+  if (antes !== aCorrer) {
+    setAntes(aCorrer);
+    setFim(!aCorrer && ok);
+  }
+  useEffect(() => {
+    if (!fim) return;
+    const t = setTimeout(() => setFim(false), FIM_VISIVEL_MS);
+    return () => clearTimeout(t);
+  }, [fim]);
+  return { mostrar: aCorrer || fim, concluido: fim && !aCorrer };
+}
+
+/**
+ * «1,2 de 5,1 MB», «340 de 820 KB»: a contagem de uma descarga, em palavras de
+ * gente. As duas metades na MESMA unidade — a do total —, senão «340 de
+ * 5,1 MB» lia-se como 340 MB.
+ */
+export function contagemEmBytes(feito: number, total: number): string {
+  const mb = total >= 1024 * 1024;
+  const div = mb ? 1024 * 1024 : 1024;
+  const f = (n: number) => (n / div).toLocaleString("pt-PT", { maximumFractionDigits: mb ? 1 : 0 });
+  return `${f(Math.min(feito, total))} de ${f(total)} ${mb ? "MB" : "KB"}`;
+}
+
 export interface EmCursoProps {
   /**
    * O que está a acontecer, na primeira pessoa do que o computador faz: «A
@@ -106,6 +153,16 @@ export interface EmCursoProps {
   aoParar?: () => void;
   rotuloDoParar?: string;
   /**
+   * Acabou, e bem: a barra enche, o ponto passa a visto (com a mola de
+   * marcar) e a frase passa a ser a de {@link pronto}. Quem o liga é o
+   * {@link useFimVisivel}, que o mantém à vista o tempo de se ler.
+   */
+  concluido?: boolean;
+  /** A frase do fim: «PDF pronto», «Cópia guardada». */
+  pronto?: ReactNode;
+  /** A contagem é em BYTES: escreve-se «1,2 de 5,1 MB» e não «1258291 de…». */
+  emBytes?: boolean;
+  /**
    * Numa linha só, sem cartão: o ponto, a frase e a barra ao lado. É a forma
    * das barras finas (o «Rever e enviar» no ecrã largo, 14/10), onde um cartão
    * de três linhas partia a barra em duas. As notas não cabem e não se dizem.
@@ -123,16 +180,37 @@ export function EmCurso({
   notaDemorada,
   aoParar,
   rotuloDoParar = "Parar",
+  concluido = false,
+  pronto = "Pronto",
+  emBytes = false,
   emLinha = false,
   className,
 }: EmCursoProps) {
-  const decorrido = useDecorrido();
+  const decorrido = useDecorrido(!concluido);
   const sabida = typeof feito === "number" && typeof total === "number" && total > 0;
-  const avanco = sabida
-    ? Math.min(1, Math.max(0, feito! / total!))
-    : avancoDaEspera(decorrido, estimadoMs ?? 0);
-  const demorada = !sabida && !!notaDemorada && esperaDemorada(decorrido, estimadoMs ?? 0);
-  const temBarra = sabida || (estimadoMs ?? 0) > 0;
+  const cego = avancoDaEspera(decorrido, estimadoMs ?? 0);
+  /**
+   * ── A BARRA NUNCA ANDA PARA TRÁS ──────────────────────────────────────────
+   *
+   * Uma descarga espera primeiro às cegas (o servidor a desenhar o PDF) e só
+   * depois sabe o tamanho. Medido com a rede lenta, no mapa de mesas: a barra
+   * cega ia nos 95 %, chegavam os primeiros bytes e ela caía para 32 %. Agora
+   * guarda-se onde a espera cega estava quando o tamanho chegou, e os bytes
+   * enchem o que FALTA a partir daí. A contagem continua a dizer os bytes
+   * verdadeiros.
+   */
+  const [base, setBase] = useState<number | null>(null);
+  if (sabida && base === null) setBase(cego);
+  if (!sabida && base !== null) setBase(null);
+  const daBase = sabida ? (base ?? cego) : 0;
+  const avanco = concluido
+    ? 1
+    : sabida
+      ? daBase + (1 - daBase) * Math.min(1, Math.max(0, feito! / total!))
+      : cego;
+  const demorada =
+    !concluido && !sabida && !!notaDemorada && esperaDemorada(decorrido, estimadoMs ?? 0);
+  const temBarra = concluido || sabida || (estimadoMs ?? 0) > 0;
 
   if (emLinha) {
     return (
@@ -144,11 +222,28 @@ export function EmCurso({
           className,
         )}
       >
-        <span
-          aria-hidden="true"
-          className="h-1.5 w-1.5 shrink-0 rounded-full bg-sage-600 motion-safe:animate-pulse"
-        />
-        <span className="min-w-0 truncate">{titulo}</span>
+        {concluido ? (
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 12 12"
+            data-em-curso="visto"
+            className={`h-3 w-3 shrink-0 ${MOLA_DE_MARCAR}`}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="m2.5 6.5 2.2 2.2 4.8-5" />
+          </svg>
+        ) : (
+          <span
+            aria-hidden="true"
+            data-em-curso="pulso"
+            className={`h-1.5 w-1.5 shrink-0 rounded-full bg-sage-600 ${PULSO}`}
+          />
+        )}
+        <span className="min-w-0 truncate">{concluido ? pronto : titulo}</span>
         {temBarra && (
           <span
             aria-hidden="true"
@@ -176,20 +271,41 @@ export function EmCurso({
     >
       <div className="flex items-center gap-2">
         <p className="flex min-w-0 flex-1 items-center gap-2 text-xs font-medium text-sage-600">
-          <span
-            aria-hidden="true"
-            className="h-1.5 w-1.5 shrink-0 rounded-full bg-sage-600 motion-safe:animate-pulse"
-          />
-          <span className="min-w-0">{titulo}</span>
+          {concluido ? (
+            /* O visto, com a mola de marcar — o mesmo gesto do círculo de uma
+               tarefa feita, porque quer dizer o mesmo: está. */
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 12 12"
+              data-em-curso="visto"
+              className={`h-3 w-3 shrink-0 ${MOLA_DE_MARCAR}`}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="m2.5 6.5 2.2 2.2 4.8-5" />
+            </svg>
+          ) : (
+            /* O pulso da casa (§8.2): 1,2 s, até 0,45. Era o `animate-pulse`
+               do Tailwind — 2 s e até 0,5, ou seja outro ritmo. */
+            <span
+              aria-hidden="true"
+              data-em-curso="pulso"
+              className={`h-1.5 w-1.5 shrink-0 rounded-full bg-sage-600 ${PULSO}`}
+            />
+          )}
+          <span className="min-w-0">{concluido ? pronto : titulo}</span>
         </p>
         {/* A contagem à direita e em números tabulares: sem eles, «7 de 312» a
             passar a «8 de 312» empurra a linha meio pixel a cada foto. */}
-        {sabida && (
+        {sabida && !concluido && (
           <span className="shrink-0 text-[11px] tabular-nums text-sage-600/70">
-            {feito} de {total}
+            {emBytes ? contagemEmBytes(feito!, total!) : `${feito} de ${total}`}
           </span>
         )}
-        {aoParar && (
+        {aoParar && !concluido && (
           <button
             type="button"
             onClick={aoParar}
@@ -210,7 +326,8 @@ export function EmCurso({
            anunciar a mesma espera duas vezes. */
         <span
           aria-hidden="true"
-          className="mt-2 block h-[3px] w-full overflow-hidden rounded-full bg-sage-600/15"
+          // 4 px: o §10 do sistema de design («barra de 4 px»). Era 3.
+          className="mt-2 block h-1 w-full overflow-hidden rounded-full bg-sage-600/15"
         >
           <span
             // A marca é para os testes: o traço não tem papel nem nome (é
@@ -229,7 +346,7 @@ export function EmCurso({
         </span>
       )}
 
-      {(demorada ? notaDemorada : nota) && (
+      {!concluido && (demorada ? notaDemorada : nota) && (
         <p className="mt-1.5 text-[11px] leading-relaxed text-foreground/50">
           {demorada ? notaDemorada : nota}
         </p>

@@ -8,6 +8,7 @@ import { Button, Field, FolhaOuDialogo } from "../ui";
 import { useToast } from "../Toast";
 import type { MoreMenuItem } from "../MoreMenu";
 import { LogotipoEmail, LogotipoWhatsApp } from "../LogotiposDosCanais";
+import { FalhaDaDescarga, guardarBlob, useDescarga } from "../ui/descarregar";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -41,9 +42,16 @@ export function usePartilharMapa({
   pedido: Quote;
   /** Grava o que está por gravar. `false` quando não conseguiu. */
   antes: () => Promise<boolean>;
-}): { itens: MoreMenuItem[]; folha: ReactNode; aTrabalhar: boolean } {
+}): {
+  itens: MoreMenuItem[];
+  folha: ReactNode;
+  aTrabalhar: boolean;
+  /** A barra do PDF a chegar, para o `EmCurso` do editor. */
+  descarga: { mostrar: boolean; barra: ReturnType<typeof useDescarga>["barra"] };
+} {
   const { toast } = useToast();
   const [aTrabalhar, setATrabalhar] = useState(false);
+  const pdf = useDescarga();
   const [emailAberto, setEmailAberto] = useState(false);
 
   const nome = pedido.name || "o evento";
@@ -55,33 +63,29 @@ export function usePartilharMapa({
       toast("O mapa ainda não ficou guardado — tenta outra vez daqui a um instante.", "error");
       return null;
     }
-    let res: Response;
     try {
-      res = await fetch(`/api/mesas/${pedido.id}/pdf`, { cache: "no-store" });
-    } catch {
-      toast(porqueRebentou("preparar o PDF do mapa").mensagem, "error");
+      // Pelo `descarregar` da casa: os bytes contam à medida que chegam, e o
+      // editor mostra-os (o PDF do mapa traz `Content-Length`, D1).
+      const { blob, nome } = await pdf.obter(`/api/mesas/${pedido.id}/pdf`, { cache: "no-store" });
+      return new File([blob], nome ?? "mapa-de-mesas.pdf", { type: "application/pdf" });
+    } catch (e) {
+      if (e instanceof FalhaDaDescarga) {
+        // A mesma frase de sempre (sessão caída, servidor, a frase da rota).
+        const res = new Response(null, { status: e.estado });
+        toast(
+          porqueFalhou("preparar o PDF do mapa", res, e.daRota ? { error: e.message } : null)
+            .mensagem,
+          "error",
+        );
+      } else {
+        toast(porqueRebentou("preparar o PDF do mapa").mensagem, "error");
+      }
       return null;
     }
-    if (!res.ok) {
-      const corpo = await res.json().catch(() => null);
-      toast(porqueFalhou("preparar o PDF do mapa", res, corpo).mensagem, "error");
-      return null;
-    }
-    const ficheiro =
-      /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") ?? "")?.[1] ??
-      "mapa-de-mesas.pdf";
-    return new File([await res.blob()], ficheiro, { type: "application/pdf" });
   }
 
   function guardarNoDisco(f: File) {
-    const url = URL.createObjectURL(f);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = f.name;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 0);
+    guardarBlob(f, f.name);
   }
 
   async function comPdf(gesto: (f: File) => Promise<void> | void) {
@@ -169,7 +173,7 @@ export function usePartilharMapa({
     />
   );
 
-  return { itens, folha, aTrabalhar };
+  return { itens, folha, aTrabalhar, descarga: { mostrar: pdf.mostrar, barra: pdf.barra } };
 }
 
 function FolhaEmail({

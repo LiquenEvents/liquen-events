@@ -218,6 +218,8 @@ import { aquecerBiblioteca, aquecerFotosEmSegundoPlano } from "./theme-picker-ca
 // ponto a pulsar, e a contagem quando o código sabe contar — este ficheiro não
 // inventa nenhuma espera sua.
 import { Ajuda, Button, Card, EmCurso, Field, FolhaOuDialogo, Segmented } from "./ui";
+import { useFimVisivel } from "./ui/EmCurso";
+import { descarregar, type Avanco } from "./ui/descarregar";
 import { useAlturaDoConteudo } from "./ui/altura-do-conteudo";
 import {
   eCasamento,
@@ -1985,6 +1987,15 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    * estimativa, e diz-se que é uma estimativa.
    */
   const [bytesDoPdf, setBytesDoPdf] = useState<number | null>(null);
+  /**
+   * O FIM DA ESPERA DO PDF VÊ-SE (D2). `pdfSaiu` diz se a última descarga
+   * acabou bem, e o `useFimVisivel` mantém o `EmCurso` mais um instante com o
+   * visto e «PDF pronto» — antes, a espera desaparecia sem dizer como acabou.
+   */
+  const [pdfSaiu, setPdfSaiu] = useState(false);
+  const fimDoPdf = useFimVisivel(busy === "preview", pdfSaiu);
+  /** Os bytes do PDF ENVIADO a chegar (a rota do guardado diz o tamanho). */
+  const [avancoDaEnviada, setAvancoDaEnviada] = useState<Avanco | null>(null);
   /**
    * O link de aceitação da proposta MAIS RECENTE que saiu mesmo para o
    * cliente, para o botão «Copiar resumo». `null` até se saber que existe —
@@ -6698,6 +6709,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
   async function preview({ rascunho = false }: { rascunho?: boolean } = {}) {
     if (busy) return;
+    setPdfSaiu(false);
     setBusy("preview");
     // O documento EXACTO que vai ser desenhado — é este que fica «visto».
     const desenhado = stripPendingImages(doc);
@@ -6746,6 +6758,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
         idiomaDoPdf,
       );
       guardarNoDisco(blob, rascunho ? nome.replace(/\.pdf$/i, " (rascunho).pdf") : nome);
+      setPdfSaiu(true);
       // O gerador SALTA a foto que não consegue ir buscar E CORTA o que não
       // cabe no desenho, por isso um PDF incompleto sai na mesma, com ar de
       // estar bem. Sem este aviso, a primeira pessoa a dar pela falta era o
@@ -6793,16 +6806,22 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
    */
   async function descarregarAEnviada() {
     if (busy) return;
+    setPdfSaiu(false);
+    setAvancoDaEnviada(null);
     setBusy("preview");
     let blob: Blob | null = null;
     try {
       const doEnvio = enviada.current;
       blob = (await doEnvio?.pdf?.catch(() => null))?.blob ?? null;
       if (!blob && doEnvio?.id) {
-        const res = await fetch(`/api/orcamento/${quote.id}/propostas/${doEnvio.id}/pdf`, {
-          cache: "no-store",
-        });
-        if (res.ok) blob = await res.blob();
+        // Pelo `descarregar` da casa: a rota do guardado manda o tamanho, e a
+        // barra conta os bytes em vez de rodar às cegas.
+        blob = await descarregar(`/api/orcamento/${quote.id}/propostas/${doEnvio.id}/pdf`, {
+          init: { cache: "no-store" },
+          aoAvancar: setAvancoDaEnviada,
+        })
+          .then((r) => r.blob)
+          .catch(() => null);
       }
       if (blob) {
         guardarNoDisco(
@@ -6817,6 +6836,7 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             idiomaDoPdf,
           ),
         );
+        setPdfSaiu(true);
         toast("PDF descarregado — o mesmo que seguiu para o cliente.", "success");
       }
     } catch {
@@ -11907,9 +11927,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
 
                       A espera é OPACA de propósito: é um pedido só, e do lado de
                       cá não há nada para contar até a resposta chegar. */}
-                  {busy === "preview" ? (
+                  {fimDoPdf.mostrar ? (
                     <EmCurso
                       className="max-w-xs"
+                      concluido={fimDoPdf.concluido}
+                      pronto="PDF pronto"
                       // A língua continua dita enquanto roda: são dezenas de
                       // segundos numa proposta cheia, tempo que chega para deixar
                       // de haver a certeza do que se escolheu — o português
@@ -12112,9 +12134,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                     ariaLabel: o.label,
                   }))}
                 />
-                {busy === "preview" ? (
+                {fimDoPdf.mostrar ? (
                   <EmCurso
                     emLinha
+                    concluido={fimDoPdf.concluido}
+                    pronto="PDF pronto"
                     titulo={idiomaDoPdf === "en" ? "A gerar o PDF em inglês…" : "A gerar o PDF…"}
                     estimadoMs={tempoEstimado(totalDeFotos, amostras)}
                   />
@@ -12390,16 +12414,28 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             <Button size="sm" variant="ghost" onClick={() => setStep("evento")}>
               ← Voltar ao evento
             </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              className="ml-auto"
-              onClick={() => void descarregarAEnviada()}
-              loading={busy === "preview"}
-              disabled={busy !== null}
-            >
-              Descarregar PDF
-            </Button>
+            {fimDoPdf.mostrar ? (
+              <EmCurso
+                emLinha
+                className="ml-auto"
+                titulo="A descarregar o PDF…"
+                concluido={fimDoPdf.concluido}
+                pronto="PDF pronto"
+                {...(avancoDaEnviada
+                  ? { feito: avancoDaEnviada.feito, total: avancoDaEnviada.total }
+                  : { estimadoMs: 2_000 })}
+              />
+            ) : (
+              <Button
+                size="sm"
+                variant="secondary"
+                className="ml-auto"
+                onClick={() => void descarregarAEnviada()}
+                disabled={busy !== null}
+              >
+                Descarregar PDF
+              </Button>
+            )}
           </>
         )}
       </div>

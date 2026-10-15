@@ -11,6 +11,9 @@ import {
   REGRESSO_MS,
   PROGRESSO_MS,
   MARCA_MS,
+  PULSO,
+  PULSO_MS,
+  FIM_VISIVEL_MS,
 } from "./movimento";
 
 /**
@@ -338,6 +341,7 @@ describe("as classes exportadas existem no texto do ficheiro, e não só em mem�
     ["PRESSAO", PRESSAO],
     ["PROGRESSO", PROGRESSO],
     ["MARCA", MARCA],
+    ["PULSO", PULSO],
   ];
 
   it.each(EXPORTADAS)("%s está escrita por extenso", (nome, valor) => {
@@ -364,5 +368,26 @@ describe("as classes exportadas existem no texto do ficheiro, e não só em mem�
         /\$\{/,
       );
     }
+  });
+});
+
+/**
+ * O PULSO E O FIM DAS ESPERAS (14/10, «a animação a descarregar… melhores
+ * mesmo muito»). Ficam fora da régua dos 400 ms de propósito — ver o
+ * comentário da `PULSO` no `movimento.ts` — e por isso têm a régua deles.
+ */
+describe("o pulso e o fim das esperas", () => {
+  it("o pulso é o do §8.2: 1,2 s, `--ease-in-out`, sem fim, e só com movimento", () => {
+    expect(PULSO_MS).toBe(1200);
+    expect(PULSO).toBe("motion-safe:animate-[bo-pulso_1.2s_var(--ease-in-out)_infinite]");
+    const tema = readFileSync(join(AQUI, "../../../../../tema.css"), "utf8");
+    expect(tema).toMatch(/@keyframes bo-pulso\s*\{[\s\S]*?opacity:\s*0\.45/);
+    const globais = readFileSync(join(AQUI, "../../../../../globals.css"), "utf8");
+    expect(globais).toMatch(/--ease-in-out:\s*cubic-bezier\(/);
+  });
+
+  it("o fim fica à vista o tempo de ler o visto, e não atrasa nada", () => {
+    expect(FIM_VISIVEL_MS).toBeGreaterThanOrEqual(MARCA_MS);
+    expect(FIM_VISIVEL_MS).toBeLessThanOrEqual(800);
   });
 });

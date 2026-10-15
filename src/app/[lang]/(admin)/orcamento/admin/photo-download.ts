@@ -1,4 +1,5 @@
 import type { ThemeImage } from "@/lib/theme-types";
+import { guardarBlob as saveBlob } from "./ui/descarregar";
 
 /**
  * TRANSFERIR FOTOS DA BIBLIOTECA DE TEMAS.
@@ -25,20 +26,6 @@ export function downloadName(image: ThemeImage, themeName: string, index: number
       .replace(/^-|-$/g, "")
       .toLowerCase() || "tema";
   return `${slug}-${String(index + 1).padStart(2, "0")}.${ext}`;
-}
-
-/** Guarda um blob no disco com o nome dado. */
-function saveBlob(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  // Só depois de o browser ter começado a guardar. Revogar já a seguir
-  // cancelava a transferência em alguns navegadores.
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 /**

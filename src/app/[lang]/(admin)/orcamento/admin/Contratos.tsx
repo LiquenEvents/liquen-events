@@ -1,7 +1,7 @@
 "use client";
 
 import { casaComAProcura } from "@/lib/procura";
-import { useMemo, useState, useDeferredValue } from "react";
+import { createContext, useContext, useMemo, useState, useDeferredValue } from "react";
 // `import type` é totalmente apagado no build, por isso puxar a forma do store
 // server-only nunca arrasta o guard `server-only` (→ repository → fs) para o
 // bundle cliente. O tipo vive no módulo client-safe `contract-types`.
@@ -25,6 +25,8 @@ import { AvisoDeFalha } from "./AvisoDeFalha";
 import { useToast } from "./Toast";
 import { useAnular } from "./ui/anular";
 import { ESTADO, PRESSAO } from "./ui/movimento";
+import { EmCurso } from "./ui/EmCurso";
+import { useDescarga } from "./ui/descarregar";
 import { referenciaCurta } from "@/lib/referencia-curta";
 
 // Estado do contrato → rótulo + paleta. Aceite usa o musgo (positivo); pendente
@@ -340,6 +342,26 @@ export default function Contratos({
     refresh,
   } = useCachedList<ItemDosAceites[]>("contratos", "/api/contratos");
   const contracts = useMemo(() => itens.filter(ehContrato), [itens]);
+  const { toast } = useToast();
+  const pdfDoContrato = useDescarga();
+  const [contratoADescarregar, setContratoADescarregar] = useState<string | null>(null);
+  const descargaDoPdf = useMemo(
+    () => ({
+      aDescarregar: pdfDoContrato.aCorrer ? contratoADescarregar : null,
+      descarregar: (id: string) => {
+        setContratoADescarregar(id);
+        pdfDoContrato
+          .correr(`/api/contratos/${encodeURIComponent(id)}/pdf`, `contrato-${id}.pdf`)
+          .catch((e: unknown) =>
+            toast(
+              e instanceof Error && e.message ? e.message : "Não foi possível descarregar o PDF.",
+              "error",
+            ),
+          );
+      },
+    }),
+    [pdfDoContrato, contratoADescarregar, toast],
+  );
   const semContrato = itens.length - contracts.length;
   const [search, setSearch] = useState("");
   // Defer so filtering + row reconcile runs off the keystroke; input stays instant.
@@ -433,8 +455,9 @@ export default function Contratos({
   if (loading) return <SkeletonList rows={5} />;
 
   return (
-    <div>
-      {/* ── A ESCADA DESTA VISTA ────────────────────────────────────────────
+    <DescargaDosContratos.Provider value={descargaDoPdf}>
+      <div>
+        {/* ── A ESCADA DESTA VISTA ────────────────────────────────────────────
           Quatro blocos, pela ordem por que se lêem: a linha que diz o que isto
           é (0), os controlos de procura e exportação (1), o filtro de estado
           (2) e o livro dos contratos (3). É a mesma escada do `Overview` e do
@@ -442,145 +465,157 @@ export default function Contratos({
 
           O esqueleto de carregamento acima NÃO leva degrau: um esqueleto é a
           espera, não uma apresentação. */}
-      {/* One calm line saying what this screen is for */}
-      <p
-        style={{ "--cena": 0 } as React.CSSProperties}
-        className="bo-cena mb-6 text-sm leading-relaxed text-[var(--bo-text-muted)]"
-      >
-        Todas as propostas aceites e os pedidos marcados como Ganho. O contrato regista os termos
-        que o cliente aceitou; quando ainda falta, cria-se aqui.
-      </p>
+        {/* One calm line saying what this screen is for */}
+        <p
+          style={{ "--cena": 0 } as React.CSSProperties}
+          className="bo-cena mb-6 text-sm leading-relaxed text-[var(--bo-text-muted)]"
+        >
+          Todas as propostas aceites e os pedidos marcados como Ganho. O contrato regista os termos
+          que o cliente aceitou; quando ainda falta, cria-se aqui.
+        </p>
 
-      {/* Toolbar */}
-      <Toolbar
-        style={{ "--cena": 1 } as React.CSSProperties}
-        className="bo-cena mb-6"
-        start={
-          <div className="relative w-full max-w-md sm:w-80">
-            <svg
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground/25"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              aria-hidden="true"
-            >
-              <circle cx="11" cy="11" r="7" />
-              <path d="m21 21-4.3-4.3" strokeLinecap="round" />
-            </svg>
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Cliente ou referência…"
-              aria-label="Procurar contratos"
-              className="bo-input py-2.5 pl-10 pr-3 text-sm text-[var(--bo-text)] placeholder-foreground/30"
-            />
-          </div>
-        }
-        end={
-          itens.length > 0 ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={exportCsv}
-              title="Guarda a lista dos contratos num ficheiro que abre no Excel"
-            >
-              Exportar lista
-            </Button>
-          ) : undefined
-        }
-      />
-
-      {/* Status filter */}
-      {/* O filtro chega a seguir aos controlos porque é a seguir que se lê —
-          e é UM degrau para a fila inteira, nunca um por pastilha. */}
-      <div
-        style={{ "--cena": 2 } as React.CSSProperties}
-        className="bo-cena mb-5 flex flex-wrap items-center gap-2"
-      >
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar por estado">
-          <Button
-            size="sm"
-            variant={status === "all" ? "subtle" : "ghost"}
-            aria-pressed={status === "all"}
-            onClick={() => setStatus("all")}
-          >
-            Todos · {itens.length}
-          </Button>
-          {STATUSES.map((s) => {
-            const count = contracts.filter((c) => c.status === s).length;
-            return (
-              <Button
-                key={s}
-                size="sm"
-                variant={status === s ? "subtle" : "ghost"}
-                aria-pressed={status === s}
-                onClick={() => setStatus(s)}
-              >
-                {STATUS_META[s].label} · {count}
-              </Button>
-            );
-          })}
-          {semContrato > 0 && (
-            <Button
-              size="sm"
-              variant={status === "sem-contrato" ? "subtle" : "ghost"}
-              aria-pressed={status === "sem-contrato"}
-              onClick={() => setStatus("sem-contrato")}
-            >
-              Sem contrato · {semContrato}
-            </Button>
-          )}
-        </div>
-        {aceites > 0 && (
-          <span className="ml-auto self-center text-xs text-foreground/40">
-            {aceites} {aceites === 1 ? "contrato aceite" : "contratos aceites"} · versão atual dos
-            termos: {TERMS_VERSION}
-          </span>
-        )}
-      </div>
-
-      {/* Ledger */}
-      {/* O último degrau, e é o CONTENTOR do livro: as linhas de contrato são
-          uma coluna de datas e referências que alguém confere — chegam com a
-          tabela, todas ao mesmo tempo, e nunca uma a uma. */}
-      <Card
-        padding="none"
-        style={{ "--cena": 3 } as React.CSSProperties}
-        className="bo-cena overflow-hidden"
-      >
-        {filtered.length === 0 ? (
-          <EmptyState
-            icon={
+        {/* Toolbar */}
+        <Toolbar
+          style={{ "--cena": 1 } as React.CSSProperties}
+          className="bo-cena mb-6"
+          start={
+            <div className="relative w-full max-w-md sm:w-80">
               <svg
-                width="24"
-                height="24"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground/25"
+                width="14"
+                height="14"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="1.4"
+                strokeWidth="2"
                 aria-hidden="true"
               >
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <path d="M14 2v6h6" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="m9 14 2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="11" cy="11" r="7" />
+                <path d="m21 21-4.3-4.3" strokeLinecap="round" />
               </svg>
-            }
-            title={itens.length === 0 ? "Ainda sem propostas aceites" : "Nada encontrado"}
-            description={
-              itens.length === 0
-                ? // O botão de aceitar pelo link foi RETIRADO — «um casamento não se
-                  // fecha num botão» — e esta frase ficou a descrever um caminho
-                  // que já não existe. Um ecrã vazio que explica mal é pior do
-                  // que um ecrã vazio: manda esperar por uma coisa que nunca vem.
-                  "Aparecem aqui quando uma proposta é aceite ou um pedido é marcado como Ganho. Depois de o casal assinar, marca-o aqui como assinado."
-                : "Tenta outra pesquisa ou estado."
-            }
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Cliente ou referência…"
+                aria-label="Procurar contratos"
+                className="bo-input py-2.5 pl-10 pr-3 text-sm text-[var(--bo-text)] placeholder-foreground/30"
+              />
+            </div>
+          }
+          end={
+            itens.length > 0 ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={exportCsv}
+                title="Guarda a lista dos contratos num ficheiro que abre no Excel"
+              >
+                Exportar lista
+              </Button>
+            ) : undefined
+          }
+        />
+
+        {/* A descarga do PDF de um contrato: a barra diz quanto já chegou e,
+          no fim, «PDF pronto» (14/10). Uma só, por cima da lista — numa célula
+          da tabela não havia sítio para ela. */}
+        {pdfDoContrato.mostrar && (
+          <EmCurso
+            className="mb-4"
+            titulo="A descarregar o contrato em PDF…"
+            pronto="PDF pronto"
+            estimadoMs={2_000}
+            {...pdfDoContrato.barra}
           />
-        ) : (
-          /* ── UMA LISTA, UMA ÁRVORE ────────────────────────────────────────
+        )}
+        {/* Status filter */}
+        {/* O filtro chega a seguir aos controlos porque é a seguir que se lê —
+          e é UM degrau para a fila inteira, nunca um por pastilha. */}
+        <div
+          style={{ "--cena": 2 } as React.CSSProperties}
+          className="bo-cena mb-5 flex flex-wrap items-center gap-2"
+        >
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrar por estado">
+            <Button
+              size="sm"
+              variant={status === "all" ? "subtle" : "ghost"}
+              aria-pressed={status === "all"}
+              onClick={() => setStatus("all")}
+            >
+              Todos · {itens.length}
+            </Button>
+            {STATUSES.map((s) => {
+              const count = contracts.filter((c) => c.status === s).length;
+              return (
+                <Button
+                  key={s}
+                  size="sm"
+                  variant={status === s ? "subtle" : "ghost"}
+                  aria-pressed={status === s}
+                  onClick={() => setStatus(s)}
+                >
+                  {STATUS_META[s].label} · {count}
+                </Button>
+              );
+            })}
+            {semContrato > 0 && (
+              <Button
+                size="sm"
+                variant={status === "sem-contrato" ? "subtle" : "ghost"}
+                aria-pressed={status === "sem-contrato"}
+                onClick={() => setStatus("sem-contrato")}
+              >
+                Sem contrato · {semContrato}
+              </Button>
+            )}
+          </div>
+          {aceites > 0 && (
+            <span className="ml-auto self-center text-xs text-foreground/40">
+              {aceites} {aceites === 1 ? "contrato aceite" : "contratos aceites"} · versão atual dos
+              termos: {TERMS_VERSION}
+            </span>
+          )}
+        </div>
+
+        {/* Ledger */}
+        {/* O último degrau, e é o CONTENTOR do livro: as linhas de contrato são
+          uma coluna de datas e referências que alguém confere — chegam com a
+          tabela, todas ao mesmo tempo, e nunca uma a uma. */}
+        <Card
+          padding="none"
+          style={{ "--cena": 3 } as React.CSSProperties}
+          className="bo-cena overflow-hidden"
+        >
+          {filtered.length === 0 ? (
+            <EmptyState
+              icon={
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  aria-hidden="true"
+                >
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <path d="M14 2v6h6" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="m9 14 2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              }
+              title={itens.length === 0 ? "Ainda sem propostas aceites" : "Nada encontrado"}
+              description={
+                itens.length === 0
+                  ? // O botão de aceitar pelo link foi RETIRADO — «um casamento não se
+                    // fecha num botão» — e esta frase ficou a descrever um caminho
+                    // que já não existe. Um ecrã vazio que explica mal é pior do
+                    // que um ecrã vazio: manda esperar por uma coisa que nunca vem.
+                    "Aparecem aqui quando uma proposta é aceite ou um pedido é marcado como Ganho. Depois de o casal assinar, marca-o aqui como assinado."
+                  : "Tenta outra pesquisa ou estado."
+              }
+            />
+          ) : (
+            /* ── UMA LISTA, UMA ÁRVORE ────────────────────────────────────────
              Aqui estavam DUAS: um `<ul md:hidden>` com os cartões e um
              `<table>` de sete colunas `hidden md:block`, as duas montadas ao
              mesmo tempo, as duas a ler e a escrever o mesmo `expanded`. É o
@@ -592,65 +627,66 @@ export default function Contratos({
              (`CORTES.desktop`, 1024) em vez dos 768 px do `md:`, que este back
              office não usa e que é justamente a largura de um iPad em retrato —
              onde sete colunas não cabem. Ver `ui/adaptativo.ts:53-60`. */
-          <div className="p-3 sm:p-4">
-            <TabelaOuCartoes
-              itens={filtered}
-              chaveDe={(c) => c.id}
-              legenda="Contratos"
-              // O cartão traz a sua própria moldura e os seus próprios botões
-              // («Ver termos», «PDF», «Marcar como assinado»): embrulhá-lo no
-              // botão do primitivo dava um botão dentro de outro botão.
-              semMoldura
-              cartao={(c) =>
-                ehContrato(c) ? (
-                  <CartaoDeContrato
-                    c={c}
-                    aberto={expanded === c.id}
-                    onAlternar={() => setExpanded(expanded === c.id ? null : c.id)}
-                    aoRegistar={refresh}
-                  />
-                ) : (
-                  <CartaoSemContrato
-                    item={c}
-                    quotes={quotes}
-                    onOpenQuote={onOpenQuote}
-                    feito={refresh}
-                  />
-                )
-              }
-              colunas={colunasDeContratos({
-                aberto: expanded,
-                alternar: (c) => setExpanded((e) => (e === c.id ? null : c.id)),
-                aoRegistar: refresh,
-                quotes,
-                onOpenQuote,
-              })}
-            />
+            <div className="p-3 sm:p-4">
+              <TabelaOuCartoes
+                itens={filtered}
+                chaveDe={(c) => c.id}
+                legenda="Contratos"
+                // O cartão traz a sua própria moldura e os seus próprios botões
+                // («Ver termos», «PDF», «Marcar como assinado»): embrulhá-lo no
+                // botão do primitivo dava um botão dentro de outro botão.
+                semMoldura
+                cartao={(c) =>
+                  ehContrato(c) ? (
+                    <CartaoDeContrato
+                      c={c}
+                      aberto={expanded === c.id}
+                      onAlternar={() => setExpanded(expanded === c.id ? null : c.id)}
+                      aoRegistar={refresh}
+                    />
+                  ) : (
+                    <CartaoSemContrato
+                      item={c}
+                      quotes={quotes}
+                      onOpenQuote={onOpenQuote}
+                      feito={refresh}
+                    />
+                  )
+                }
+                colunas={colunasDeContratos({
+                  aberto: expanded,
+                  alternar: (c) => setExpanded((e) => (e === c.id ? null : c.id)),
+                  aoRegistar: refresh,
+                  quotes,
+                  onOpenQuote,
+                })}
+              />
 
-            {/* ── OS TERMOS ABERTOS, NO COMPUTADOR ──────────────────────────
+              {/* ── OS TERMOS ABERTOS, NO COMPUTADOR ──────────────────────────
                 Na tabela isto era uma segunda `<tr colSpan={7}>`, e o
                 `TabelaOuCartoes` desenha uma linha por item — de propósito, é
                 o que lhe permite ordenar e rolar sem saber nada do conteúdo.
                 Os termos passam para um painel a seguir à tabela, com o nome
                 de quem se está a ver por cima. É o MESMO `ContractDetails` do
                 cartão, montado uma vez. */}
-            {emTabela && aberto && (
-              <div className="mt-3 rounded-xl border border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] p-4">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <p className="truncate text-sm font-medium text-[var(--bo-text)]">
-                    {aberto.clientName || "—"}
-                  </p>
-                  <Button size="sm" variant="ghost" onClick={() => setExpanded(null)}>
-                    Fechar
-                  </Button>
+              {emTabela && aberto && (
+                <div className="mt-3 rounded-xl border border-[var(--bo-hairline)] bg-[var(--bo-tinta-3)] p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <p className="truncate text-sm font-medium text-[var(--bo-text)]">
+                      {aberto.clientName || "—"}
+                    </p>
+                    <Button size="sm" variant="ghost" onClick={() => setExpanded(null)}>
+                      Fechar
+                    </Button>
+                  </div>
+                  <ContractDetails c={aberto} />
                 </div>
-                <ContractDetails c={aberto} />
-              </div>
-            )}
-          </div>
-        )}
-      </Card>
-    </div>
+              )}
+            </div>
+          )}
+        </Card>
+      </div>
+    </DescargaDosContratos.Provider>
   );
 }
 
@@ -692,25 +728,38 @@ function ContractDetails({ c }: { c: Contract }) {
   );
 }
 
+/** Quem descarrega o PDF de um contrato: o ecrã, uma vez, para a barra ser uma só. */
+const DescargaDosContratos = createContext<{
+  aDescarregar: string | null;
+  descarregar: (id: string) => void;
+} | null>(null);
+
 /**
- * A prova em papel — o PDF do contrato, numa aba nova.
+ * A prova em papel — o PDF do contrato.
  *
  * Escrito uma vez porque estava escrito duas (uma no cartão, outra na tabela) e
  * as duas cópias já tinham divergido na altura: `h-9` num sítio, `h-8` no
  * outro, ao lado de botões de 44. `pointer-coarse:h-11` é o que o `ui/Button`
- * faz sozinho; este link está escrito à mão e por isso pede-o à mão.
+ * faz sozinho; este está escrito à mão e por isso pede-o à mão.
+ *
+ * Era um `<a target=_blank>` sem sinal nenhum: carregava-se e nada dizia que
+ * estava a andar (14/10, «a animação a descarregar… melhores mesmo muito»).
+ * Passa a descarregar o ficheiro, com a barra do ecrã a dizer quanto já chegou.
  */
 function PdfDoContrato({ id }: { id: string }) {
+  const descarga = useContext(DescargaDosContratos);
+  const aDescarregar = descarga?.aDescarregar === id;
   return (
-    <a
-      href={`/api/contratos/${id}/pdf`}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={`inline-flex h-9 pointer-coarse:h-11 items-center rounded-xl px-3 text-xs font-medium text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)] ${ESTADO} ${PRESSAO}`}
+    <button
+      type="button"
+      onClick={() => descarga?.descarregar(id)}
+      disabled={!descarga || aDescarregar}
+      aria-busy={aDescarregar || undefined}
+      className={`inline-flex h-9 pointer-coarse:h-11 items-center rounded-xl px-3 text-xs font-medium text-[var(--bo-text-muted)] hover:bg-[var(--bo-tinta-6)] hover:text-[var(--bo-text)] disabled:opacity-60 ${ESTADO} ${PRESSAO}`}
       title="Descarregar contrato em PDF"
     >
       PDF
-    </a>
+    </button>
   );
 }
 

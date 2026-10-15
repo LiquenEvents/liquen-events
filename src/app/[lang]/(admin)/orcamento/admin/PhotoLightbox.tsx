@@ -6,7 +6,8 @@ import { cn } from "./ui";
 import { SAIDA } from "./ui/saida";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { useFotoComPlanoB } from "@/lib/useFotoComPlanoB";
-import { ESTADO, PRESSAO } from "./ui/movimento";
+import { ESTADO, PRESSAO, PROGRESSO } from "./ui/movimento";
+import { contagemEmBytes } from "./ui/EmCurso";
 
 /**
  * VER UMA FOTO EM GRANDE, dentro da biblioteca de temas.
@@ -51,6 +52,12 @@ export interface PhotoLightboxProps {
   /** Transferir a foto que está à vista. */
   onDownload: (image: ThemeImage, index: number) => void;
   downloading?: boolean;
+  /**
+   * A transferência a chegar, em bytes (o `barra` do `useDescarga`). Sem o
+   * tamanho, só a frase; com ele, a contagem no botão e um traço de 4 px por
+   * baixo da barra de cima. `concluido` mostra «Transferida» uns instantes.
+   */
+  transferencia?: { concluido: boolean; feito?: number; total?: number } | null;
   /**
    * ── DE ONDE A LUPA CRESCE ─────────────────────────────────────────────
    *
@@ -126,6 +133,7 @@ export default function PhotoLightbox({
   onClose,
   onDownload,
   downloading,
+  transferencia = null,
   origem = null,
 }: PhotoLightboxProps) {
   const image = images[index];
@@ -257,7 +265,28 @@ export default function PhotoLightbox({
      classes. */
   const conteudo = (
     <>
-      <div className="flex items-center gap-2 px-4 py-3 text-white">
+      <div className="relative flex items-center gap-2 px-4 py-3 text-white">
+        {/* O traço da transferência, colado ao fundo da barra de cima. Branco
+            sobre o preto do visualizador — o verde do `EmCurso` não se lia
+            aqui. `aria-hidden`: a contagem já está no nome do botão. */}
+        {transferencia && (transferencia.concluido || transferencia.total) ? (
+          <span
+            aria-hidden="true"
+            className="absolute inset-x-4 bottom-0 block h-1 overflow-hidden rounded-full bg-white/15"
+          >
+            <span
+              data-barra="preenchimento"
+              className={`block h-full w-full origin-left rounded-full bg-white ${PROGRESSO}`}
+              style={{
+                transform: `scaleX(${
+                  transferencia.concluido
+                    ? 1
+                    : Math.min(1, (transferencia.feito ?? 0) / (transferencia.total || 1))
+                })`,
+              }}
+            />
+          </span>
+        ) : null}
         <span className="text-sm tabular-nums text-white/80">
           {index + 1} / {images.length}
         </span>
@@ -282,7 +311,13 @@ export default function PhotoLightbox({
             onClick={() => onDownload(image, index)}
             className={`alvo-toque inline-flex h-9 items-center justify-center rounded-full bg-white/10 px-3 text-caption font-medium text-white hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white disabled:opacity-60 ${ESTADO} ${PRESSAO}`}
           >
-            {downloading ? "A transferir…" : "Transferir"}
+            {transferencia?.concluido
+              ? "Transferida"
+              : downloading
+                ? transferencia?.total
+                  ? `A transferir… ${contagemEmBytes(transferencia.feito ?? 0, transferencia.total)}`
+                  : "A transferir…"
+                : "Transferir"}
           </button>
           <button
             ref={closeRef}
