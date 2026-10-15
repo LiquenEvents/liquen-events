@@ -110,6 +110,29 @@ do prompt aqui em baixo é o atualizado, que acompanha o exemplo novo.
    da forma que o lugar pede, as de maior resolução primeiro, nunca a mesma em
    duas páginas seguidas. **Os separadores** levam as duas de MAIOR resolução
    do capítulo, sem olhar à forma, como o texto pede.
+   - **Isto é agora o que acontece quando ELA NÃO ESCOLHE (15/10).** Pedido
+     dela: «as fotos de fundo que estão por trás dos títulos [Cocktail…] são
+     completamente automáticas… queremos ser nós a meter as fotos… em qualquer
+     sítio do PDF». Escolhe-se **nas miniaturas** da vista de conjunto
+     («Mudar fotografia»), **de qualquer sítio** (as desta proposta, a
+     biblioteca de temas ou carregada na hora), e **no separador uma (a página
+     inteira) ou duas (lado a lado)** — as três respostas dela. Fica em
+     `fotosDasPaginas`, pela chave estável de cada página (`chavesDasPaginas`,
+     em `plano.ts`). Não se escolhe nas páginas de um tema com fotografias
+     (são as do mood board) nem nos cartões de «O que propomos» (a ★ de cada
+     tema): isso já era escolha dela.
+   - **E as miniaturas mostram o que o PDF põe (15/10).** A colaboradora dela
+     viu fotografias «que não têm nada a ver» com as do PDF: a miniatura
+     adivinhava (o separador mostrava as duas primeiras do capítulo — as que o
+     PDF evita). Agora o estúdio pergunta à rota `fotos-do-pdf`, que corre o
+     MESMO plano do PDF sem o desenhar (`fotosDoEditorial`), com as MESMAS
+     medidas (as da biblioteca à escala do desenho; sem elas, as da fotografia
+     reduzida). Dois testes prendem isto: o PDF desenhado e o plano dão as
+     mesmas fotografias página a página, com e sem escolhas dela. Enquanto a
+     resposta não chega, os painéis ficam lisos em vez de adivinhados.
+   - **Fica por fazer:** o enquadramento à mão das fotografias escolhidas para
+     as páginas (o `focos` já existe no documento e o PDF já o usa; falta a
+     caixa de arrastar no estúdio, como a da capa).
 10. **As células do mosaico têm a forma da sua fotografia** (a largura é
     proporcional ao aspecto, como o `flex` do exemplo), e todas as de uma fila
     têm a mesma altura (395 px). Por isso a «troca por falta de resolução» que

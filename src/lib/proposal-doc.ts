@@ -18,6 +18,13 @@ import { round2 } from "@/lib/money";
  *  with or without a `data:` prefix — the renderer sniffs the format). */
 export type ImageData = string;
 
+/** As fotografias que ela escolheu para uma página do PDF (`fotosDasPaginas`). */
+export interface FotosDeUmaPagina {
+  fotos: ImageData[];
+  /** O enquadramento à mão de cada uma, em fracções (`null` = automático). */
+  focos?: ({ x: number; y: number } | null)[];
+}
+
 /** Taxa de IVA por omissão (23% — taxa normal em Portugal continental). */
 export const DEFAULT_VAT_RATE = 0.23;
 
@@ -462,6 +469,25 @@ export interface ProposalDoc {
    * Como o `capaMesmoAssim`, é da fotografia: trocá-la apaga-o.
    */
   focoDaCapa?: { x: number; y: number };
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * AS FOTOGRAFIAS QUE ELA ESCOLHEU PARA CADA PÁGINA DO PDF
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Pedido dela (15/10): «as fotos de fundo que estão por trás dos títulos
+   * [Cocktail…] são completamente automáticas… queremos ser nós a meter as
+   * fotos… em qualquer sítio do PDF». A chave é a da página no plano
+   * (`chavesDasPaginas`, em `pdf-editorial/plano.ts`: `indice`,
+   * `separador:cocktail`, `investimento`, `orcamento:1`…), e o valor são as
+   * fotografias de cada lugar dessa página, pela ordem — no separador, uma
+   * (a página inteira) ou duas (lado a lado). `focos` é o enquadramento à mão
+   * de cada uma, como o `focoDaCapa`.
+   *
+   * Sem entrada, a página continua a escolher sozinha (`Album.escolher`), e a
+   * miniatura do estúdio mostra o que ela escolheu (`fotosDoEditorial`).
+   */
+  fotosDasPaginas?: Record<string, FotosDeUmaPagina>;
 
   /**
    * ════════════════════════════════════════════════════════════════════════
@@ -1132,9 +1158,11 @@ export function isPendingImage(path: string | null | undefined): boolean {
 /** As fotos deste documento que ainda são promessas — o número que decide se
  *  a proposta já pode seguir para o cliente. */
 export function countPendingImages(
-  doc: Partial<Pick<ProposalDoc, "coverImages" | "moodBoards" | "escolhas">>,
+  doc: Partial<Pick<ProposalDoc, "coverImages" | "moodBoards" | "escolhas" | "fotosDasPaginas">>,
 ): number {
   let n = 0;
+  for (const e of Object.values(doc.fotosDasPaginas ?? {}))
+    for (const p of e?.fotos ?? []) if (isPendingImage(p)) n += 1;
   for (const p of doc.coverImages ?? []) if (isPendingImage(p)) n += 1;
   for (const b of doc.moodBoards ?? [])
     for (const p of b.images ?? []) if (isPendingImage(p)) n += 1;
@@ -1157,10 +1185,26 @@ export function countPendingImages(
  * não sujar as comparações por referência de quem grava o rascunho.
  */
 export function stripPendingImages<
-  T extends Partial<Pick<ProposalDoc, "coverImages" | "moodBoards" | "escolhas">>,
+  T extends Partial<
+    Pick<ProposalDoc, "coverImages" | "moodBoards" | "escolhas" | "fotosDasPaginas">
+  >,
 >(doc: T): T {
   if (countPendingImages(doc) === 0) return doc;
   const out: T = { ...doc };
+  if (doc.fotosDasPaginas) {
+    // Uma fotografia de página a caminho não vai: a página escolhe sozinha
+    // até ela chegar.
+    const paginas: NonNullable<ProposalDoc["fotosDasPaginas"]> = {};
+    for (const [chave, e] of Object.entries(doc.fotosDasPaginas)) {
+      const ficam = (e?.fotos ?? []).flatMap((p, k) => (isPendingImage(p) ? [] : [k]));
+      if (!ficam.length) continue;
+      paginas[chave] = {
+        fotos: ficam.map((k) => e.fotos[k]),
+        ...(e.focos ? { focos: ficam.map((k) => e.focos?.[k] ?? null) } : {}),
+      };
+    }
+    out.fotosDasPaginas = paginas;
+  }
   if (doc.coverImages) {
     out.coverImages = doc.coverImages.map((p) => (isPendingImage(p) ? "" : p));
   }

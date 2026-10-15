@@ -85,6 +85,9 @@ import PorqueNaoDaParaEnviar from "./PorqueNaoDaParaEnviar";
 import { ControlosDoEnvio, PainelDoEnvio, PastilhaDoEnvio } from "./BarraDoEnvioCompacta";
 import VistaDeConjunto from "./VistaDeConjunto";
 import PaginaEditorial, { fontesDasFolhas } from "./PaginaEditorial";
+import { useFotosDoPdf } from "./useFotosDoPdf";
+import EscolherFotoDaPagina from "./EscolherFotoDaPagina";
+import { useAnular } from "./ui/anular";
 import LupaDeFotos from "./LupaDeFotos";
 import {
   ArrastoDosMoodBoards,
@@ -788,7 +791,30 @@ function mapImagePaths(d: StudioDoc, f: (path: string) => string | null): Studio
     changed = true;
     return { ...b, images };
   });
-  return changed ? { ...d, coverImages: cover, moodBoards: boards } : d;
+  // As que ela escolheu para as páginas do PDF (`fotosDasPaginas`): como num
+  // mood board, a que sai deixa a página com menos uma (e, sem nenhuma, a
+  // página volta a escolher sozinha).
+  let paginas = d.fotosDasPaginas;
+  if (paginas) {
+    const novas: NonNullable<StudioDoc["fotosDasPaginas"]> = {};
+    for (const [chave, e] of Object.entries(paginas)) {
+      const fotos: string[] = [];
+      const focos: ({ x: number; y: number } | null)[] = [];
+      let mexeu = false;
+      e.fotos.forEach((p, k) => {
+        const next = f(p);
+        if (next !== p) mexeu = true;
+        if (next !== null) {
+          fotos.push(next);
+          focos.push(e.focos?.[k] ?? null);
+        }
+      });
+      if (mexeu) changed = true;
+      if (fotos.length) novas[chave] = mexeu ? { fotos, ...(e.focos ? { focos } : {}) } : e;
+    }
+    paginas = novas;
+  }
+  return changed ? { ...d, coverImages: cover, moodBoards: boards, fotosDasPaginas: paginas } : d;
 }
 
 // ── O que o PDF não leva ──
@@ -2042,7 +2068,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     // `substituir` é a posição a TROCAR no lugar: a foto escolhida entra ali em
     // vez de ir para o fim. Sem isto, trocar uma foto era removê-la, escolher
     // outra, e arrastá-la de volta ao sítio onde a primeira estava.
-    { kind: "board"; bi: number; substituir?: number } | { kind: "cover"; idx: number } | null
+    | { kind: "board"; bi: number; substituir?: number }
+    | { kind: "cover"; idx: number }
+    /** Uma página do PDF (`fotosDasPaginas`): a foto vai para o lugar `lugar`. */
+    | { kind: "pagina"; chave: string; lugar: number; max: number }
+    | null
   >(null);
 
   /* ── A BIBLIOTECA DE TEMAS TAMBÉM SE FECHA ────────────────────────────────
@@ -3900,11 +3930,95 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
   const fotosPorBoard = doc.moodBoards.map((b) => b.images.length);
   const totalDeFotos = fotosPorBoard.reduce((a, b) => a + b, 0);
   const planoDoPdf = useMemo(() => planoDaProposta(doc as ProposalDoc), [doc]);
+  /** Que fotografia o PDF põe em cada página — perguntado ao PDF (`useFotosDoPdf`). */
+  const fotosDoPdf = useFotosDoPdf(quote.id, doc as ProposalDoc, idiomaDoPdf);
   /** De onde vêm as fotografias das miniaturas do PDF novo (`PaginaEditorial`). */
   const fontesDasMiniaturas = useMemo(
-    () => fontesDasFolhas(doc as ProposalDoc, planoDoPdf, assetUrls, assetOriginais),
-    [doc, planoDoPdf, assetUrls, assetOriginais],
+    () => fontesDasFolhas(doc as ProposalDoc, planoDoPdf, assetUrls, assetOriginais, fotosDoPdf),
+    [doc, planoDoPdf, assetUrls, assetOriginais, fotosDoPdf],
   );
+  /**
+   * ── A FOTOGRAFIA DE UMA PÁGINA DO PDF, ESCOLHIDA POR ELA ──────────────────
+   *
+   * Pedido dela (15/10): «queremos ser nós a meter as fotos… em qualquer sítio
+   * do PDF». A folha abre da miniatura da página (a vista de conjunto). Cada
+   * toque aplica-se logo, com «Anular»; o que fica gravado é
+   * `fotosDasPaginas[chave]`. A capa continua a ser a «Fotografia da capa».
+   */
+  const anular = useAnular();
+  const [paginaDaFoto, setPaginaDaFoto] = useState<{
+    chave: string;
+    nome: string;
+    max: number;
+  } | null>(null);
+  const [lugarDaFoto, setLugarDaFoto] = useState(0);
+  /** O que está AGORA em cada lugar de uma página: a escolha dela, ou a do PDF. */
+  const lugaresDaPagina = (chave: string): (string | null)[] =>
+    chave === "capa"
+      ? [caminhoDaCapa ?? fotosDoPdf?.capa?.[0]?.ref ?? null]
+      : (doc.fotosDasPaginas?.[chave]?.fotos ?? (fotosDoPdf?.[chave] ?? []).map((f) => f.ref));
+  /** Grava a escolha de uma página (ou apaga-a, com `null`), com «Anular». */
+  function gravarFotosDaPagina(chave: string, fotos: string[] | null, frase: string) {
+    const antes = doc.fotosDasPaginas;
+    const seguintes = { ...(antes ?? {}) };
+    if (fotos && fotos.length) seguintes[chave] = { fotos };
+    else delete seguintes[chave];
+    patch({ fotosDasPaginas: seguintes });
+    anular(frase, () => patch({ fotosDasPaginas: antes }));
+  }
+  /** Põe `ref` no lugar `lugar` da página — os outros lugares ficam como estão. */
+  function porFotoNaPagina(chave: string, nome: string, max: number, lugar: number, ref: string) {
+    if (chave === "capa") {
+      setCoverAt(idxDaCapa, ref);
+      return;
+    }
+    const agora = lugaresDaPagina(chave).slice(0, max);
+    const fotos = [...agora];
+    fotos[Math.min(lugar, max - 1)] = ref;
+    gravarFotosDaPagina(
+      chave,
+      fotos.filter((f): f is string => !!f),
+      `Fotografia de «${nome}» trocada.`,
+    );
+  }
+  /** Uma ou duas no separador. */
+  function quantasNaPagina(chave: string, nome: string, n: 1 | 2) {
+    const agora = lugaresDaPagina(chave).filter((f): f is string => !!f);
+    let fotos = agora.slice(0, n);
+    if (n === 2 && fotos.length < 2) {
+      // A segunda: a que o PDF lá tinha, ou a primeira de outra que haja.
+      const outra = [
+        ...(fotosDoPdf?.[chave] ?? []).map((f) => f.ref),
+        ...doc.moodBoards.flatMap((b) => b.images),
+      ].find((r): r is string => !!r && !fotos.includes(r) && !isPendingImage(r));
+      if (outra) fotos = [...fotos, outra];
+    }
+    gravarFotosDaPagina(
+      chave,
+      fotos,
+      n === 1 ? `«${nome}» com uma fotografia.` : `«${nome}» com duas fotografias.`,
+    );
+    setLugarDaFoto(0);
+  }
+  /** As fotografias desta proposta, para escolher (capa e temas, sem repetir). */
+  const fotosDaProposta = useMemo(() => {
+    const vistas = new Set<string>();
+    const lista: { ref: string; url?: string; original?: string }[] = [];
+    for (const r of [
+      ...(doc.coverImages ?? []),
+      ...doc.moodBoards.flatMap((b) => b.images),
+      ...Object.values(doc.fotosDasPaginas ?? {}).flatMap((e) => e.fotos),
+    ]) {
+      if (!r || vistas.has(r) || isPendingImage(r)) continue;
+      vistas.add(r);
+      lista.push({
+        ref: r,
+        url: assetUrls[r] ?? (r.startsWith("data:") ? r : undefined),
+        original: assetOriginais[r],
+      });
+    }
+    return lista;
+  }, [doc.coverImages, doc.moodBoards, doc.fotosDasPaginas, assetUrls, assetOriginais]);
   const paginasDeInspiracao = planoDoPdf.filter((p) => p.tipo === "tema").length;
   const tempoDaProposta = tempoMostrado > 0 ? ` · ${emPalavras(tempoMostrado)} de trabalho` : "";
   const contagemDosBoards =
@@ -5234,6 +5348,14 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       );
     } else if (picker?.kind === "cover") {
       setCoverAt(picker.idx, reservas[0].marcador);
+    } else if (picker?.kind === "pagina" && paginaDaFoto) {
+      porFotoNaPagina(
+        picker.chave,
+        paginaDaFoto.nome,
+        picker.max,
+        picker.lugar,
+        reservas[0].marcador,
+      );
     }
   }
 
@@ -5297,6 +5419,8 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
       );
     } else if (picker?.kind === "cover") {
       setCoverAt(picker.idx, novas[0].path);
+    } else if (picker?.kind === "pagina" && paginaDaFoto) {
+      porFotoNaPagina(picker.chave, paginaDaFoto.nome, picker.max, picker.lugar, novas[0].path);
     }
   }
 
@@ -10952,6 +11076,11 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
             <div className="mt-6" hidden={step !== "inspiracao"}>
               <VistaDeConjunto
                 doc={doc as ProposalDoc}
+                fotosDoPdf={fotosDoPdf}
+                onMudarFoto={(chave, nome, max) => {
+                  setLugarDaFoto(0);
+                  setPaginaDaFoto({ chave, nome, max });
+                }}
                 ordem={ordemDosBoards}
                 idioma={idiomaDoPdf}
                 urls={assetUrls}
@@ -12463,6 +12592,69 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
           indice={lupa.ii}
           onFechar={() => setLupa(null)}
           onMudar={(ii) => setLupa((l) => (l ? { ...l, ii } : l))}
+        />
+      )}
+
+      {paginaDaFoto && (
+        <EscolherFotoDaPagina
+          aberto={paginaDaFoto !== null && picker === null}
+          nome={paginaDaFoto.nome}
+          max={paginaDaFoto.max}
+          lugares={lugaresDaPagina(paginaDaFoto.chave).map((r) =>
+            r
+              ? {
+                  ref: r,
+                  url: assetUrls[r] ?? (r.startsWith("data:") ? r : undefined),
+                  original: assetOriginais[r],
+                }
+              : null,
+          )}
+          escolhida={paginaDaFoto.chave === "capa" || !!doc.fotosDasPaginas?.[paginaDaFoto.chave]}
+          podeVoltarAoAutomatico={paginaDaFoto.chave !== "capa"}
+          lugar={lugarDaFoto}
+          fotosDaProposta={fotosDaProposta}
+          carregar={
+            <UploadArea
+              label="Carregar uma fotografia"
+              progresso={uploading[`pagina-${paginaDaFoto.chave}`]}
+              multiple={false}
+              curto
+              onFiles={(files) => {
+                const p = paginaDaFoto;
+                const lugar = lugarDaFoto;
+                handleUpload(`pagina-${p.chave}`, files.slice(0, 1), (paths) => {
+                  if (paths[0]) porFotoNaPagina(p.chave, p.nome, p.max, lugar, paths[0]);
+                });
+              }}
+            />
+          }
+          onLugar={setLugarDaFoto}
+          onEscolher={(ref) =>
+            porFotoNaPagina(
+              paginaDaFoto.chave,
+              paginaDaFoto.nome,
+              paginaDaFoto.max,
+              lugarDaFoto,
+              ref,
+            )
+          }
+          onQuantas={(n) => quantasNaPagina(paginaDaFoto.chave, paginaDaFoto.nome, n)}
+          onAutomatico={() =>
+            gravarFotosDaPagina(
+              paginaDaFoto.chave,
+              null,
+              `«${paginaDaFoto.nome}» volta a escolher sozinha.`,
+            )
+          }
+          onBiblioteca={() =>
+            setPicker({
+              kind: "pagina",
+              chave: paginaDaFoto.chave,
+              lugar: lugarDaFoto,
+              max: paginaDaFoto.max,
+            })
+          }
+          onFechar={() => setPaginaDaFoto(null)}
         />
       )}
 

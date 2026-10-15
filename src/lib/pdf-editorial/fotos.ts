@@ -30,6 +30,8 @@ export interface Foto {
   tema: number | null;
   /** O enquadramento escolhido à mão — ver `Foco` em `imagens.ts`. */
   foco?: Foco;
+  /** O caminho no armazenamento, quando se sabe — o que a identifica no estúdio. */
+  ref?: string;
 }
 
 /** Lê o tamanho do cabeçalho — sem descodificar a imagem. */
@@ -48,6 +50,29 @@ export async function medir(
   } catch {
     return { id, bytes, origem, w: 1, h: 1, aspecto: 1, pixeis: 0, tema };
   }
+}
+
+/** Uma foto com a medida já sabida (sem ler o cabeçalho). */
+export function comMedida(
+  bytes: Buffer,
+  origem: string,
+  id: number,
+  tema: number | null,
+  { w, h }: { w: number; h: number },
+  ref?: string,
+): Foto {
+  const ok = w > 0 && h > 0;
+  return {
+    id,
+    bytes,
+    origem,
+    w: ok ? w : 1,
+    h: ok ? h : 1,
+    aspecto: ok ? w / h : 1,
+    pixeis: ok ? w * h : 0,
+    tema,
+    ...(ref ? { ref } : {}),
+  };
 }
 
 /** A forma que um lugar pede. */

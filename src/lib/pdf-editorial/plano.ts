@@ -479,6 +479,71 @@ export function listasQueNaoSaem(
   return faltam;
 }
 
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * A CHAVE DE CADA PÁGINA — o nome que o PDF e o estúdio dão à mesma folha
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * É por ela que as fotografias que ela escolheu (`fotosDasPaginas`) chegam à
+ * página certa do PDF, e que a miniatura do estúdio sabe que fotografias o PDF
+ * pôs em cada página (`fotosDoEditorial`). Estável de propósito: não depende
+ * do número da página, que muda quando se acrescenta um serviço ou uma
+ * condição. A primeira de cada tipo leva o nome sozinho (`orcamento`); as que
+ * continuam levam o número (`orcamento:1`, `orcamento:2`).
+ *
+ * `montar.ts` dá a mesma chave a cada página que desenha (`chaveDoTipo` +
+ * {@link Chaves}); um teste prende as duas listas uma à outra.
+ */
+export function chaveDoTipo(p: PaginaDoPlano): string {
+  switch (p.tipo) {
+    case "separador":
+      return p.grupo ? `separador:${p.grupo}` : "investimento";
+    case "tema":
+      return `tema:${p.bi}`;
+    case "condicoes":
+      return `condicoes:${p.qual}`;
+    default:
+      return p.tipo;
+  }
+}
+
+/** Dá a chave a cada página, pela ordem: a 2.ª do mesmo tipo leva `:1`. */
+export class Chaves {
+  private readonly vistas = new Map<string, number>();
+  nova(base: string): string {
+    const n = this.vistas.get(base) ?? 0;
+    this.vistas.set(base, n + 1);
+    return n ? `${base}:${n}` : base;
+  }
+}
+
+/** As chaves das páginas de um plano, pela mesma ordem. */
+export function chavesDasPaginas(plano: readonly PaginaDoPlano[]): string[] {
+  const chaves = new Chaves();
+  return plano.map((p) => chaves.nova(chaveDoTipo(p)));
+}
+
+/**
+ * As páginas onde ela pode escolher a fotografia, e quantas leva cada uma.
+ *
+ * Fica de fora o que JÁ é escolha dela noutro sítio: as páginas de um tema com
+ * fotografias (são as do mood board, pela ordem dela) e os cartões de «O que
+ * propomos» (a foto ★ de cada tema). O separador leva uma ou duas.
+ */
+export function lugaresDaPagina(p: PaginaDoPlano): { min: number; max: number } | null {
+  switch (p.tipo) {
+    case "separador":
+      return { min: 1, max: 2 };
+    case "tema":
+      return p.fotos.length ? null : { min: 1, max: 1 };
+    case "servicos":
+    case "ambiente":
+      return null;
+    default:
+      return { min: 1, max: 1 };
+  }
+}
+
 /** Quantas páginas, pelo plano. */
 export const paginasDoPlano = (doc: ProposalDoc) => planoDaProposta(doc).length;
 
