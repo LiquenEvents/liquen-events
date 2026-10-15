@@ -15,9 +15,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  quality:
-    name: Lint · Typecheck · Test · Build
+  # ════════════════════════════════════════════════════════════════════════
+  # AS VERIFICAÇÕES CORREM EM PARALELO (15/10)
+  # ════════════════════════════════════════════════════════════════════════
+  #
+  # Palavras dela: «porque é que demora muito?… tornar tudo super eficiente,
+  # super rápido… para que não estejamos à espera muito tempo». Cada PR
+  # esperava ~28 minutos, e a medição (gh api, PRs #228 e #229) disse onde:
+  # o job E2E corria ONZE invocações do Playwright umas atrás das outras, e a
+  # primeira — a informativa, que nem pode pôr o PR vermelho — levava 12 dos
+  # 28 minutos. Os testes unitários levavam 9 a 12 num só processo.
+  #
+  # O trabalho é o MESMO, nenhum teste saiu nem se salta; só deixou de esperar
+  # em fila. Cada parte é um job com o seu runner, o começo de todos é a acção
+  # `.github/actions/preparar`, e dois jobs finais — com os NOMES DE SEMPRE,
+  # «Lint · Typecheck · Test · Build» e «E2E (Playwright)» — só passam se
+  # todas as suas partes passarem. Assim, se o GitHub exigir esses nomes para
+  # juntar, continua a exigi-los com o mesmo significado. Os números e o
+  # porquê de cada job estão em `docs/VERIFICACOES.md`.
+
+  estatico:
+    name: Lint · Typecheck · Build
     runs-on: ubuntu-latest
+    # (Até 15/10 este job também corria os testes de unidade — ver `unitarios`.)
     # Este job faz install + audit + lint + typecheck + ~2900 testes + um build
     # completo do Next (que inclui a pré-geração de 172 imagens). Em 2026-08-05
     # levou 15m14s e o GitHub matou-o a meio do build — e um esgotamento de
@@ -38,17 +58,7 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install dependencies
-        # Fall back to npm install if the lockfile is out of sync with sharp's
-        # platform-specific optional deps (a known cross-platform npm quirk).
-        run: npm ci || npm install
+      - uses: ./.github/actions/preparar
 
       - name: Audit dependencies (fail on high/critical)
         # Audit only what ships to users (production deps). The dev toolchain
@@ -63,32 +73,6 @@ jobs:
 
       - name: Typecheck
         run: npm run typecheck
-
-      - name: Unit tests
-        run: npm test
-
-      # ── A CACHE DAS DERIVADAS ──────────────────────────────────────────────
-      # Sem isto, cada corrida re-encoda as 2785 miniaturas do zero. Enquanto
-      # eram só WebP isso custava ~2 minutos e passava despercebido; com o AVIF
-      # ao lado passou a ~13, e foi o que empurrou este job para lá dos 30
-      # minutos e o fez ser cancelado a meio do passo das imagens.
-      #
-      # A Vercel preserva `.next/cache` entre builds sozinha — foi por isso que
-      # os deploys continuaram verdes e só o CI partiu. Aqui é preciso pedir.
-      #
-      # A chave inclui os parâmetros de encode (larguras, qualidades, formatos)
-      # porque mudá-los TEM de invalidar a cache: o pré-gerador já carimba cada
-      # ficheiro com eles, e uma chave que os ignorasse traria de volta
-      # ficheiros da qualidade anterior sem ninguém dar por isso.
-      - name: Cache das miniaturas pré-geradas
-        uses: actions/cache@v4
-        with:
-          path: |
-            .next/cache/pregen-gallery
-            .next/cache/pregen-logos
-          key: pregen-${{ runner.os }}-${{ hashFiles('public/imagens/**', 'scripts/pregen-gallery.mjs', 'scripts/pregen-logos.mjs') }}
-          restore-keys: |
-            pregen-${{ runner.os }}-
 
       - name: Build
         run: npm run build
@@ -105,6 +89,38 @@ jobs:
       # que ele lê acaba de nascer.
       - name: Peso das rotas (bloqueante)
         run: node scripts/peso-das-rotas.mjs
+
+  # Os ~880 ficheiros de testes de unidade, em três partes ao mesmo tempo
+  # (`vitest --shard`): levavam 9 a 12 minutos num só processo.
+  unitarios:
+    name: Testes unitários (${{ matrix.parte }}/3)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        parte: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/preparar
+        with:
+          miniaturas: "false"
+
+      - name: Unit tests
+        run: npm test -- --shard=${{ matrix.parte }}/3
+
+  quality:
+    name: Lint · Typecheck · Test · Build
+    # O nome de sempre: passa só se o lint, o typecheck, o build e as três partes dos testes passarem.
+    needs: [estatico, unitarios]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Todas as partes passaram?
+        run: |
+          echo "estatico=${{ needs.estatico.result }} unitarios=${{ needs.unitarios.result }}"
+          if [ "${{ needs.estatico.result }}" != success ] || [ "${{ needs.unitarios.result }}" != success ]; then exit 1; fi
 
   # ── O PACOTE DAS MINIATURAS, PARA A VERCEL ──────────────────────────────
   # A 13/10 nenhum deploy acabava: a Vercel restaurou uma cache de build sem
@@ -154,122 +170,25 @@ jobs:
           gh release upload pregen-cache pregen-gallery.tar --clobber
           gh release edit pregen-cache --notes "$CHAVE"
 
-  e2e:
-    name: E2E (Playwright)
+  # ── O RESTO DA SUITE E2E, INFORMATIVO, À PARTE ──────────────────────────
+  # Era o primeiro passo do job E2E e levava 12 dos ~28 minutos que um PR
+  # esperava — sem poder pôr nada vermelho (`continue-on-error` no passo). Corre
+  # agora em três jobs paralelos, ao lado dos que bloqueiam, e continua igual:
+  # o resultado vê-se, e não pára nada.
+  e2e-informativo:
+    name: E2E informativo (${{ matrix.parte }}/3)
     runs-on: ubuntu-latest
-    # ── 60, E É A SEGUNDA VEZ QUE ESTE NÚMERO SOBE ────────────────────────
-    #
-    # A primeira foi 30 → 45: o job foi cancelado aos 30 minutos, a meio do
-    # passo das imagens e com tudo o que já tinha corrido a passar, porque o
-    # build à frente ficou ~13 minutos mais lento quando o AVIF entrou.
-    #
-    # Agora 45 → 60, e a avaria é a mesma com outra causa. O job foi cancelado
-    # aos 45 minutos e 17 segundos, no teste 117 de 118 do passo das imagens,
-    # com TODOS os 116 anteriores a verde. Não falhou nada: acabou o tempo.
-    #
-    # Os números que o dizem, das últimas seis corridas no `main`:
-    #
-    #     5a815c4c ... 41m38   ← a última antes desta
-    #     e9c58e55 ... 39m51
-    #     86726b58 ... 36m39
-    #     3266b9f7 ... 36m58
-    #     7a71d0ce ... 38m07
-    #     21fb653b ... 31m36
-    #
-    # A suite cresce porque é assim que esta casa trabalha: cada avaria que
-    # escapou deixa cá um guarda. Em três dias subiu de 31 para 41 minutos, e o
-    # guarda que veio com este ramo — o texto sobre a fotografia da entrada —
-    # foi o que a levou a passar dos 45.
-    #
-    # ── E PORQUE É QUE ISTO NÃO É UMA SOLUÇÃO, É UMA FOLGA ────────────────
-    #
-    # Levantar o tecto compra tempo, não o resolve: ao ritmo destes três dias,
-    # os 60 chegam outra vez. O que resolve é reduzir o CUSTO, e a peça óbvia é
-    # o passo das imagens — 118 passeios de ~3,5 s que abrem página a página,
-    # sempre as mesmas. Isso é trabalho de outro ramo, não deste: um `timeout`
-    # é uma linha, e refazer a estratégia do passo das imagens é uma mudança
-    # que merece ser medida por si.
-    timeout-minutes: 60
-    # O `continue-on-error` DESCEU DO JOB PARA O PASSO informativo, e é a única
-    # razão por que este ficheiro foi tocado.
-    #
-    # Enquanto estava aqui em cima, NENHUM teste E2E podia pôr um PR vermelho —
-    # a suite corria e o resultado era decorativo. Era essa a peça mecânica que
-    # faltava por trás da queixa "as fotos falham imenso": mesmo que existisse um
-    # teste a apanhar uma imagem partida (e não existia), o CI deixava-a passar à
-    # mesma. A rede de segurança das imagens (e2e/imagens.spec.ts, títulos com
-    # `@imagens`) passa a correr num passo próprio e BLOQUEANTE; o resto da suite
-    # fica exactamente como estava, informativo, no passo anterior.
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        parte: [1, 2, 3]
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: ./.github/actions/preparar
         with:
-          node-version: 22
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci || npm install
-
-      # ── O PASSO QUE COMEU 45 MINUTOS SEM CORRER UM TESTE ──────────────────
-      # Duas corridas seguidas foram CANCELADAS por esgotarem o tecto do job, e
-      # nenhuma delas chegou a executar um teste. Os registos dizem onde:
-      #
-      #   Get:5 https://archive.ubuntu.com/ubuntu noble-security InRelease
-      #   [44 minutos de silêncio]
-      #   ##[error]The operation was canceled.
-      #   Terminate orphan process: npm exec playwright install --with-deps
-      #
-      # O `--with-deps` instala bibliotecas do sistema com o apt, e o espelho de
-      # pacotes do runner (`azure.archive.ubuntu.com`) estava a responder `Ign:`
-      # a tudo. Sem tecto próprio, esse passo fica pendurado até o JOB inteiro
-      # ser cortado — e o que se perde não é o passo, é a bateria toda de
-      # passeios, que nem chega a arrancar.
-      #
-      # Duas mudanças, e a segunda é a que interessa: um tecto de 8 minutos para
-      # a falha ser rápida, e um caminho alternativo SEM apt. A imagem
-      # `ubuntu-latest` já traz as bibliotecas de que o Chromium precisa; o
-      # `--with-deps` é cinto e suspensórios, não o único caminho. Com o espelho
-      # em baixo, os testes correm à mesma.
-      - name: Install Playwright browser (com dependências do sistema)
-        id: navegador
-        timeout-minutes: 8
-        continue-on-error: true
-        run: npx playwright install --with-deps chromium
-
-      - name: Install Playwright browser (sem apt, se o espelho estiver em baixo)
-        if: steps.navegador.outcome != 'success'
-        timeout-minutes: 5
-        run: npx playwright install chromium
-
-      # ── A CACHE DAS DERIVADAS ──────────────────────────────────────────────
-      # Sem isto, cada corrida re-encoda as 2785 miniaturas do zero. Enquanto
-      # eram só WebP isso custava ~2 minutos e passava despercebido; com o AVIF
-      # ao lado passou a ~13, e foi o que empurrou este job para lá dos 30
-      # minutos e o fez ser cancelado a meio do passo das imagens.
-      #
-      # A Vercel preserva `.next/cache` entre builds sozinha — foi por isso que
-      # os deploys continuaram verdes e só o CI partiu. Aqui é preciso pedir.
-      #
-      # A chave inclui os parâmetros de encode (larguras, qualidades, formatos)
-      # porque mudá-los TEM de invalidar a cache: o pré-gerador já carimba cada
-      # ficheiro com eles, e uma chave que os ignorasse traria de volta
-      # ficheiros da qualidade anterior sem ninguém dar por isso.
-      - name: Cache das miniaturas pré-geradas
-        uses: actions/cache@v4
-        with:
-          path: |
-            .next/cache/pregen-gallery
-            .next/cache/pregen-logos
-          key: pregen-${{ runner.os }}-${{ hashFiles('public/imagens/**', 'scripts/pregen-gallery.mjs', 'scripts/pregen-logos.mjs') }}
-          restore-keys: |
-            pregen-${{ runner.os }}-
-
-      - name: Build
-        run: npm run build
-        env:
-          NEXT_TELEMETRY_DISABLED: "1"
+          navegador: "true"
+          construir: "true"
 
       # Corre primeiro o resto da suite (informativo). Se corresse depois do
       # passo bloqueante, uma falha nas imagens saltava-o por completo.
@@ -278,7 +197,7 @@ jobs:
         # `@propostas` corre no seu próprio passo bloqueante, com config e
         # servidor próprios — aqui só duplicaria trabalho, e falharia, porque
         # este servidor é o de produção e recusa escritas sem Supabase.
-        run: npx playwright test --grep-invert "@imagens|@movel|@propostas|@galeria|@desempenho|@movimento|@semrede|@vidro"
+        run: npx playwright test --grep-invert "@imagens|@movel|@propostas|@galeria|@desempenho|@movimento|@semrede|@vidro" --shard=${{ matrix.parte }}/3
         env:
           CI: "true"
           # Test-only admin auth so the back-office smoke can log in against the
@@ -288,31 +207,53 @@ jobs:
           ADMIN_PASSWORD_HASH: "$2b$10$eSAkm9hz/JUpFYWRdPrA9.YJP.Gjry2IwVwgZa3hjvHcvV/r27n7u"
           SESSION_SECRET: "e2e-ci-session-secret-not-for-production-use"
 
-      # BLOQUEANTE. A ergonomia táctil do back office num iPhone SE (375 px,
-      # toque ligado): alvos de 44x44 px, campos com letra >= 16 px, nada de
-      # conteúdo para lá da margem direita, e nada de focável fora do ecrã. As
-      # quatro regras e os limiares estão
-      # em e2e/ergonomia-tactil.mjs, partilhados com o varrimento que produz o
-      # relatório (scripts/auditar-toque-admin.mjs), para o CI e o relatório
-      # nunca discordarem.
-      #
-      # Bloqueante e não informativo porque isto regride sozinho: basta alguém
-      # escrever `py-1.5` num botão novo. Um passo que avisa e deixa passar é um
-      # passo que se ignora — e a dona trabalha no telemóvel.
-      #
-      # Corre à parte do passo de cima (que é `continue-on-error`) pela mesma
-      # razão que as passkeys: senão a falha ficava enterrada num passo que não
-      # pára nada.
-      # BLOQUEANTE. A galeria é a montra do negócio e recebe tráfego pago: uma
-      # regressão de peso aqui custa dinheiro em duas frentes (converte menos E
-      # o Índice de Qualidade sobe o custo por clique). Estes testes guardam a
-      # CAUSA de cada ganho medido — o tecto de resolução por classe de ecrã, a
-      # ordem AVIF/WebP, o placeholder e a caixa reservada.
-      #
-      # Bloqueante e não informativo porque a regressão é INVISÍVEL: a galeria
-      # continua a parecer bem com fotos três vezes maiores do que precisa. Foi
-      # exactamente assim que ela chegou a 55 MB por travessia sem ninguém dar
-      # por isso — e um passo que avisa e deixa passar é um passo que se ignora.
+  # BLOQUEANTE, em dois jobs: os 118 passeios das imagens, metade em cada.
+  e2e-imagens:
+    name: E2E · imagens (${{ matrix.parte }}/2)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        parte: [1, 2]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/preparar
+        with:
+          navegador: "true"
+          construir: "true"
+
+      # BLOQUEANTE. Uma imagem que não pinte em qualquer página, em telemóvel ou
+      # em computador, com o menu fechado ou aberto, põe o PR vermelho. Corre em
+      # dois jobs paralelos (`--shard`), cada um com metade dos passeios.
+      - name: Imagens — nenhuma imagem partida em nenhuma página
+        run: npx playwright test --grep "@imagens" --shard=${{ matrix.parte }}/2
+        env:
+          CI: "true"
+          ADMIN_PASSWORD_HASH: "$2b$10$eSAkm9hz/JUpFYWRdPrA9.YJP.Gjry2IwVwgZa3hjvHcvV/r27n7u"
+          SESSION_SECRET: "e2e-ci-session-secret-not-for-production-use"
+
+      - name: Upload report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-imagens-${{ matrix.parte }}
+          path: playwright-report/
+          retention-days: 7
+
+  # BLOQUEANTE. Os passos curtos contra o servidor de PRODUÇÃO (`next start`):
+  # cada um é de segundos, e juntos cabem num job.
+  e2e-producao:
+    name: E2E · peso, galeria, molas, vidro, sem rede
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/preparar
+        with:
+          navegador: "true"
+          construir: "true"
+
       # BLOQUEANTE. O PESO DO BACK OFFICE, que até aqui não era medido por
       # ninguém: os orçamentos do `lighthouserc.json` cobrem seis páginas e são
       # todas do sítio público. O painel que ela abre todos os dias no telemóvel
@@ -333,6 +274,16 @@ jobs:
           ADMIN_PASSWORD_HASH: "$2b$10$eSAkm9hz/JUpFYWRdPrA9.YJP.Gjry2IwVwgZa3hjvHcvV/r27n7u"
           SESSION_SECRET: "e2e-ci-session-secret-not-for-production-use"
 
+      # BLOQUEANTE. A galeria é a montra do negócio e recebe tráfego pago: uma
+      # regressão de peso aqui custa dinheiro em duas frentes (converte menos E
+      # o Índice de Qualidade sobe o custo por clique). Estes testes guardam a
+      # CAUSA de cada ganho medido — o tecto de resolução por classe de ecrã, a
+      # ordem AVIF/WebP, o placeholder e a caixa reservada.
+      #
+      # Bloqueante e não informativo porque a regressão é INVISÍVEL: a galeria
+      # continua a parecer bem com fotos três vezes maiores do que precisa. Foi
+      # exactamente assim que ela chegou a 55 MB por travessia sem ninguém dar
+      # por isso — e um passo que avisa e deixa passar é um passo que se ignora.
       - name: Desempenho da galeria (bloqueante)
         run: npx playwright test --grep "@galeria"
         env:
@@ -429,18 +380,25 @@ jobs:
           ADMIN_PASSWORD_HASH: "$2b$10$eSAkm9hz/JUpFYWRdPrA9.YJP.Gjry2IwVwgZa3hjvHcvV/r27n7u"
           SESSION_SECRET: "e2e-ci-session-secret-not-for-production-use"
 
-      # Config própria porque estes passeios CRIAM um pedido — precisam de um
-      # cliente na lista para chegar ao estúdio — e o servidor de produção do
-      # CI recusa escritas sem Supabase. Com o servidor de produção, o pedido
-      # não chegava a gravar e a falha aparecia disfarçada de outra coisa
-      # («main li button» não encontrado, trinta linhas à frente). A razão
-      # está escrita em playwright.movel.config.ts.
-      - name: Ergonomia táctil no telemóvel (bloqueante)
-        run: npm run test:e2e:movel
-        env:
-          CI: "true"
-          ADMIN_PASSWORD_HASH: "$2b$10$eSAkm9hz/JUpFYWRdPrA9.YJP.Gjry2IwVwgZa3hjvHcvV/r27n7u"
-          SESSION_SECRET: "e2e-ci-session-secret-not-for-production-use"
+      - name: Upload report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-producao
+          path: playwright-report/
+          retention-days: 7
+
+  # BLOQUEANTE. Os passeios que GRAVAM, com o servidor de desenvolvimento
+  # (cada config arranca o seu `npm run dev`): não precisam do build.
+  e2e-dados:
+    name: E2E · dados
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/preparar
+        with:
+          navegador: "true"
 
       # BLOQUEANTE. Os passeios que precisam de GRAVAR — e que por isso têm
       # servidor próprio (`playwright.dados.config.ts` explica porquê). O
@@ -454,6 +412,52 @@ jobs:
       # de Faturas nem sequer se vê sem uma fatura grande semeada.
       - name: Geometria e dados — os passeios que gravam (bloqueante)
         run: npm run test:e2e:dados
+        env:
+          CI: "true"
+          ADMIN_PASSWORD_HASH: "$2b$10$eSAkm9hz/JUpFYWRdPrA9.YJP.Gjry2IwVwgZa3hjvHcvV/r27n7u"
+          SESSION_SECRET: "e2e-ci-session-secret-not-for-production-use"
+
+      - name: Upload report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-dados
+          path: playwright-report/
+          retention-days: 7
+
+  e2e-gravam:
+    name: E2E · telemóvel, propostas, passkeys
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/preparar
+        with:
+          navegador: "true"
+
+      # BLOQUEANTE. A ergonomia táctil do back office num iPhone SE (375 px,
+      # toque ligado): alvos de 44x44 px, campos com letra >= 16 px, nada de
+      # conteúdo para lá da margem direita, e nada de focável fora do ecrã. As
+      # quatro regras e os limiares estão
+      # em e2e/ergonomia-tactil.mjs, partilhados com o varrimento que produz o
+      # relatório (scripts/auditar-toque-admin.mjs), para o CI e o relatório
+      # nunca discordarem.
+      #
+      # Bloqueante e não informativo porque isto regride sozinho: basta alguém
+      # escrever `py-1.5` num botão novo. Um passo que avisa e deixa passar é um
+      # passo que se ignora — e a dona trabalha no telemóvel.
+      #
+      # Corre à parte do passo de cima (que é `continue-on-error`) pela mesma
+      # razão que as passkeys: senão a falha ficava enterrada num passo que não
+      # pára nada.
+      # Config própria porque estes passeios CRIAM um pedido — precisam de um
+      # cliente na lista para chegar ao estúdio — e o servidor de produção do
+      # CI recusa escritas sem Supabase. Com o servidor de produção, o pedido
+      # não chegava a gravar e a falha aparecia disfarçada de outra coisa
+      # («main li button» não encontrado, trinta linhas à frente). A razão
+      # está escrita em playwright.movel.config.ts.
+      - name: Ergonomia táctil no telemóvel (bloqueante)
+        run: npm run test:e2e:movel
         env:
           CI: "true"
           ADMIN_PASSWORD_HASH: "$2b$10$eSAkm9hz/JUpFYWRdPrA9.YJP.Gjry2IwVwgZa3hjvHcvV/r27n7u"
@@ -487,20 +491,58 @@ jobs:
           CI: "true"
           SESSION_SECRET: "e2e-ci-session-secret-not-for-production-use"
 
-      # BLOQUEANTE. Uma imagem que não pinte em qualquer página, em telemóvel ou
-      # em computador, com o menu fechado ou aberto, põe o PR vermelho. Corre em
-      # último para o relatório HTML que fica no artefacto ser o desta rede.
-      - name: Imagens — nenhuma imagem partida em nenhuma página
-        run: npx playwright test --grep "@imagens"
-        env:
-          CI: "true"
-          ADMIN_PASSWORD_HASH: "$2b$10$eSAkm9hz/JUpFYWRdPrA9.YJP.Gjry2IwVwgZa3hjvHcvV/r27n7u"
-          SESSION_SECRET: "e2e-ci-session-secret-not-for-production-use"
-
       - name: Upload report on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-gravam
           path: playwright-report/
           retention-days: 7
+
+  e2e:
+    name: E2E (Playwright)
+    # O nome de sempre: passa só se todos os passeios que bloqueiam passarem. O informativo fica de fora, como sempre ficou.
+    needs: [e2e-imagens, e2e-producao, e2e-dados, e2e-gravam]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Todas as partes passaram?
+        run: |
+          echo "e2e-imagens=${{ needs.e2e-imagens.result }} e2e-producao=${{ needs.e2e-producao.result }} e2e-dados=${{ needs.e2e-dados.result }} e2e-gravam=${{ needs.e2e-gravam.result }}"
+          if [ "${{ needs.e2e-imagens.result }}" != success ] || [ "${{ needs.e2e-producao.result }}" != success ] || [ "${{ needs.e2e-dados.result }}" != success ] || [ "${{ needs.e2e-gravam.result }}" != success ]; then exit 1; fi
+
+  # A história do tecto do job E2E antigo (para quem vier a seguir):
+    # ── 60, E É A SEGUNDA VEZ QUE ESTE NÚMERO SOBE ────────────────────────
+    #
+    # A primeira foi 30 → 45: o job foi cancelado aos 30 minutos, a meio do
+    # passo das imagens e com tudo o que já tinha corrido a passar, porque o
+    # build à frente ficou ~13 minutos mais lento quando o AVIF entrou.
+    #
+    # Agora 45 → 60, e a avaria é a mesma com outra causa. O job foi cancelado
+    # aos 45 minutos e 17 segundos, no teste 117 de 118 do passo das imagens,
+    # com TODOS os 116 anteriores a verde. Não falhou nada: acabou o tempo.
+    #
+    # Os números que o dizem, das últimas seis corridas no `main`:
+    #
+    #     5a815c4c ... 41m38   ← a última antes desta
+    #     e9c58e55 ... 39m51
+    #     86726b58 ... 36m39
+    #     3266b9f7 ... 36m58
+    #     7a71d0ce ... 38m07
+    #     21fb653b ... 31m36
+    #
+    # A suite cresce porque é assim que esta casa trabalha: cada avaria que
+    # escapou deixa cá um guarda. Em três dias subiu de 31 para 41 minutos, e o
+    # guarda que veio com este ramo — o texto sobre a fotografia da entrada —
+    # foi o que a levou a passar dos 45.
+    #
+    # ── E PORQUE É QUE ISTO NÃO É UMA SOLUÇÃO, É UMA FOLGA ────────────────
+    #
+    # Levantar o tecto compra tempo, não o resolve: ao ritmo destes três dias,
+    # os 60 chegam outra vez. O que resolve é reduzir o CUSTO, e a peça óbvia é
+    # o passo das imagens — 118 passeios de ~3,5 s que abrem página a página,
+    # sempre as mesmas. Isso é trabalho de outro ramo, não deste: um `timeout`
+    # é uma linha, e refazer a estratégia do passo das imagens é uma mudança
+    # que merece ser medida por si.
+  # Desde 15/10 cada parte tem o seu job e o seu tecto de 30 minutos.

@@ -1,0 +1,67 @@
+name: Preparar
+description: >
+  Node, dependências, a cache das miniaturas pré-geradas e — se pedido — o
+  Chromium do Playwright e o build de produção. É o começo de todos os jobs do
+  CI desde que deixaram de correr uns atrás dos outros (15/10): escrito uma vez,
+  para nenhum job divergir dos outros no que instala ou na chave da cache.
+
+inputs:
+  navegador:
+    description: Instalar o Chromium do Playwright.
+    default: "false"
+  construir:
+    description: Fazer o `npm run build` (os passeios contra `next start`).
+    default: "false"
+  miniaturas:
+    description: Restaurar a cache das miniaturas (os testes de unidade não precisam).
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: npm
+
+    - name: Install dependencies
+      # Fall back to npm install if the lockfile is out of sync with sharp's
+      # platform-specific optional deps (a known cross-platform npm quirk).
+      shell: bash
+      run: npm ci || npm install
+
+    # ── O PASSO QUE COMEU 45 MINUTOS SEM CORRER UM TESTE ──────────────────
+    # O `--with-deps` instala bibliotecas do sistema com o apt, e o espelho de
+    # pacotes do runner chegou a ficar 44 minutos a responder `Ign:` a tudo —
+    # duas corridas canceladas sem um teste executado. Daí um tecto de 8
+    # minutos e um caminho alternativo SEM apt: a imagem `ubuntu-latest` já
+    # traz as bibliotecas de que o Chromium precisa.
+    - name: Install Playwright browser
+      if: inputs.navegador == 'true'
+      shell: bash
+      run: timeout 8m npx playwright install --with-deps chromium || timeout 5m npx playwright install chromium
+
+    # ── A CACHE DAS DERIVADAS ──────────────────────────────────────────────
+    # Sem isto, cada corrida re-encoda as 2785 miniaturas do zero (~13 minutos
+    # com o AVIF). A Vercel preserva `.next/cache` sozinha; aqui é preciso
+    # pedir. A chave inclui os parâmetros de encode porque mudá-los TEM de
+    # invalidar a cache. É a MESMA chave em todos os jobs e no Lighthouse —
+    # antes, a do Lighthouse não batia e só acertava pelo `restore-keys`.
+    - name: Cache das miniaturas pré-geradas
+      if: inputs.miniaturas == 'true'
+      uses: actions/cache@v4
+      with:
+        path: |
+          .next/cache/pregen-gallery
+          .next/cache/pregen-logos
+        key: pregen-${{ runner.os }}-${{ hashFiles('public/imagens/**', 'scripts/pregen-gallery.mjs', 'scripts/pregen-logos.mjs') }}
+        restore-keys: |
+          pregen-${{ runner.os }}-
+
+    - name: Build
+      if: inputs.construir == 'true'
+      shell: bash
+      run: npm run build
+      env:
+        NEXT_TELEMETRY_DISABLED: "1"

@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   lighthouse:
-    name: Performance / A11y / SEO budgets
+    name: Performance / A11y / SEO budgets (${{ matrix.modo }})
     runs-on: ubuntu-latest
     # Informational: surfaces scores on every PR without blocking the merge.
     continue-on-error: true
@@ -38,40 +38,27 @@ jobs:
     # arrancam juntas, portanto na primeira depois de mexer nas fotos nenhuma
     # tem cache) sem deixar de mostrar crescimento.
     timeout-minutes: 40
+    # Desktop e telemóvel em dois jobs ao mesmo tempo (15/10): eram dois passos
+    # seguidos, 7 + 6 minutos.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - modo: desktop
+            config: lighthouserc.json
+          - modo: telemóvel
+            config: lighthouserc.mobile.json
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      # A mesma preparação dos outros jobs — e por isso a MESMA chave da cache
+      # das miniaturas. A deste ficheiro não incluía o `pregen-logos.mjs` e só
+      # acertava pelo `restore-keys`.
+      - uses: ./.github/actions/preparar
         with:
-          node-version: 22
-          cache: npm
+          construir: "true"
 
-      - name: Install dependencies
-        run: npm ci || npm install
-
-      # A MESMA CHAVE dos jobs do `ci.yml`, de propósito: as três compilações do
-      # mesmo commit partilham o resultado do encode em vez de o repetirem. A
-      # chave inclui os parâmetros de encode (via `scripts/pregen-gallery.mjs`)
-      # porque mudá-los TEM de invalidar a cache — senão voltavam ficheiros da
-      # qualidade anterior sem ninguém dar por isso.
-      - name: Cache das miniaturas pré-geradas
-        uses: actions/cache@v4
-        with:
-          path: .next/cache/pregen-gallery
-          key: pregen-${{ runner.os }}-${{ hashFiles('public/imagens/**', 'scripts/pregen-gallery.mjs') }}
-          restore-keys: |
-            pregen-${{ runner.os }}-
-
-      - name: Build
-        run: npm run build
-        env:
-          NEXT_TELEMETRY_DISABLED: "1"
-
-      - name: Run Lighthouse CI (desktop)
+      - name: Run Lighthouse CI (${{ matrix.modo }})
         run: |
           npm install -g @lhci/cli@0.14.x
-          lhci autorun --config=lighthouserc.json
-
-      - name: Run Lighthouse CI (mobile)
-        run: lhci autorun --config=lighthouserc.mobile.json
+          lhci autorun --config=${{ matrix.config }}
