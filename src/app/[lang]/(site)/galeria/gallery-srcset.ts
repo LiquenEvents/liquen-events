@@ -106,7 +106,10 @@ export function sizesDaFila(racios: number[], idx: number): string {
     const naFila = racios.slice(0, k + 1);
     if (idx >= naFila.length) return;
     const soma = naFila.reduce((a, r) => a + r, 0);
-    partes.push(`${limite}${Math.ceil((racios[idx] / soma) * 100)}vw`);
+    // Para BAIXO, a 0,1vw: arredondar para cima (27vw para uma caixa de 26,1)
+    // bastava, perto de um degrau, para pedir o ficheiro seguinte — medido, 29
+    // de 900 fotos da fila a 1440 px recebiam o de 1024 em vez do de 768.
+    partes.push(`${limite}${Math.floor((racios[idx] / soma) * 1000) / 10}vw`);
   });
   return partes.join(", ");
 }
