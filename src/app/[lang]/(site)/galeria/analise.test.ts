@@ -155,3 +155,44 @@ describe("com as 918 fotografias verdadeiras", () => {
     expect(a).toEqual(b);
   });
 });
+
+/**
+ * O DESTAQUE É SEMPRE DEITADO (15/10). Ela mandou uma foto ao alto no maior
+ * lugar da página, e pediu que a galeria o percebesse sozinha. Medido antes
+ * desta correcção: em 400 ordens, 10 sem destaque nas primeiras 24, e numa
+ * delas uma foto ao alto à cabeça.
+ */
+describe("o destaque é sempre deitado", () => {
+  const MUITAS = Array.from({ length: 400 }, (_, i) => `:d${i}`);
+
+  it("com as fotografias verdadeiras, em 400 ordens", () => {
+    const falhas = MUITAS.filter((seed) => {
+      const [grande] = interleaveByCollection(FOTOS, seed);
+      return !grande.destaque || razao(grande) < 1.2;
+    });
+    expect(falhas).toEqual([]);
+  });
+
+  /** 40 fotos ao alto de eventos diferentes, uma delas deitada. */
+  const umaDeitada = (n: number, comAnalise: boolean): Photo[] =>
+    Array.from({ length: n }, (_, i) => ({
+      src: `/imagens/galeria-teste-${String(i).padStart(2, "0")}.jpg`,
+      label: (["Casamento", "Evento", "Corporativo"] as const)[i % 3],
+      aspectRatio: i === n - 1 ? "3 / 2" : "4 / 5",
+      ...(comAnalise && i === n - 1 ? { destaque: true } : {}),
+    }));
+
+  it("vai buscá-lo à lista inteira quando não está nas primeiras 24", () => {
+    const fotos = umaDeitada(60, true);
+    for (const seed of MUITAS.slice(0, 50)) {
+      expect(interleaveByCollection(fotos, seed)[0].aspectRatio, seed).toBe("3 / 2");
+    }
+  });
+
+  it("sem dados de análise, fica a mais deitada", () => {
+    const fotos = umaDeitada(20, false);
+    for (const seed of MUITAS.slice(0, 50)) {
+      expect(interleaveByCollection(fotos, seed)[0].aspectRatio, seed).toBe("3 / 2");
+    }
+  });
+});

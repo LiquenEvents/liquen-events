@@ -336,8 +336,9 @@ describe("navegar com o dedo, sem dar a volta (GAL-2)", () => {
   it("o deslize na tira não muda de foto (o gesto é só da foto)", async () => {
     vi.useRealTimers();
     abrir(2);
-    await esperar();
-    const tira = screen.getAllByRole("button", { name: /^foto \d+ de/ })[0].parentElement!;
+    // A tira monta depois de a foto abrir: espera-se por ela, não por um tempo
+    // fixo (com a máquina carregada, 40 ms não chegavam).
+    const tira = (await screen.findAllByRole("button", { name: /^foto \d+ de/ }))[0].parentElement!;
     fireEvent.pointerDown(tira, { pointerId: 3, pointerType: "touch", clientX: 500, clientY: 800 });
     fireEvent.pointerMove(tira, { pointerId: 3, pointerType: "touch", clientX: 100, clientY: 800 });
     fireEvent.pointerUp(tira, { pointerId: 3, pointerType: "touch", clientX: 100, clientY: 800 });

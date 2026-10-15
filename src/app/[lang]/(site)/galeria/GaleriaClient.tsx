@@ -7,7 +7,7 @@ import { createPortal } from "react-dom";
 import Image from "next/image";
 import type { Label } from "./photos-data";
 import { collectionFor } from "./collections";
-import { type Photo, interleaveByCollection } from "./interleave";
+import { type Photo, interleaveByCollection, razaoDe } from "./interleave";
 import type { Dict } from "@/lib/i18n";
 import GalleryImage from "./GalleryImage";
 import { galleryImageLoader } from "./gallery-image-loader";
@@ -17,6 +17,7 @@ import {
   ESCADA_TELEMOVEL,
   ficheiroDaGaleria,
   srcsetDaGaleria,
+  sizesDaFila,
 } from "./gallery-srcset";
 import { snapGalleryWidth } from "./gallery-image-loader";
 import { useAntecipacao } from "./useAntecipacao";
@@ -323,7 +324,7 @@ const Tile = memo(function Tile({
   label,
   caption,
   sub,
-  hiddenSm,
+  escondida,
   eager,
   revealDelay,
   tabbable,
@@ -342,7 +343,8 @@ const Tile = memo(function Tile({
   label: string;
   caption: string;
   sub?: string;
-  hiddenSm: boolean;
+  /** Classes que a escondem onde a mesma foto está na fila do topo (`NA_GRELHA_ATE`). */
+  escondida: string;
   eager: boolean;
   revealDelay: number;
   tabbable: boolean;
@@ -359,7 +361,7 @@ const Tile = memo(function Tile({
   return (
     <div
       ref={registerTile}
-      className={`g-reveal${hiddenSm ? " sm:hidden" : ""}`}
+      className={`g-reveal${escondida ? ` ${escondida}` : ""}`}
       style={{ "--reveal-delay": `${revealDelay}ms` } as React.CSSProperties}
     >
       <button
@@ -420,13 +422,40 @@ const Tile = memo(function Tile({
 });
 
 /**
- * Um dos 4 satélites do mosaico-herói. Componente próprio só por causa do ref:
- * o `anchorRef` de cada satélite tem de ser o SEU botão (é ele que o observer
- * vigia).
+ * A FILA DO TOPO, SEM CORTES (15/10, a pedido dela: «isto não pode acontecer…
+ * as fotos têm que ser apresentadas de acordo com as suas dimensões»).
+ *
+ * Era um mosaico de altura FIXA — um 2×2 e quatro satélites, todos recortados
+ * (`object-cover`) em caixas cuja forma mudava com a largura do ecrã. A 1920 px
+ * o 2×2 ficava com 958×600 e uma foto ao alto mostrava só o céu; as satélites
+ * recebiam uma foto ao alto 87 % das vezes e cortavam-na também.
+ *
+ * Agora é uma fila «justificada»: cada foto leva uma caixa com o SEU rácio
+ * (`aspect-ratio`) e `flex: <rácio> 1 0%`. Numa linha flex isso dá a cada uma
+ * uma largura proporcional ao rácio, e portanto a MESMA altura a todas — a que
+ * faz a fila caber na largura. Nada se recorta, em largura nenhuma, e é só CSS:
+ * o servidor já sabe a forma de cada foto, a altura fica reservada desde o
+ * primeiro fotograma e não há salto.
+ *
+ * Quantas entram na fila depende da largura (o destaque, e mais uma por
+ * degrau); as que não entram vivem na grelha, como as satélites viviam no
+ * telemóvel. Cada foto 1–3 existe duas vezes e o CSS mostra uma só: a da fila
+ * desde o degrau dela (`NA_FILA_DESDE`), a da grelha até lá (`NA_GRELHA_ATE`).
  */
-function SatelliteTile({
+const FILA_MAX = 4;
+const NA_FILA_DESDE = ["", "hidden sm:block", "hidden md:block", "hidden 2xl:block"];
+const NA_GRELHA_ATE = ["", "sm:hidden", "md:hidden", "2xl:hidden"];
+/** Os mesmos degraus em JS: quantas fotos leva a fila a esta largura. */
+const DEGRAUS_DA_FILA = ["(min-width: 640px)", "(min-width: 768px)", "(min-width: 1536px)"];
+
+/**
+ * Uma foto da fila do topo. Componente próprio por causa do ref: o `anchorRef`
+ * de cada uma tem de ser o SEU botão (é ele que o observer vigia).
+ */
+function FotoDaFila({
   photo,
   idx,
+  sizes,
   alt,
   label,
   cap,
@@ -439,6 +468,8 @@ function SatelliteTile({
 }: {
   photo: Photo;
   idx: number;
+  /** Ver `sizesDaFila`: sai da forma das fotos que estão na fila. */
+  sizes: string;
   alt: string;
   label: string;
   cap: { caption: string; sub?: string };
@@ -450,6 +481,7 @@ function SatelliteTile({
   onTileFocus: (idx: number) => void;
 }) {
   const btnRef = useRef<HTMLButtonElement>(null);
+  const r = razaoDe(photo.aspectRatio);
   return (
     <button
       ref={btnRef}
@@ -463,22 +495,36 @@ function SatelliteTile({
       aria-label={label}
       data-cap={cap.caption}
       data-sub={cap.sub}
-      className={`g-hero g-tile relative hidden sm:block h-full w-full overflow-hidden group ${FOCUS_RING}`}
+      className={`g-hero g-tile relative min-w-0 overflow-hidden group ${FOCUS_RING}${NA_FILA_DESDE[idx] ? ` ${NA_FILA_DESDE[idx]}` : ""}`}
       style={
-        // 40 ms e não 70: com a opacidade fora da animação (ver `g-hero-in`), o
-        // atraso deixou de ser tempo com o mosaico invisível, mas continua a ser
-        // tempo até a parede assentar. A onda lê-se na mesma.
-        { "--hero-delay": `${idx * 40}ms`, backgroundColor: photo.color } as React.CSSProperties
+        {
+          // A caixa tem a forma da foto: ver a nota em `FILA_MAX`.
+          aspectRatio: photo.aspectRatio,
+          flex: `${r} 1 0%`,
+          // 40 ms e não 70: com a opacidade fora da animação (ver `g-hero-in`),
+          // o atraso deixou de ser tempo com a fila invisível, mas continua a
+          // ser tempo até a parede assentar. A onda lê-se na mesma.
+          "--hero-delay": `${idx * 40}ms`,
+          backgroundColor: photo.color,
+        } as React.CSSProperties
       }
     >
+      {/* Fica SEMPRE montada, também com esta foto aberta: é o sítio para onde
+          o voo de volta aterra. */}
       <GalleryImage
         src={photo.src}
         alt={alt}
-        sizes="25vw"
+        sizes={sizes}
+        // A caixa tem a forma da foto, por isso `cover` já não recorta nada;
+        // fica pelo arredondamento de um píxel.
         className={`object-cover ${zoomClass}`}
         aspectRatio={photo.aspectRatio}
-        // A satélite recorta: pelo ponto de interesse, não pelo centro.
         foco={photo.foco}
+        // O destaque é a maior imagem da página e o candidato a LCP: eager e
+        // `fetchPriority="high"`. As outras não levam `priority`: escondidas
+        // (`display:none`) o observer nunca dispara e o telemóvel não as
+        // descarrega; à vista, entram na fila logo a seguir.
+        priority={idx === 0}
         anchorRef={btnRef}
         unavailableLabel={unavailableLabel}
         blurDataURL={photo.blurDataURL}
@@ -536,22 +582,14 @@ export default function GaleriaClient({
    * `voo.ts`). `null` quando não há miniatura pintada a partir da qual voar.
    */
   const [origem, setOrigem] = useState<OrigemDoVoo | null>(null);
-  // Breakpoint sm (as fotos 1-4 vivem no mosaico em sm+ e no masonry em mobile;
-  // o CSS esconde uma). `isSm` diz qual é a instância VISÍVEL de cada foto.
-  const [isSm, setIsSm] = useState<boolean | null>(null);
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 640px)");
-    const apply = () => setIsSm(mq.matches);
-    apply();
-    mq.addEventListener("change", apply);
-    return () => mq.removeEventListener("change", apply);
-  }, []);
   // Nº de colunas da masonry — medido no cliente para podermos distribuir os
   // tiles MANUALMENTE por colunas equilibradas (ver `masonryColumns`). Começa em
   // 1 (mobile-first) para que o SSR e a primeira renderização no cliente
   // coincidam (sem hydration mismatch); o efeito ajusta para o valor real. Espelha
   // os breakpoints antigos (columns-1 / sm:columns-2 / md:columns-3).
   const [cols, setCols] = useState(1);
+  // Quantas fotos leva a fila do topo (ver `FILA_MAX`): 1 no SSR, como `cols`.
+  const [fila, setFila] = useState(1);
   // Measure the real column count in a LAYOUT effect (before the browser paints),
   // not a passive effect. SSR + the hydration render still use cols=1 (no
   // mismatch), but the correction to 2/3 now lands before first paint — so a
@@ -559,15 +597,16 @@ export default function GaleriaClient({
   // column and then re-pack into 2–3 columns (that 1→N repack was a big CLS on
   // landing at /galeria). Runs as a passive effect on the server (no-op there).
   useIsomorphicLayoutEffect(() => {
-    const sm = window.matchMedia("(min-width: 640px)");
-    const md = window.matchMedia("(min-width: 768px)");
-    const apply = () => setCols(md.matches ? 3 : sm.matches ? 2 : 1);
+    const degraus = DEGRAUS_DA_FILA.map((q) => window.matchMedia(q));
+    const [sm, md] = degraus;
+    const apply = () => {
+      setCols(md.matches ? 3 : sm.matches ? 2 : 1);
+      setFila(1 + degraus.filter((m) => m.matches).length);
+    };
     apply();
-    sm.addEventListener("change", apply);
-    md.addEventListener("change", apply);
+    for (const m of degraus) m.addEventListener("change", apply);
     return () => {
-      sm.removeEventListener("change", apply);
-      md.removeEventListener("change", apply);
+      for (const m of degraus) m.removeEventListener("change", apply);
     };
   }, []);
 
@@ -1029,8 +1068,8 @@ export default function GaleriaClient({
   // carregar mais uma página nunca desloca tiles já colocados, portanto a grelha
   // continua a não re-baralhar a meio do scroll.
   const masonryColumns = useMemo(() => {
-    // O mosaico-herói fica com a foto 0 (e 1–4 em sm+); a masonry leva o resto.
-    const start = collectionFilter ? 0 : cols === 1 ? 1 : 5;
+    // A fila do topo fica com as `fila` primeiras; a masonry leva o resto.
+    const start = collectionFilter ? 0 : fila;
     const cells: { p: Photo; idx: number }[][] = Array.from({ length: cols }, () => []);
     const heights = new Array<number>(cols).fill(0);
     for (let i = start; i < visible.length; i++) {
@@ -1043,7 +1082,7 @@ export default function GaleriaClient({
       heights[c] += rel;
     }
     return cells;
-  }, [visible, cols, collectionFilter]);
+  }, [visible, cols, fila, collectionFilter]);
 
   // ── Tabulação rotativa da grelha ────────────────────────────────────────
   // A grelha é um único ponto de tabulação e as setas ←/→ (mais Home/End)
@@ -1054,29 +1093,22 @@ export default function GaleriaClient({
   // inalcançáveis sem rato.
   const [rovingIdx, setRovingIdx] = useState(0);
   const pendingFocusRef = useRef<number | null>(null);
-  const heroRef = useRef<HTMLButtonElement>(null);
   // Ao trocar de filtro/coleção o pool encolhe; o índice tabulável é sempre
   // encostado ao que existe, para a grelha nunca ficar sem porta de entrada.
   const roving = Math.min(rovingIdx, Math.max(0, visible.length - 1));
-  /** Foca o mosaico `idx` na sua instância VISÍVEL (as fotos 1-4 existem duas
-      vezes: no mosaico-herói em sm+ e no masonry em mobile). */
-  const focusTile = useCallback(
-    (idx: number) => {
-      if (typeof document === "undefined") return false;
-      // Qual das duas instâncias está visível é decidido pelo breakpoint, não
-      // por medição de layout: as fotos 1-4 vivem no mosaico-herói em sm+ e no
-      // masonry em mobile, e o CSS esconde a outra.
-      const want = isSm ? "hero" : "grid";
-      const el =
-        document.querySelector<HTMLElement>(
-          `[data-tile-idx="${idx}"][data-tile-variant="${want}"]`,
-        ) ?? document.querySelector<HTMLElement>(`[data-tile-idx="${idx}"]`);
-      if (!el) return false;
-      el.focus();
-      return true;
-    },
-    [isSm],
-  );
+  /** Foca o mosaico `idx` na sua instância VISÍVEL (as fotos 1-3 existem duas
+      vezes: na fila do topo e na grelha, e o CSS esconde uma conforme a
+      largura — são quatro degraus, por isso conta a que tem tamanho). */
+  const focusTile = useCallback((idx: number) => {
+    if (typeof document === "undefined") return false;
+    const el =
+      miniaturaPintada(idx) ??
+      document.querySelector<HTMLElement>(`[data-tile-idx="${idx}"][data-tile-variant="grid"]`) ??
+      document.querySelector<HTMLElement>(`[data-tile-idx="${idx}"]`);
+    if (!el) return false;
+    el.focus();
+    return true;
+  }, []);
   const onTileFocus = useCallback((idx: number) => setRovingIdx(idx), []);
   /**
    * Nome acessível do botão de um mosaico. Antes não havia nenhum: o nome vinha
@@ -1297,85 +1329,36 @@ export default function GaleriaClient({
         <p id="galeria-grid-hint" className="sr-only">
           {dict.gridHint}
         </p>
-        {/* Hero — mosaico editorial de 5 fotos. Skipped in collection view:
-            the mosaic/masonry dual-mount for slots 1-4, combined with a full
-            pool swap, is exactly the combination that confuses React's
-            <ViewTransition> into logging duplicate-name errors. A collection
-            is one simple, uniform story anyway — no need for a hero. */}
+        {/* A fila do topo, sem cortes (ver `FILA_MAX`). Fora da vista de
+            coleção: a coleção é uma história só, e começa direita na grelha. */}
         {!collectionFilter && visible.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 grid-rows-2 gap-0.5 mb-0.5 h-[320px] sm:h-[480px] lg:h-[600px]">
-            {/* Foto grande — 2×2 */}
-            <button
-              ref={heroRef}
-              onClick={() => openAt(0)}
-              onKeyDown={(e) => onKeyNav(e, 0)}
-              onFocus={() => onTileFocus(0)}
-              data-ripple
-              data-tile-idx={0}
-              data-tile-variant="hero"
-              tabIndex={roving === 0 ? 0 : -1}
-              aria-label={tileLabel(visible[0].src, visible[0].label, 0)}
-              data-cap={caption(visible[0].src, visible[0].label).caption}
-              data-sub={caption(visible[0].src, visible[0].label).sub}
-              className={`g-hero g-tile relative col-span-2 row-span-2 h-full w-full overflow-hidden group ${FOCUS_RING}`}
-              style={{ backgroundColor: visible[0].color }}
-            >
-              {/* Fica SEMPRE montada, também com esta foto aberta. Desmontava
-                  para servir um morph que já não existia, e ao fechar via-se
-                  um buraco cinzento até a fotografia voltar a descodificar —
-                  agora é o sítio para onde o voo de volta aterra. */}
-              <GalleryImage
-                src={visible[0].src}
-                alt={altText(visible[0].src, visible[0].label)}
-                sizes="(max-width: 640px) 100vw, 50vw"
-                className={`object-cover ${zoomClass}`}
-                aspectRatio={visible[0].aspectRatio}
-                // O 2×2 recorta: pelo ponto de interesse, não pelo centro.
-                foco={visible[0].foco}
-                // The 2×2 flagship tile is the largest grid image and the LCP
-                // candidate on this route — eager so it resolves without a lazy
-                // delay / pop-in. `priority` aqui também significa: salta a
-                // fila e leva fetchPriority="high" (era null em TODAS as <img>
-                // da página, mesmo nesta, que compete com o herói e o logo).
-                priority
-                anchorRef={heroRef}
+          <div className="flex items-start gap-0.5 mb-0.5">
+            {visible.slice(0, FILA_MAX).map((p, idx, fila) => (
+              <FotoDaFila
+                key={p.src}
+                photo={p}
+                idx={idx}
+                sizes={sizesDaFila(
+                  fila.map((f) => razaoDe(f.aspectRatio)),
+                  idx,
+                )}
+                alt={altText(p.src, p.label)}
+                label={tileLabel(p.src, p.label, idx)}
+                cap={caption(p.src, p.label)}
+                tabbable={roving === idx}
+                zoomClass={zoomClass}
                 unavailableLabel={dict.photoUnavailable}
-                blurDataURL={visible[0].blurDataURL}
+                onOpen={openAt}
+                onKeyNav={onKeyNav}
+                onTileFocus={onTileFocus}
               />
-              <HoverOverlay {...caption(visible[0].src, visible[0].label)} />
-              <FocusRing />
-            </button>
-
-            {/* 4 fotos satélite — só em sm+. Não levam `priority`: em mobile
-                estão em `display:none`, portanto o observer nunca dispara e o
-                telemóvel continua a não as descarregar (era o que o
-                loading="lazy" garantia). Em sm+ estão sempre visíveis, por
-                isso entram na fila logo a seguir ao 2x2 e deixam de esperar os
-                250ms de descoberta lazy que se mediram. */}
-            {[1, 2, 3, 4].map((idx) =>
-              visible.length > idx ? (
-                <SatelliteTile
-                  key={idx}
-                  photo={visible[idx]}
-                  idx={idx}
-                  alt={altText(visible[idx].src, visible[idx].label)}
-                  label={tileLabel(visible[idx].src, visible[idx].label, idx)}
-                  cap={caption(visible[idx].src, visible[idx].label)}
-                  tabbable={roving === idx}
-                  zoomClass={zoomClass}
-                  unavailableLabel={dict.photoUnavailable}
-                  onOpen={openAt}
-                  onKeyNav={onKeyNav}
-                  onTileFocus={onTileFocus}
-                />
-              ) : null,
-            )}
+            ))}
           </div>
         )}
 
-        {/* Masonry — fotos restantes (satélites 1-4 reaparecem aqui em
-            mobile); numa vista de coleção começa em 0, sem hero, cada foto
-            com um único nome VT estável (ver nota acima).
+        {/* Masonry — fotos restantes (as da fila que não cabem nela a esta
+            largura reaparecem aqui); numa vista de coleção começa em 0, sem
+            fila.
 
             Colunas flex distribuídas manualmente (ver `masonryColumns`), NÃO
             CSS multi-column: cada coluna é uma pilha independente que encolhe
@@ -1398,7 +1381,7 @@ export default function GaleriaClient({
                       label={tileLabel(p.src, p.label, idx)}
                       caption={cap.caption}
                       sub={cap.sub}
-                      hiddenSm={!collectionFilter && idx < 5}
+                      escondida={!collectionFilter && idx < FILA_MAX ? NA_GRELHA_ATE[idx] : ""}
                       eager={!!collectionFilter && idx === 0}
                       revealDelay={(j % 3) * 60}
                       tabbable={roving === idx}
@@ -1556,9 +1539,8 @@ type OrigemDoVoo = {
 const caixaDe = (r: DOMRect): Caixa => ({ x: r.left, y: r.top, w: r.width, h: r.height });
 
 /**
- * A miniatura PINTADA da foto `idx`. As fotos 1 a 4 existem duas vezes (no
- * mosaico em sm+ e no masonry no telemóvel) e o CSS esconde uma: conta a que
- * tem tamanho.
+ * A miniatura PINTADA da foto `idx`. As fotos 1 a 3 existem duas vezes (na
+ * fila do topo e na grelha) e o CSS esconde uma: conta a que tem tamanho.
  */
 function miniaturaPintada(idx: number): HTMLElement | null {
   for (const el of document.querySelectorAll<HTMLElement>(`[data-tile-idx="${idx}"]`)) {
@@ -2119,7 +2101,9 @@ function Lightbox({
         origin.focus?.({ preventScroll: true });
         return;
       }
-      const tile = document.querySelector<HTMLElement>(`[data-tile-idx="${indexRef.current}"]`);
+      const tile =
+        miniaturaPintada(indexRef.current) ??
+        document.querySelector<HTMLElement>(`[data-tile-idx="${indexRef.current}"]`);
       (tile ?? document.querySelector<HTMLElement>("[data-tile-idx]"))?.focus({
         preventScroll: true,
       });

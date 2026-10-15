@@ -162,6 +162,21 @@ function deAdjacent(list: Photo[], desde = 1): Photo[] {
   return out;
 }
 
+/** Largura ÷ altura, do `aspectRatio` (`"w / h"`) que vem em todas as fotos. */
+export function razaoDe(aspectRatio: string): number {
+  const [w, h] = aspectRatio.split("/").map((n) => parseFloat(n));
+  return w > 0 && h > 0 ? w / h : 1;
+}
+
+/** O índice da foto mais deitada (a de maior razão); -1 numa lista vazia. */
+function maisDeitada(list: Photo[]): number {
+  let melhor = -1;
+  for (let i = 0; i < list.length; i++) {
+    if (melhor < 0 || razaoDe(list[i].aspectRatio) > razaoDe(list[melhor].aspectRatio)) melhor = i;
+  }
+  return melhor;
+}
+
 /** Até onde se procura a foto do mosaico grande: as primeiras desta ordem,
  *  para o destaque mudar de visita para visita como o resto. */
 const PROCURA_DESTAQUE = 24;
@@ -169,21 +184,32 @@ const PROCURA_DESTAQUE = 24;
 /**
  * O MOSAICO DO TOPO ESCOLHE A MELHOR.
  *
- * As cinco primeiras da ordem são o mosaico: a 0 é o 2×2, as quatro seguintes
- * as satélites (`GaleriaClient`). Até aqui calhava lá o que a sorte mandasse —
- * uma foto ao alto, a preto e branco ou tremida no maior quadrado da página.
+ * As primeiras da ordem são a fila do topo (`GaleriaClient`, `FotoDaFila`): a
+ * 0 é o destaque, a maior; as seguintes entram conforme a largura do ecrã. Até
+ * aqui calhava lá o que a sorte mandasse — uma foto ao alto, a preto e branco
+ * ou tremida no maior lugar da página.
  *
- *  · para o 2×2 vem a primeira, entre as `PROCURA_DESTAQUE` primeiras, que
+ *  · para o destaque vem a primeira, entre as `PROCURA_DESTAQUE` primeiras, que
  *    serve de destaque (deitada, a cores, nítida — `serveParaDestaque`);
- *  · para as satélites, as primeiras que não são da mesma cena nem do mesmo
- *    evento que o 2×2, e no máximo uma a preto e branco.
+ *  · para as outras quatro, as primeiras que não são da mesma cena nem do mesmo
+ *    evento que o destaque, e no máximo uma a preto e branco.
  *
- * Só reordena o princípio: o resto da lista fica como estava. Sem dados de
- * análise (`destaque` em nenhuma), devolve a lista tal e qual.
+ * Só reordena o princípio: o resto da lista fica como estava.
+ *
+ * O DESTAQUE É SEMPRE DEITADO (15/10, a pedido dela: «as fotos têm que ser
+ * apresentadas de acordo com as suas dimensões»). Medido em 400 ordens, em 10
+ * não havia destaque nas primeiras 24 e ficava a primeira que calhasse — numa
+ * delas uma foto ao alto, na maior caixa da página. Agora:
+ *  · procura-se primeiro nas `PROCURA_DESTAQUE` primeiras (para variar);
+ *  · se lá não houver, na lista inteira;
+ *  · sem dados de análise (`destaque` em nenhuma), fica a mais deitada das
+ *    primeiras `PROCURA_DESTAQUE`.
  */
 function comMosaico(list: Photo[]): Photo[] {
   const limite = Math.min(list.length, PROCURA_DESTAQUE);
-  const iDestaque = list.slice(0, limite).findIndex((p) => p.destaque);
+  let iDestaque = list.slice(0, limite).findIndex((p) => p.destaque);
+  if (iDestaque < 0) iDestaque = list.findIndex((p) => p.destaque);
+  if (iDestaque < 0) iDestaque = maisDeitada(list.slice(0, limite));
   if (iDestaque < 0) return list;
   const resto = [...list];
   const [grande] = resto.splice(iDestaque, 1);
