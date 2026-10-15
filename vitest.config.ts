@@ -63,7 +63,18 @@ export default defineConfig({
      * — um teste que não corre é pior do que um teste que não existe, porque
      * dá a impressão de que alguém está a tomar conta.
      */
-    include: ["src/**/*.test.ts", "src/**/*.test.tsx", "e2e/**/*.test.ts", "test/**/*.test.ts"],
+    include: [
+      "src/**/*.test.ts",
+      "src/**/*.test.tsx",
+      "e2e/**/*.test.ts",
+      "test/**/*.test.ts",
+      // O guião que decide o que o CI corre (`scripts/ci/o-que-correr.mjs`).
+      "scripts/**/*.test.ts",
+    ],
+    // Os casos dos ficheiros que correm em partes (`test/em-partes.ts`): quem os
+    // corre são os `*.parte-N.test.*`. Ficam com `.test` no nome para as regras
+    // da casa que varrem a pasta os tratarem como testes, e não como código.
+    exclude: ["**/node_modules/**", "**/*.casos.test.*"],
     coverage: {
       provider: "v8",
       include: ["src/lib/**/*.ts"],

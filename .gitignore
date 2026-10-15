@@ -134,3 +134,7 @@ e2e/.auth/
 
 # Referências do redesenho do PDF (fotografias de clientes; não vão para o git)
 /referencia/
+
+# Caches do CI (lint e typecheck)
+.eslintcache
+.tsbuildinfo-ci

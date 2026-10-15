@@ -64,6 +64,52 @@ mudou**. As partes deixaram de esperar em fila, e cada uma tem o seu runner.
 - **Mais minutos de runner no total.** O repositório é público, e os minutos do
   GitHub Actions não se pagam.
 
-## Os tempos depois
+## Os tempos depois da 1.ª volta (#231, medidos)
 
-Medidos no PR desta mudança, preenchidos quando o CI dele acabou.
+| Job | Tempo |
+|---|---|
+| Lint · Typecheck · Build | 3:43 |
+| Testes unitários 1/3 · 2/3 · 3/3 | 2:55 · 3:49 · **7:59** |
+| E2E · imagens 1/2 · 2/2 | 4:07 · 5:21 |
+| E2E · peso, galeria, molas, vidro, sem rede | 4:44 |
+| E2E · telemóvel, propostas, passkeys | 3:37 |
+| E2E · dados | 6:59 |
+
+Espera total de cerca de 8 minutos, contra 28. Os dois mais lentos eram a parte
+3/3 dos testes de unidade (lá calhou o ficheiro do estúdio, que levava ~6
+minutos sozinho) e os `dados`.
+
+## A 2.ª volta: inteligente (15/10)
+
+Ela pediu «2 minutos, 3 minutos… quero tornar o sistema mesmo inteligente», e
+escolheu **«inteligente + completa depois»**:
+
+- **Num PR, verifica-se o que a mudança pode afectar.** Quem decide é o job
+  `decidir`, com a regra em `scripts/ci/o-que-correr.mjs` (um teste por caso;
+  na dúvida, corre tudo):
+  - **só documentos** (`docs/`, `*.md`) → só o lint, o typecheck e o build;
+  - **os testes de unidade** → só os ligados a um ficheiro mudado (`vitest
+    related`, que segue o grafo de imports);
+  - **os passeios no browser, por área** → uma mudança só no sítio público não
+    corre os passeios que gravam do back office (`dados`, telemóvel, propostas,
+    passkeys); uma mudança no back office corre tudo o que é browser; o que é
+    partilhado (`src/lib`…) corre tudo;
+  - **configuração, dependências, o próprio CI, os passeios** → tudo.
+- **Depois de juntar, todas as noites (03:17) e à mão** → a verificação
+  **completa**. É isto que a rapidez troca: uma avaria que um PR inteligente
+  não apanhasse aparece na corrida seguinte do `main`, e o GitHub avisa por
+  email.
+- **Mais depressa mesmo quando corre tudo:**
+  - o ficheiro do estúdio (339 testes, ~6 min) e o do `montar` (~2 min) correm
+    em partes (`test/em-partes.ts`): os casos ficam num `*.casos.tsx`, e cada
+    `*.parte-N.test.tsx` corre uma fatia dos `describe`;
+  - testes de unidade em 5 partes, imagens em 3, `dados` em 3, informativo
+    em 4;
+  - lint e typecheck ao mesmo tempo, com cache (`eslint --cache`,
+    `tsc --incremental`);
+  - o Chromium guardado entre corridas.
+- **Os totais à vista:** cada parte de unidade, de imagens e de dados escreve
+  uma anotação com o que correu, para se conferir que a soma é tudo (879
+  ficheiros de unidade).
+
+Os tempos medidos desta volta ficam aqui quando o CI dela acabar.
