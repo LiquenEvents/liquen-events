@@ -29,7 +29,7 @@ import { capitulos as capitulosDaInspiracao } from "./grupos";
 import { eCasamento } from "../proposal-evento";
 import { logotipoNaCor } from "./imagens";
 import type { Contexto } from "./moldura";
-import { repartir as repartirFotos } from "./mosaico";
+import { disposicaoDoTema, repartir as repartirFotos } from "./mosaico";
 import { HEX } from "./paleta";
 import { paletaDasFotos } from "./paleta-das-fotos";
 import { capa, contracapa } from "./paginas/capa";
@@ -282,6 +282,7 @@ async function motor(
         subtitulo: (naLingua.subtitulo ?? "").trim(),
         nota: (naLingua.annotation ?? "").trim(),
         fotos,
+        disposicao: disposicaoDoTema(pt),
       };
     }),
   );
@@ -535,7 +536,7 @@ async function motor(
     for (const x of c.itens) {
       vezDoTema++;
       const numero = vezDoTema;
-      const porPagina = x.fotos.length ? repartirFotos(x.fotos.length) : [0];
+      const porPagina = x.fotos.length ? repartirFotos(x.fotos.length, x.disposicao) : [0];
       let feitas = 0;
       porPagina.forEach((quantas, k) => {
         const fotos = x.fotos.slice(feitas, feitas + quantas);
@@ -565,6 +566,7 @@ async function motor(
               fotos,
               pagina: n,
               painel,
+              disposicao: x.disposicao,
             }),
         });
       });

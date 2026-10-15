@@ -14,7 +14,7 @@ import {
   type CaixaPx,
   type Contexto,
 } from "../moldura";
-import { composicao } from "../mosaico";
+import { composicao, type Disposicao } from "../mosaico";
 import { COR, FOLHA_PX_H, FOLHA_PX_W, LETRA, MARGEM, fio, px } from "../paleta";
 import {
   baseDaLinha,
@@ -34,8 +34,9 @@ import { DE_BAIXO } from "./fotografia";
  *
  * A parte principal da proposta. Cada tema que ela tem no back office gera a
  * sua página (ou duas, acima de doze fotografias), com TODAS as fotografias,
- * o título, o subtítulo e a nota que ela escreveu. A composição escolhe-se
- * pelo número de fotografias — ver `mosaico.ts`.
+ * o título, o subtítulo e a nota que ela escreveu. A composição é a que ela
+ * escolheu para o tema, ou a automática pelo número de fotografias — ver
+ * `mosaico.ts`.
  *
  * As páginas de mosaico não têm o rodapé normal: o mosaico de texto leva em
  * baixo o logótipo da Líquen e o número da página.
@@ -58,6 +59,8 @@ export interface DadosDoTema {
    * para o painel da esquerda — «nenhuma página é só texto sobre fundo liso».
    */
   painel?: Foto | null;
+  /** A disposição que ela escolheu para o tema; sem ela, a automática. */
+  disposicao?: Disposicao | null;
 }
 
 const doisAlgarismos = (n: number) => String(n).padStart(2, "0");
@@ -70,6 +73,7 @@ export async function tema(ctx: Contexto, d: DadosDoTema): Promise<PDFPage> {
   const c = composicao(
     d.fotos.map((f) => f.aspecto),
     d.numero % 2 === 0,
+    d.disposicao,
   );
   const sobre = d.grupo ? `${ctx.te.inspiracao} · ${d.grupo}` : ctx.te.inspiracao;
 

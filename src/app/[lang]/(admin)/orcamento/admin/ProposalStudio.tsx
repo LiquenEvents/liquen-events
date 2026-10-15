@@ -84,6 +84,7 @@ const CANAL_GUARDADO = "liquen-canal-de-envio";
 import PorqueNaoDaParaEnviar from "./PorqueNaoDaParaEnviar";
 import { ControlosDoEnvio, PainelDoEnvio, PastilhaDoEnvio } from "./BarraDoEnvioCompacta";
 import VistaDeConjunto from "./VistaDeConjunto";
+import EscolherDisposicao from "./EscolherDisposicao";
 import PaginaEditorial, { fontesDasFolhas } from "./PaginaEditorial";
 import { useFotosDoPdf } from "./useFotosDoPdf";
 import EscolherFotoDaPagina from "./EscolherFotoDaPagina";
@@ -155,13 +156,15 @@ import {
   capituloDoTema,
   composicaoEmPalavras,
   MAXIMO_POR_PAGINA,
+  ordemDoDesenho,
   paginasDoTema,
   planoDaProposta,
   temasComPagina,
 } from "@/lib/pdf-editorial/plano";
+import { NOME_DA_DISPOSICAO, disposicaoDoTema, type Disposicao } from "@/lib/pdf-editorial/mosaico";
 import { avisoDeTituloParecido, titulosParecidos } from "@/lib/proposal-titulos-parecidos";
 import { depositPercentOf } from "@/lib/proposal-doc";
-import { PERDA_QUE_SE_AVISA } from "@/lib/proposal-geometria";
+import { ASPETO_POR_OMISSAO, PERDA_QUE_SE_AVISA } from "@/lib/proposal-geometria";
 import {
   LADO_MINIMO_DA_CAPA,
   perdaNaFolha,
@@ -3966,6 +3969,31 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     patch({ fotosDasPaginas: seguintes });
     anular(frase, () => patch({ fotosDasPaginas: antes }));
   }
+  /**
+   * A disposição das fotografias de um tema (ou a automática, com `null`), com
+   * «Anular». Ela pediu-a de volta a 15/10 — ver `EscolherDisposicao`.
+   */
+  function mudarDisposicao(bi: number, d: Disposicao | null) {
+    const antes = doc.moodBoards[bi]?.disposicao;
+    updateBoard(bi, { disposicao: d ?? undefined });
+    anular(d ? `Disposição: ${NOME_DA_DISPOSICAO[d]}.` : "Disposição automática.", () =>
+      updateBoard(bi, { disposicao: antes }),
+    );
+  }
+  /** A mesma disposição em todos os temas que não estão fechados, com «Anular». */
+  function disposicaoEmTodos(d: Disposicao) {
+    const antes = doc.moodBoards.map((b) => b.disposicao);
+    setDoc((x) => ({
+      ...x,
+      moodBoards: x.moodBoards.map((b) => (b.bloqueado ? b : { ...b, disposicao: d })),
+    }));
+    anular(`«${NOME_DA_DISPOSICAO[d]}» em todos os temas.`, () =>
+      setDoc((x) => ({
+        ...x,
+        moodBoards: x.moodBoards.map((b, i) => ({ ...b, disposicao: antes[i] })),
+      })),
+    );
+  }
   /** Põe `ref` no lugar `lugar` da página — os outros lugares ficam como estão. */
   function porFotoNaPagina(chave: string, nome: string, max: number, lugar: number, ref: string) {
     if (chave === "capa") {
@@ -5682,9 +5710,10 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
     // mas é uma página a mais, e decide-se melhor a escolher do que no PDF.
     const antes = doc.moodBoards[bi]?.images.length ?? 0;
     const total = antes + paths.length;
-    if (paginasDoTema(total) > paginasDoTema(antes) && antes > 0) {
+    const disposicao = disposicaoDoTema(doc.moodBoards[bi]);
+    if (paginasDoTema(total, disposicao) > paginasDoTema(antes, disposicao) && antes > 0) {
       toast(
-        `Este tema fica com ${total} fotos e passa a ocupar ${paginasDoTema(total)} páginas no PDF.`,
+        `Este tema fica com ${total} fotos e passa a ocupar ${paginasDoTema(total, disposicao)} páginas no PDF.`,
         "info",
       );
     }
@@ -8986,14 +9015,20 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                            */
                           const principalDoTema = fotoPrincipalDe(b);
                           /**
-                           * O que o PDF faz com este tema. No desenho novo a
-                           * disposição não se escolhe: sai do número de
-                           * fotografias (`pdf-editorial/mosaico.ts`), e o capítulo
-                           * sai do título (`grupos.ts`). Diz-se aqui, só de
-                           * leitura, no lugar do selector que existia.
+                           * O que o PDF faz com este tema: a disposição que ela
+                           * escolheu, ou a automática pelo número de fotografias
+                           * (`pdf-editorial/mosaico.ts`); o capítulo sai do
+                           * título (`grupos.ts`).
                            */
                           const fotosDoTema = b.images.length;
-                          const paginasDesteTema = paginasDoTema(fotosDoTema);
+                          const disposicaoDesteTema = disposicaoDoTema(b);
+                          const paginasDesteTema = paginasDoTema(fotosDoTema, disposicaoDesteTema);
+                          /** A vez do tema no PDF — decide de que lado fica o texto. */
+                          const vezDesteTema =
+                            planoDoPdf.reduce(
+                              (v, e) => (e.tipo === "tema" && e.bi === bi ? e.vez : v),
+                              0,
+                            ) || 1;
                           /** Esta página está fechada a alterações? */
                           const fechado = !!b.bloqueado;
                           /** E dobrada, que é só uma questão de espaço no ecrã? */
@@ -9463,23 +9498,36 @@ export default function ProposalStudio({ quote, quotes, onSent, onQuoteUpdated }
                                           />
                                         </div>
                                       )}
-                                      {/* ── O QUE O PDF FAZ COM ESTE TEMA ─────────
-                                        Era aqui o selector das seis disposições,
-                                        o «Manter a forma de cada fotografia» e os
-                                        avisos de recorte e da última fila. O PDF
-                                        novo não usa nenhum deles: a composição
-                                        sai do número de fotografias e cada
-                                        célula tem quase a forma da sua foto. O
-                                        que fica é dizer o que vai sair — o
-                                        capítulo e a composição —, só de
-                                        leitura. */}
+                                      {/* ── A DISPOSIÇÃO DAS FOTOS ─────────────────
+                                        Saiu no #173 e voltou a 15/10, a pedido
+                                        dela, com as composições do PDF novo
+                                        (`EscolherDisposicao`). O «Manter a forma»
+                                        do PDF antigo não volta: cada célula do
+                                        desenho novo já tem quase a forma da sua
+                                        foto. */}
+                                      <EscolherDisposicao
+                                        valor={disposicaoDesteTema}
+                                        aspectos={ordemDoDesenho(b).map(
+                                          (k) =>
+                                            aspetosDasFotos[b.images[k] ?? ""] ??
+                                            ASPETO_POR_OMISSAO,
+                                        )}
+                                        vezPar={vezDesteTema % 2 === 0}
+                                        desligado={fechado}
+                                        onEscolher={(d) => mudarDisposicao(bi, d)}
+                                        onAplicarATodos={
+                                          doc.moodBoards.length > 1 && disposicaoDesteTema
+                                            ? () => disposicaoEmTodos(disposicaoDesteTema)
+                                            : undefined
+                                        }
+                                      />
                                       <p className="mt-2 text-xs leading-relaxed text-[var(--bo-text-muted)]">
                                         Capítulo:{" "}
                                         <strong className="font-medium text-[var(--bo-tinta-72)]">
                                           {capituloDoTema(b, eCasamento(doc.eventType))}
                                         </strong>
                                         <span className="text-foreground/35"> · </span>
-                                        {composicaoEmPalavras(fotosDoTema)}
+                                        {composicaoEmPalavras(fotosDoTema, disposicaoDesteTema)}
                                       </p>
                                       {/* ── A PÁGINA, COMO VAI SAIR ───────────────
                                         Onde o painel da direita não cabe, a
