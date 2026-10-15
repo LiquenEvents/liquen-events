@@ -1,0 +1,51 @@
+import { NextRequest, NextResponse } from "next/server";
+import { isAuthed } from "@/lib/admin-auth";
+import type { ProposalDoc } from "@/lib/proposal-doc";
+import { ehIdiomaDaProposta, IDIOMA_POR_OMISSAO } from "@/lib/proposal-doc-textos";
+import { fotosDoEditorialDoDocumento } from "@/lib/proposal-doc-render";
+import { log } from "@/lib/logger";
+
+// O sharp precisa do runtime Node.
+export const runtime = "nodejs";
+export const maxDuration = 30;
+
+/** O rascunho é JSON com caminhos, sem fotografias: chega e sobra. */
+const MAXIMO_DO_CORPO = 2 * 1024 * 1024;
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * QUE FOTOGRAFIA VAI PARA CADA PÁGINA DO PDF — PARA AS MINIATURAS DO ESTÚDIO
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A colaboradora dela: as fotografias das miniaturas de baixo «não têm nada a
+ * ver» com as do PDF. A miniatura adivinhava; quem escolhe é o álbum do PDF,
+ * pelos pixéis de cada ficheiro. Esta rota corre o MESMO plano do PDF sem o
+ * desenhar (`fotosDoEditorialDoDocumento`) e devolve, por chave de página, o
+ * caminho de cada fotografia em cada lugar — o estúdio pinta essas.
+ *
+ * Não grava nada: recebe o rascunho como o estúdio o tem, e responde.
+ */
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  if (!isAuthed(request)) return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+  const { id } = await params;
+  const tamanho = Number(request.headers.get("content-length") ?? 0);
+  if (tamanho > MAXIMO_DO_CORPO) {
+    return NextResponse.json({ error: "Pedido demasiado grande" }, { status: 413 });
+  }
+  const body = (await request.json().catch(() => null)) as {
+    doc?: unknown;
+    idioma?: unknown;
+  } | null;
+  const doc = body?.doc as ProposalDoc | undefined;
+  if (!doc || typeof doc !== "object" || !Array.isArray(doc.moodBoards)) {
+    return NextResponse.json({ error: "Documento inválido" }, { status: 400 });
+  }
+  const idioma = ehIdiomaDaProposta(body?.idioma) ? body.idioma : IDIOMA_POR_OMISSAO;
+  try {
+    const fotos = await fotosDoEditorialDoDocumento(doc, idioma);
+    return NextResponse.json({ ok: true, fotos }, { headers: { "Cache-Control": "no-store" } });
+  } catch (err) {
+    log.error("fotos-do-pdf falhou", err, { id });
+    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
+  }
+}

@@ -2,6 +2,7 @@ import "server-only";
 import sharp from "sharp";
 import { criarCachePorBytes } from "@/lib/cache-por-bytes";
 import {
+  isPendingImage,
   MOOD_BOARD_MAX_IMAGES,
   type MoodBoard,
   type ProposalDoc,
@@ -36,7 +37,14 @@ import {
 import { TECTO_DA_ROTA_MS } from "@/lib/custo-do-pdf";
 import { log } from "@/lib/logger";
 import { IDIOMA_POR_OMISSAO, type IdiomaDaProposta } from "@/lib/proposal-doc-textos";
-import { renderEditorialPdf } from "@/lib/pdf-editorial/montar";
+import {
+  fotosDoEditorial,
+  renderEditorialPdf,
+  type FontesDasFotos,
+  type FotosDoPdf,
+  type Medida,
+} from "@/lib/pdf-editorial/montar";
+import { formasDeCaminhos } from "@/lib/biblioteca-fotos-store";
 import { focoAutomatico, LADO_PAGINA, pixeisDaCaixa, type Foco } from "@/lib/pdf-editorial/imagens";
 import { FOLHA } from "@/lib/pdf-editorial/moldura";
 
@@ -221,7 +229,7 @@ async function resolveImages(
    * existem.
    */
   opcoes: { originais?: boolean } = {},
-): Promise<{ doc: ProposalDoc; missing: number }> {
+): Promise<{ doc: ProposalDoc; missing: number; refs: NonNullable<FontesDasFotos["refs"]> }> {
   let remaining = MAX_IMAGES_PER_DOC;
   // Quantas fotos foram PEDIDAS e não entraram. Uma proposta com fotos a menos
   // seguia para o cliente sem ninguém dar por isso; agora quem chama fica a
@@ -367,6 +375,7 @@ async function resolveImages(
       ref ? await buscarComTecto(ref, null) : null,
     )
   ).map((r) => (r ? r.bytes.toString("base64") : ""));
+  const refsDaCapa = (doc.coverImages ?? []).map((ref) => ref || null);
 
   /**
    * ══════════════════════════════════════════════════════════════════════════
@@ -491,10 +500,39 @@ async function resolveImages(
     );
 
     // A marca reindexada segue com o board: o gerador vai permutar por ela.
-    return { ...mb, images: finais.map((b) => b.toString("base64")), principal };
+    return {
+      board: { ...mb, images: finais.map((b) => b.toString("base64")), principal },
+      refs: vivas.map((r) => r.ref),
+    };
   });
 
-  return { doc: { ...doc, coverImages: cover, moodBoards }, missing };
+  /**
+   * As fotografias que ELA escolheu para as páginas (`fotosDasPaginas`). Só o
+   * desenho editorial as tem. Cada uma no seu lugar; a que não se deixar
+   * buscar fica vazia — e a página volta a escolher sozinha.
+   */
+  const paginas: Record<string, { fotos: string[]; focos?: ({ x: number; y: number } | null)[] }> =
+    {};
+  const refsDasPaginas: Record<string, (string | null)[]> = {};
+  if (opcoes.originais) {
+    for (const [chave, e] of Object.entries(doc.fotosDasPaginas ?? {})) {
+      const lista = (e?.fotos ?? []).filter((r) => r && r.trim());
+      const obtidas = await mapLimit(lista, FETCH_CONCURRENCY, (ref) => buscarComTecto(ref, null));
+      paginas[chave] = { ...e, fotos: obtidas.map((r) => (r ? r.bytes.toString("base64") : "")) };
+      refsDasPaginas[chave] = lista.map((ref, k) => (obtidas[k] ? ref : null));
+    }
+  }
+
+  return {
+    doc: {
+      ...doc,
+      coverImages: cover,
+      moodBoards: moodBoards.map((m) => m.board),
+      ...(opcoes.originais ? { fotosDasPaginas: paginas } : {}),
+    },
+    missing,
+    refs: { capa: refsDaCapa, temas: moodBoards.map((m) => m.refs), paginas: refsDasPaginas },
+  };
 }
 
 /**
@@ -711,11 +749,94 @@ export async function renderStoredEditorialPdfWithReport(
   doc: ProposalDoc,
   idioma: IdiomaDaProposta = IDIOMA_POR_OMISSAO,
   opcoes: { rascunho?: boolean } = {},
-): Promise<{ pdf: Buffer<ArrayBuffer>; missingImages: number; truncations: DocTruncation[] }> {
+): Promise<{
+  pdf: Buffer<ArrayBuffer>;
+  missingImages: number;
+  truncations: DocTruncation[];
+  /** Que fotografia foi para cada página — o mesmo que `fotosDoEditorialDoDocumento`. */
+  fotos: FotosDoPdf;
+}> {
   const withDefaults = withProposalDefaults(doc);
-  const { doc: resolved, missing } = await resolveImages(withDefaults, { originais: true });
-  const { bytes, truncations, undrawnImages } = await renderEditorialPdf(resolved, idioma, opcoes);
-  return { pdf: Buffer.from(bytes), missingImages: missing + undrawnImages, truncations };
+  const { doc: resolved, missing, refs } = await resolveImages(withDefaults, { originais: true });
+  const medidas = await medidasDaBiblioteca(caminhosDoDocumento(withDefaults));
+  const { bytes, truncations, undrawnImages, fotos } = await renderEditorialPdf(
+    resolved,
+    idioma,
+    opcoes,
+    { refs, medidas },
+  );
+  return { pdf: Buffer.from(bytes), missingImages: missing + undrawnImages, truncations, fotos };
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * AS MESMAS MEDIDAS PARA O PDF E PARA AS MINIATURAS
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O álbum escolhe os separadores e os painéis pelos PIXÉIS de cada fotografia.
+ * Para a miniatura do estúdio mostrar a mesma escolha que o PDF, os dois têm de
+ * comparar as fotos pelos mesmos números — senão uma foto de 1 800 × 1 200 e
+ * outra de 1 800 × 1 201 trocam de lugar entre um e outro.
+ *
+ * A regra é uma só: a medida guardada na biblioteca de fotografias (largura e
+ * altura do ficheiro, gravadas ao carregar), à escala a que o desenho a usa
+ * (`LADO_EDITORIAL`); sem ela, a da fotografia reduzida que o desenho usa. O
+ * desenho tem essa em mão; o plano sem desenho (`fotosDoEditorialDoDocumento`)
+ * vai buscá-la — é a mesma, e fica em memória para o desenho a seguir.
+ */
+function reduzidaParaOEditorial(w: number, h: number): Medida {
+  const escala = Math.min(1, LADO_EDITORIAL / Math.max(w, h));
+  return { w: Math.round(w * escala), h: Math.round(h * escala) };
+}
+
+/**
+ * As referências de todas as fotografias que o desenho editorial pode usar —
+ * caminhos do armazenamento e também `data:` ou endereços, que o desenho
+ * também aceita (e que a biblioteca não conhece: medem-se dos bytes).
+ */
+function caminhosDoDocumento(doc: ProposalDoc): string[] {
+  return [
+    ...new Set(
+      [
+        ...(doc.coverImages ?? []),
+        ...(doc.moodBoards ?? []).flatMap((b) => b.images ?? []),
+        ...Object.values(doc.fotosDasPaginas ?? {}).flatMap((e) => e?.fotos ?? []),
+      ].filter((r): r is string => !!r && r.trim() !== "" && !isPendingImage(r)),
+    ),
+  ];
+}
+
+async function medidasDaBiblioteca(refs: readonly string[]): Promise<Map<string, Medida>> {
+  const formas = await formasDeCaminhos(refs.filter(guardavel));
+  const saida = new Map<string, Medida>();
+  for (const [ref, f] of formas) saida.set(ref, reduzidaParaOEditorial(f.largura, f.altura));
+  return saida;
+}
+
+/**
+ * Que fotografia vai para cada lugar de cada página do PDF editorial, sem o
+ * desenhar — é o que as miniaturas do estúdio mostram. `doc` é o rascunho como
+ * o estúdio o tem, com os caminhos do armazenamento.
+ */
+export async function fotosDoEditorialDoDocumento(
+  doc: ProposalDoc,
+  idioma: IdiomaDaProposta = IDIOMA_POR_OMISSAO,
+): Promise<FotosDoPdf> {
+  const withDefaults = withProposalDefaults(doc);
+  const caminhos = caminhosDoDocumento(withDefaults);
+  const medidas = await medidasDaBiblioteca(caminhos);
+  const faltam = caminhos.filter((r) => !medidas.has(r));
+  await mapLimit(faltam, FETCH_CONCURRENCY, async (ref) => {
+    const reduzida = await fotoEditorial(ref, fetchProposalImageBytes);
+    if (!reduzida) return;
+    try {
+      const m = await sharp(reduzida, { failOn: "none" }).metadata();
+      if (m.width && m.height) medidas.set(ref, { w: m.width, h: m.height });
+    } catch {
+      /* não se deixa ler: fica sem medida, como o desenho a deixaria */
+    }
+  });
+  return fotosDoEditorial(withDefaults, idioma, medidas);
 }
 
 /**

@@ -3,7 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ProposalDoc } from "@/lib/proposal-doc";
 import type { IdiomaDaProposta } from "@/lib/proposal-doc-textos";
-import { planoDaProposta, type EntradaDoPlano } from "@/lib/pdf-editorial/plano";
+import {
+  chavesDasPaginas,
+  lugaresDaPagina,
+  planoDaProposta,
+  type EntradaDoPlano,
+} from "@/lib/pdf-editorial/plano";
+import type { FotosDoPdf } from "@/lib/pdf-editorial/fotos-do-pdf";
 import PaginaEditorial, { fontesDasFolhas } from "./PaginaEditorial";
 import { ESTADO, PRESSAO } from "./ui/movimento";
 
@@ -42,6 +48,8 @@ const INTENCAO_MS = 400;
 
 export default function VistaDeConjunto({
   doc,
+  fotosDoPdf = null,
+  onMudarFoto,
   ordem,
   idioma = "pt",
   urls,
@@ -53,6 +61,13 @@ export default function VistaDeConjunto({
   onFechar,
 }: {
   doc: ProposalDoc;
+  /** Que fotografia o PDF põe em cada página (`useFotosDoPdf`); `null` enquanto não se sabe. */
+  fotosDoPdf?: FotosDoPdf | null;
+  /**
+   * Abrir a escolha da fotografia de uma página (`fotosDasPaginas`) — pedido
+   * dela de 15/10. Sem isto, a vista só mostra.
+   */
+  onMudarFoto?: (chave: string, nome: string, max: number) => void;
   /** Índices reais dos boards, pela ordem em que as páginas saem. */
   ordem: readonly number[];
   idioma?: IdiomaDaProposta;
@@ -71,9 +86,10 @@ export default function VistaDeConjunto({
   onFechar?: () => void;
 }) {
   const paginas = useMemo(() => planoDaProposta(doc), [doc]);
+  const chaves = useMemo(() => chavesDasPaginas(paginas), [paginas]);
   const fontes = useMemo(
-    () => fontesDasFolhas(doc, paginas, urls, originais),
-    [doc, paginas, urls, originais],
+    () => fontesDasFolhas(doc, paginas, urls, originais, fotosDoPdf),
+    [doc, paginas, urls, originais, fotosDoPdf],
   );
   const aumentada = useIntencaoDeAmpliar();
   void idioma;
@@ -96,8 +112,8 @@ export default function VistaDeConjunto({
             {/* O número que ela vê aqui é o MESMO que o botão de gerar mostra —
                 sai os dois de `planoDaProposta`. Duas contagens sobre o mesmo
                 documento foi o defeito que isto veio fechar. */}
-            Cerca de {paginas.length} páginas, pela ordem em que saem. Clica numa para ir onde ela
-            se escreve. As fotografias dos separadores e painéis são escolhidas pelo PDF.
+            Cerca de {paginas.length} páginas, pela ordem em que saem, com as fotografias que o PDF
+            lá põe. Clica numa para ir onde ela se escreve.
           </p>
         </div>
         {onFechar && (
@@ -181,6 +197,31 @@ export default function VistaDeConjunto({
                     Página {i + 1} de {paginas.length}
                   </span>
                   <span className="block truncate">{pagina.nome}</span>
+                  {(() => {
+                    const lugares =
+                      pagina.tipo === "capa" ? { min: 1, max: 1 } : lugaresDaPagina(pagina);
+                    if (!onMudarFoto || !lugares || pagina.tipo === "contracapa") return null;
+                    const escolhida = pagina.tipo === "capa" || !!doc.fotosDasPaginas?.[chaves[i]];
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => onMudarFoto(chaves[i], pagina.nome, lugares.max)}
+                        aria-label={`Mudar a fotografia da página ${i + 1}, ${pagina.nome}`}
+                        className={`alvo-toque mt-0.5 inline-flex items-center gap-1 text-[11px] font-medium text-[var(--bo-accent)] ${ESTADO} ${PRESSAO}`}
+                      >
+                        {escolhida && pagina.tipo !== "capa" && (
+                          <span
+                            aria-hidden="true"
+                            className="h-1.5 w-1.5 rounded-full bg-[var(--bo-accent)]"
+                          />
+                        )}
+                        Mudar fotografia
+                        {escolhida && pagina.tipo !== "capa" && (
+                          <span className="sr-only"> (escolhida por vocês)</span>
+                        )}
+                      </button>
+                    );
+                  })()}
                 </p>
                 {vi >= 0 && (
                   <span className="flex shrink-0 gap-0.5">

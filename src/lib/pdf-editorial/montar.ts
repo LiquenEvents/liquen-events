@@ -24,7 +24,7 @@ import { LOGO_WHITE_PNG_B64 } from "@/lib/proposal-assets";
 import { SITE } from "@/lib/site";
 import { aoMeio, paginarColunasFixas, paginarCorrido, repartir, type Peca } from "./colunas";
 import { bytesDaFoto, embedImagem } from "./embutir";
-import { Album, medir, type Foto } from "./fotos";
+import { Album, comMedida, medir, type Foto } from "./fotos";
 import { capitulos as capitulosDaInspiracao } from "./grupos";
 import { eCasamento } from "../proposal-evento";
 import { logotipoNaCor } from "./imagens";
@@ -33,7 +33,10 @@ import { repartir as repartirFotos } from "./mosaico";
 import { HEX } from "./paleta";
 import { paletaDasFotos } from "./paleta-das-fotos";
 import { capa, contracapa } from "./paginas/capa";
-import { ordemDoDesenho, servicosDoDocumento } from "./plano";
+import { Chaves, ordemDoDesenho, servicosDoDocumento } from "./plano";
+import type { FotosDoPdf, Medida } from "./fotos-do-pdf";
+
+export type { FotoNaPagina, FotosDoPdf, Medida } from "./fotos-do-pdf";
 import { problemaDaCapa } from "./regra-da-capa";
 import {
   alturaDasColunas,
@@ -84,8 +87,99 @@ export async function renderEditorialPdf(
    * dela). Sai igual, com «RASCUNHO» à frente do rodapé de cada página e no
    * título do ficheiro — nada mais muda no desenho.
    */
-  { rascunho = false }: { rascunho?: boolean } = {},
-): Promise<{ bytes: Uint8Array; truncations: DocTruncation[]; undrawnImages: number }> {
+  opcoes: { rascunho?: boolean } = {},
+  fontes: FontesDasFotos = {},
+): Promise<{
+  bytes: Uint8Array;
+  truncations: DocTruncation[];
+  undrawnImages: number;
+  /** Que fotografia foi para cada lugar de cada página — ver `fotosDoEditorial`. */
+  fotos: FotosDoPdf;
+}> {
+  const m = await motor(original, idioma, opcoes, fontes);
+  for (const [i, passo] of m.plano.entries()) await passo.desenhar(i + 1, m.entradas);
+  const bytes = await m.pdf.save();
+  return {
+    bytes,
+    truncations: m.ctx.cortes,
+    undrawnImages: m.ctx.naoDesenhadas.size,
+    fotos: fotosDoPlano(m.plano),
+  };
+}
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * AS FOTOGRAFIAS DE CADA PÁGINA, SEM DESENHAR O PDF
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * A colaboradora dela viu-o: as miniaturas do estúdio mostravam fotografias
+ * «que não têm nada a ver» com as do PDF. A miniatura adivinhava por conta
+ * própria (`fontesDasFolhas` rodava as fotos dos temas), e quem escolhe é o
+ * álbum, aqui, pelos pixéis de cada ficheiro — que o navegador não sabe.
+ *
+ * Agora a miniatura pergunta: corre-se o MESMO plano do PDF (as mesmas páginas,
+ * as mesmas regras do álbum, as mesmas medidas), sem desenhar nada, e devolve-se
+ * o caminho de cada fotografia em cada página, pela chave da página
+ * (`chavesDasPaginas`). `original` tem as referências do armazenamento no lugar
+ * dos bytes; as `medidas` são as mesmas que o desenho usa (ver
+ * `medidasDasFotos`, em `proposal-doc-render.ts`).
+ */
+export async function fotosDoEditorial(
+  original: ProposalDoc,
+  idioma: IdiomaDaProposta,
+  medidas: ReadonlyMap<string, Medida>,
+): Promise<FotosDoPdf> {
+  const m = await motor(original, idioma, {}, { semBytes: true, medidas });
+  return fotosDoPlano(m.plano);
+}
+
+/**
+ * De onde vêm as fotografias. Sem nada, como sempre: os bytes vêm no próprio
+ * documento (base64) e medem-se aqui.
+ */
+export interface FontesDasFotos {
+  /**
+   * O caminho no armazenamento de cada fotografia do documento resolvido, no
+   * mesmo lugar: a capa, as de cada mood board (depois das que faltaram
+   * saírem) e as de `fotosDasPaginas`. É o que identifica uma foto entre o PDF
+   * e o estúdio.
+   */
+  refs?: {
+    capa: readonly (string | null)[];
+    temas: readonly (readonly string[])[];
+    paginas: Readonly<Record<string, readonly (string | null)[]>>;
+  };
+  /** As medidas por caminho; o que faltar mede-se dos bytes. */
+  medidas?: ReadonlyMap<string, Medida>;
+  /** O documento traz caminhos e não bytes: só se planeia, não se desenha. */
+  semBytes?: boolean;
+}
+
+/** Uma página por desenhar, com a sua chave e as fotografias que leva. */
+interface Passo {
+  entrada?: string;
+  chave: string;
+  fotos: readonly (Foto | null)[];
+  desenhar: (numero: number, entradas: readonly EntradaDoIndice[]) => Promise<unknown>;
+}
+
+function fotosDoPlano(plano: readonly Passo[]): FotosDoPdf {
+  const saida: FotosDoPdf = {};
+  for (const p of plano) {
+    saida[p.chave] = p.fotos.map((f) => ({
+      ref: f?.ref ?? null,
+      ...(f?.foco ? { foco: f.foco } : {}),
+    }));
+  }
+  return saida;
+}
+
+async function motor(
+  original: ProposalDoc,
+  idioma: IdiomaDaProposta,
+  { rascunho = false }: { rascunho?: boolean },
+  fontes: FontesDasFotos,
+) {
   const doc = docNaLingua(original, idioma);
   const t = textosDaProposta(idioma);
   const te = textosEditoriais(idioma);
@@ -124,16 +218,41 @@ export async function renderEditorialPdf(
 
   // ── As fotografias, medidas ──────────────────────────────────────────────
   let proximoId = 0;
-  const medida = (dado: string | undefined, origem: string, tema: number | null) => {
+  /**
+   * Uma fotografia do documento, medida. Com `semBytes` o documento traz o
+   * CAMINHO e a medida vem de `medidas` — sem medida, a foto não existe (é a
+   * que o desenho também não conseguiria buscar). Com bytes, a medida das
+   * `medidas` manda quando existe, para o desenho e a miniatura compararem as
+   * fotos pelos MESMOS números; senão lê-se do ficheiro, como sempre.
+   */
+  const medida = async (
+    dado: string | null | undefined,
+    origem: string,
+    tema: number | null,
+    refDada?: string | null,
+  ): Promise<Foto | null> => {
+    const ref = (fontes.semBytes ? dado : refDada) || undefined;
+    const sabida = ref ? fontes.medidas?.get(ref) : undefined;
+    if (fontes.semBytes) {
+      if (!ref || !sabida) return null;
+      return comMedida(Buffer.alloc(0), origem, proximoId++, tema, sabida, ref);
+    }
     const bytes = bytesDaFoto(dado);
-    return bytes ? medir(bytes, origem, proximoId++, tema) : Promise.resolve(null);
+    if (!bytes) return null;
+    const id = proximoId++;
+    const f = sabida
+      ? comMedida(bytes, origem, id, tema, sabida)
+      : await medir(bytes, origem, id, tema);
+    return ref ? { ...f, ref } : f;
   };
   // UMA fotografia de capa: a primeira que houver. As propostas antigas tinham
   // dois lugares, «Esquerda» e «Direita», e há-as só com a da direita.
+  const iCapa = (doc.coverImages ?? []).findIndex((d) => d && d.trim());
   const fotoDaCapa = await medida(
-    (doc.coverImages ?? []).find((d) => d && d.trim()),
+    iCapa >= 0 ? doc.coverImages[iCapa] : undefined,
     "Capa · fotografia",
     null,
+    iCapa >= 0 ? fontes.refs?.capa[iCapa] : null,
   );
 
   // Os temas pela ordem do documento (a mesma do gerador antigo), e as fotos
@@ -147,11 +266,17 @@ export async function renderEditorialPdf(
       const fotos = (
         await Promise.all(
           ordemDoDesenho(pt).map((k) =>
-            medida(pt.images?.[k], `Tema «${pt.title}» · foto ${k + 1}`, vez),
+            medida(
+              pt.images?.[k],
+              `Tema «${pt.title}» · foto ${k + 1}`,
+              vez,
+              fontes.refs?.temas[i]?.[k],
+            ),
           ),
         )
       ).filter((f): f is Foto => f !== null);
       return {
+        bi: i,
         pt,
         titulo: (naLingua.title ?? "").trim(),
         subtitulo: (naLingua.subtitulo ?? "").trim(),
@@ -166,13 +291,36 @@ export async function renderEditorialPdf(
   const inspiracao = comConteudo.flatMap((x) => x.fotos);
   const album = new Album(inspiracao);
 
+  // ── As fotografias que ELA escolheu para cada página (`fotosDasPaginas`) ──
+  // Uma que já esteja num tema é a MESMA foto para o álbum (o mesmo `id`): o
+  // automático deixa de a pôr na página ao lado. Uma da biblioteca ou carregada
+  // só para aqui entra como foto nova. Uma que não se deixe buscar cai — e a
+  // página volta a escolher sozinha.
+  const escolhas = new Map<string, Foto[]>();
+  for (const [chave, e] of Object.entries(original.fotosDasPaginas ?? {})) {
+    const lista: Foto[] = [];
+    for (const [k, dado] of (e?.fotos ?? []).entries()) {
+      const ref = fontes.semBytes ? dado : fontes.refs?.paginas[chave]?.[k];
+      const ja = ref ? inspiracao.find((f) => f.ref === ref) : undefined;
+      const f = ja ?? (await medida(dado, `Página «${chave}» · foto ${k + 1}`, null, ref));
+      if (!f) continue;
+      const foco = e.focos?.[k];
+      lista.push(foco ? { ...f, foco } : f);
+    }
+    if (lista.length) escolhas.set(chave, lista);
+  }
+  const chaves = new Chaves();
+  /** As que ela escolheu para a página `chave`, já registadas no álbum. */
+  const escolhidas = (chave: string, pagina: number): Foto[] | null => {
+    const e = escolhas.get(chave);
+    if (!e) return null;
+    for (const f of e) album.usar(f, pagina);
+    return e;
+  };
+
   // ── O plano: cada página sabe o seu número antes de se desenhar ─────────
   // É o que deixa o índice dizer a página VERDADEIRA de cada secção, e o
   // álbum não repetir uma fotografia em duas páginas seguidas.
-  type Passo = {
-    entrada?: string;
-    desenhar: (numero: number, entradas: readonly EntradaDoIndice[]) => Promise<unknown>;
-  };
   const plano: Passo[] = [];
   const proxima = () => plano.length + 1;
   /** O número de uma secção no índice (01, 02…), pela página onde começa. */
@@ -194,6 +342,8 @@ export async function renderEditorialPdf(
         : fotoDaCapa
       : (album.escolher(1, "deitada")[0] ?? fotoDaCapa ?? null);
   plano.push({
+    chave: chaves.nova("capa"),
+    fotos: [fundoDaCapa],
     desenhar: () =>
       capa(ctx, {
         sobretitulo: org ? t.capaOrganizacao : t.capaDecoracao,
@@ -209,8 +359,12 @@ export async function renderEditorialPdf(
 
   // ── Índice ──
   {
-    const foto = album.escolher(proxima(), "alta")[0] ?? fundoDaCapa;
+    const chave = chaves.nova("indice");
+    const foto =
+      escolhidas(chave, proxima())?.[0] ?? album.escolher(proxima(), "alta")[0] ?? fundoDaCapa;
     plano.push({
+      chave,
+      fotos: [foto],
       desenhar: (numero, entradas) =>
         indice(ctx, { sobretitulo: te.indice, titulo: te.tituloIndice, entradas, foto, numero }),
     });
@@ -218,7 +372,9 @@ export async function renderEditorialPdf(
 
   // ── A proposta ──
   {
-    const foto = album.escolher(proxima(), "deitada")[0] ?? fundoDaCapa;
+    const chave = chaves.nova("proposta");
+    const foto =
+      escolhidas(chave, proxima())?.[0] ?? album.escolher(proxima(), "deitada")[0] ?? fundoDaCapa;
     const factos = [
       // «Noivos» só num casamento: num restaurante, numa empresa, numa festa,
       // quem recebe a proposta é o cliente.
@@ -244,6 +400,8 @@ export async function renderEditorialPdf(
     ].filter((f) => f.valor.trim());
     plano.push({
       entrada: te.aProposta,
+      chave,
+      fotos: [foto],
       desenhar: (numero) =>
         apresentacao(ctx, {
           sobretitulo: t.sobretituloApresentacao,
@@ -279,6 +437,8 @@ export async function renderEditorialPdf(
           return { nome: s.nome, descricao: s.descricao, foto };
         });
         plano.push({
+          chave: chaves.nova("servicos"),
+          fotos: desta.map((d) => d.foto),
           desenhar: (numero) =>
             servicos(ctx, {
               sobretitulo: t.sobretituloServicos,
@@ -295,14 +455,23 @@ export async function renderEditorialPdf(
   // ── Paleta e ambiente ──
   if (inspiracao.length) {
     const pagina = proxima();
-    const cores = await paletaDasFotos(inspiracao.slice(0, 40).map((f) => f.bytes));
     // A fila: a primeira fotografia de cada tema, e depois as outras.
     const primeiras = comConteudo.map((x) => x.fotos[0]).filter((f): f is Foto => Boolean(f));
     const fila = [...new Set([...primeiras, ...inspiracao])].slice(0, 6);
     const painel =
       album.escolher(pagina, "alta", 1, inspiracao, new Set(fila.map((f) => f.id)))[0] ?? null;
     plano.push({
-      desenhar: (numero) => ambiente(ctx, { cores, fotos: fila, painel, pagina: numero }),
+      chave: chaves.nova("ambiente"),
+      // A fila nos seis primeiros lugares, o painel no sétimo.
+      fotos: [...fila, ...Array<null>(6 - fila.length).fill(null), painel],
+      desenhar: async (numero) =>
+        ambiente(ctx, {
+          // A paleta lê os bytes: só quando se desenha (o plano não os tem).
+          cores: await paletaDasFotos(inspiracao.slice(0, 40).map((f) => f.bytes)),
+          fotos: fila,
+          painel,
+          pagina: numero,
+        }),
     });
   }
 
@@ -316,6 +485,7 @@ export async function renderEditorialPdf(
       ]);
     if (pecas.length) {
       paginasDeColunasCorridas(
+        "cronograma",
         t.sobretituloCronograma,
         t.tituloCronograma,
         pecas,
@@ -337,18 +507,23 @@ export async function renderEditorialPdf(
     // regra do documento dela, e a forma não entra na escolha —, de
     // preferência fora do primeiro tema, que vem logo a seguir.
     const paginaDoSeparador = proxima();
+    const chaveDoSeparador = chaves.nova(`separador:${c.chave}`);
     const evitar = new Set(c.itens.length > 1 ? c.itens[0].fotos.map((f) => f.id) : []);
     // Um capítulo sem fotografias (um mood board só com texto) leva as da
-    // proposta — é o que a pré-visualização do estúdio mostra (`fontesDasFolhas`).
-    const fotosDoSeparador = album.escolher(
-      paginaDoSeparador,
-      "qualquer",
-      2,
-      doCapitulo.length ? doCapitulo : inspiracao,
-      evitar,
-    );
+    // proposta. As que ela escolheu mandam: uma (a página inteira) ou duas.
+    const fotosDoSeparador =
+      escolhidas(chaveDoSeparador, paginaDoSeparador)?.slice(0, 2) ??
+      album.escolher(
+        paginaDoSeparador,
+        "qualquer",
+        2,
+        doCapitulo.length ? doCapitulo : inspiracao,
+        evitar,
+      );
     plano.push({
       entrada: `${te.inspiracao} · ${nome}`,
+      chave: chaveDoSeparador,
+      fotos: fotosDoSeparador,
       desenhar: (numero, entradas) =>
         separador(ctx, {
           sobretitulo: `${numeroNoIndice(entradas, numero)} · ${te.inspiracao}`,
@@ -366,14 +541,19 @@ export async function renderEditorialPdf(
         const fotos = x.fotos.slice(feitas, feitas + quantas);
         feitas += quantas;
         const pagina = proxima();
+        const chave = chaves.nova(`tema:${x.bi}`);
         for (const f of fotos) album.usar(f, pagina);
         // Um tema sem fotografias leva um painel de outro tema do capítulo
-        // (ou, não havendo, de qualquer tema) — nenhuma página é só texto.
+        // (ou, não havendo, de qualquer tema) — nenhuma página é só texto. Ou
+        // o que ela escolheu para esse painel.
         const painel = fotos.length
           ? null
-          : (album.escolher(pagina, "alta", 1, doCapitulo.length ? doCapitulo : inspiracao)[0] ??
+          : (escolhidas(chave, pagina)?.[0] ??
+            album.escolher(pagina, "alta", 1, doCapitulo.length ? doCapitulo : inspiracao)[0] ??
             null);
         plano.push({
+          chave,
+          fotos: fotos.length ? fotos : [painel],
           desenhar: (n) =>
             tema(ctx, {
               numero,
@@ -393,9 +573,11 @@ export async function renderEditorialPdf(
     // A citação, a meio da inspiração: a fotografia horizontal de maior
     // resolução da proposta (que não esteja numa página vizinha).
     if (ci + 1 === meio) {
-      const foto = album.escolher(proxima(), "deitada")[0];
+      const foto = escolhidas("citacao", proxima())?.[0] ?? album.escolher(proxima(), "deitada")[0];
       if (foto) {
         plano.push({
+          chave: chaves.nova("citacao"),
+          fotos: [foto],
           desenhar: () =>
             citacao(ctx, {
               frase: t.slogan ?? SITE.slogan,
@@ -431,9 +613,14 @@ export async function renderEditorialPdf(
     const temOrcamento = linhas.length > 0 || totais.aPagar > 0 || Boolean(totalStr.trim());
     if (temOrcamento) {
       const paginaDoSeparador = proxima();
-      const fotosDoSeparador = album.escolher(paginaDoSeparador, "qualquer", 2);
+      const chaveDoSeparador = chaves.nova("investimento");
+      const fotosDoSeparador =
+        escolhidas(chaveDoSeparador, paginaDoSeparador)?.slice(0, 2) ??
+        album.escolher(paginaDoSeparador, "qualquer", 2);
       plano.push({
         entrada: te.investimento,
+        chave: chaveDoSeparador,
+        fotos: fotosDoSeparador,
         desenhar: (numero, entradas) =>
           separador(ctx, {
             sobretitulo: numeroNoIndice(entradas, numero),
@@ -445,10 +632,14 @@ export async function renderEditorialPdf(
       let primeiro = 1;
       for (const [k, desta] of repartirLinhas(ctx, linhas).entries()) {
         if (!desta.length) continue;
-        const painel = album.escolher(proxima(), "alta")[0] ?? null;
+        const chave = chaves.nova("orcamento");
+        const painel =
+          escolhidas(chave, proxima())?.[0] ?? album.escolher(proxima(), "alta")[0] ?? null;
         const n0 = primeiro;
         primeiro += desta.length;
         plano.push({
+          chave,
+          fotos: [painel],
           desenhar: (numero) =>
             orcamento(ctx, {
               titulo: k ? `${te.tituloOrcamento} ${te.continuacao}` : te.tituloOrcamento,
@@ -461,8 +652,12 @@ export async function renderEditorialPdf(
         });
       }
 
-      const fotoDoTotal = album.escolher(proxima(), "deitada")[0] ?? null;
+      const chaveDoTotal = chaves.nova("total");
+      const fotoDoTotal =
+        escolhidas(chaveDoTotal, proxima())?.[0] ?? album.escolher(proxima(), "deitada")[0] ?? null;
       plano.push({
+        chave: chaveDoTotal,
+        fotos: [fotoDoTotal],
         desenhar: (numero) => total(ctx, { ...dadosDoTotal(), foto: fotoDoTotal, pagina: numero }),
       });
 
@@ -555,12 +750,17 @@ export async function renderEditorialPdf(
       ],
       lista(t.observacoesGerais, fixos.observacoesGerais),
     ].filter((c) => c.length);
-    paginasDeColunasFixas(te.condicoes, te.tituloNotas, notas, 28, te.condicoes);
+    paginasDeColunasFixas("condicoes:notas", te.condicoes, te.tituloNotas, notas, 28, te.condicoes);
 
     // 2. Condições gerais — duas colunas corridas.
     const gerais: Peca[] = fixos.condicoesGerais.map((texto) => ({ tipo: "item", texto }));
     if (gerais.length)
-      paginasDeColunasCorridas(t.sobretituloCondicoes, te.tituloCondicoesGerais, gerais);
+      paginasDeColunasCorridas(
+        "condicoes:gerais",
+        t.sobretituloCondicoes,
+        te.tituloCondicoesGerais,
+        gerais,
+      );
 
     // 3. Pagamento e cancelamento — o faseamento com os valores, os contactos.
     const pct = totais.percentagemSinal;
@@ -594,33 +794,42 @@ export async function renderEditorialPdf(
       ],
       lista(t.cancelamento, fixos.cancelamento),
     ].filter((c) => c.length);
-    paginasDeColunasFixas(t.sobretituloCondicoes, te.tituloPagamento, pagamento, 50);
+    paginasDeColunasFixas(
+      "condicoes:pagamento",
+      t.sobretituloCondicoes,
+      te.tituloPagamento,
+      pagamento,
+      50,
+    );
   }
 
   // ── Contracapa ──
+  // A da capa, ou a que ela escolheu só para aqui.
+  const chaveDaContracapa = chaves.nova("contracapa");
+  const fundoDaContracapa = escolhidas(chaveDaContracapa, proxima())?.[0] ?? fundoDaCapa;
   plano.push({
+    chave: chaveDaContracapa,
+    fotos: [fundoDaContracapa],
     desenhar: () =>
       contracapa(ctx, {
         sobretitulo: t.obrigada,
         agradecimento: t.agradecimento,
         lema: t.slogan ?? SITE.slogan,
         validade: t.passoValidade(t.data(resolveValidUntil(doc))),
-        fundo: fundoDaCapa,
+        fundo: fundoDaContracapa,
       }),
   });
 
   const entradas: EntradaDoIndice[] = plano.flatMap((p, i) =>
     p.entrada ? [{ titulo: p.entrada, pagina: i + 1 }] : [],
   );
-  for (const [i, passo] of plano.entries()) await passo.desenhar(i + 1, entradas);
-
-  const bytes = await pdf.save();
-  return { bytes, truncations: ctx.cortes, undrawnImages: ctx.naoDesenhadas.size };
+  return { pdf, ctx, plano, entradas };
 
   /* ── As páginas de colunas, repartidas antes de se desenharem ────────── */
 
   /** Colunas fixas (cada uma continua na mesma coluna da página seguinte). */
   function paginasDeColunasFixas(
+    base: string,
     sobre: string,
     titulo: string,
     colunas: readonly (readonly Peca[])[],
@@ -631,9 +840,13 @@ export async function renderEditorialPdf(
     const largura = larguraDaColuna(colunas.length, vao);
     const paginas = paginarColunasFixas(ctx, colunas, largura, alturaDasColunas(ctx, titulo));
     paginas.forEach((cols, k) => {
-      const faixa = album.escolher(proxima(), "alta")[0] ?? null;
+      const chave = chaves.nova(base);
+      const faixa =
+        escolhidas(chave, proxima())?.[0] ?? album.escolher(proxima(), "alta")[0] ?? null;
       plano.push({
         entrada: k === 0 ? entrada : undefined,
+        chave,
+        fotos: [faixa],
         desenhar: (numero) =>
           paginaDeColunas(ctx, {
             sobretitulo: sobre,
@@ -649,6 +862,7 @@ export async function renderEditorialPdf(
 
   /** Uma lista corrida em duas colunas, equilibradas quando cabe numa página. */
   function paginasDeColunasCorridas(
+    base: string,
     sobre: string,
     titulo: string,
     pecas: readonly Peca[],
@@ -667,9 +881,13 @@ export async function renderEditorialPdf(
       }
     }
     paginas.forEach((cols, k) => {
-      const faixa = album.escolher(proxima(), "alta")[0] ?? null;
+      const chave = chaves.nova(base);
+      const faixa =
+        escolhidas(chave, proxima())?.[0] ?? album.escolher(proxima(), "alta")[0] ?? null;
       plano.push({
         entrada: k === 0 ? entrada : undefined,
+        chave,
+        fotos: [faixa],
         desenhar: (numero) =>
           paginaDeColunas(ctx, {
             sobretitulo: sobre,

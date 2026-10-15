@@ -3,7 +3,8 @@
 import type { CSSProperties, ReactNode } from "react";
 import type { ProposalDoc } from "@/lib/proposal-doc";
 import { composicao, LARGURA_DO_MOSAICO, type Caixa } from "@/lib/pdf-editorial/mosaico";
-import type { EntradaDoPlano } from "@/lib/pdf-editorial/plano";
+import { chavesDasPaginas, type EntradaDoPlano } from "@/lib/pdf-editorial/plano";
+import type { FotosDoPdf } from "@/lib/pdf-editorial/fotos-do-pdf";
 import { textosDaProposta } from "@/lib/proposal-doc-textos";
 import { ASPETO_POR_OMISSAO } from "@/lib/proposal-geometria";
 import { SITE } from "@/lib/site";
@@ -29,9 +30,11 @@ import ImagemComPlanoB from "./ImagemComPlanoB";
  * estúdio já mediu.
  *
  * As outras páginas são a sua ESTRUTURA — onde fica a fotografia, onde fica o
- * texto. Que fotografia vai em cada separador ou painel escolhe-o o servidor
- * pela resolução de cada ficheiro, que aqui não se sabe; mostra-se uma dos temas
- * certos, e é dito por baixo da vista de conjunto.
+ * texto — com as fotografias que o PDF lá põe. Quem as escolhe é o álbum do
+ * PDF, pelos pixéis de cada ficheiro (ou ela, à mão: `fotosDasPaginas`), e o
+ * estúdio pergunta-lhe (`fotosDoEditorial`, pela rota `fotos-do-pdf`): até 15/10
+ * a miniatura adivinhava, e a colaboradora dela viu fotografias «que não têm
+ * nada a ver» com as do PDF.
  *
  * Tudo em píxeis da folha do exemplo (1123 × 794), convertidos em `cqw` — a
  * miniatura é um contentor, e a letra cresce com ela.
@@ -202,7 +205,7 @@ export default function PaginaEditorial({
     case "contracapa":
       conteudo = (
         <>
-          <Foto foto={capa} estilo={{ inset: 0 }} escura="esquerda" />
+          <Foto foto={outra(0) ?? capa} estilo={{ inset: 0 }} escura="esquerda" />
           {pagina.tipo === "capa" ? (
             <>
               <Texto x={MARGEM} y={290} w={560} tam={13} acento maiusculas>
@@ -243,7 +246,7 @@ export default function PaginaEditorial({
             </>
           ) : (
             <>
-              <Foto foto={outra(1)} estilo={{ inset: 0 }} escura="esquerda" />
+              <Foto foto={outra(0)} estilo={{ inset: 0 }} escura="esquerda" />
               <Texto x={MARGEM} y={180} w={500} tam={13} acento maiusculas>
                 A proposta
               </Texto>
@@ -316,8 +319,16 @@ export default function PaginaEditorial({
     case "separador":
       conteudo = (
         <>
-          <Foto foto={outra(0)} estilo={caixa({ x: 0, y: 0, w: 559, h: H })} />
-          <Foto foto={outra(1)} estilo={caixa({ x: 564, y: 0, w: 559, h: H })} />
+          {/* Uma fotografia: a página inteira; duas: lado a lado — como o PDF
+              (`paginas/fotografia.ts`) e como ela escolhe. */}
+          {outra(0) && !outra(1) ? (
+            <Foto foto={outra(0)} estilo={{ inset: 0 }} />
+          ) : (
+            <>
+              <Foto foto={outra(0)} estilo={caixa({ x: 0, y: 0, w: 559, h: H })} />
+              <Foto foto={outra(1)} estilo={caixa({ x: 564, y: 0, w: 559, h: H })} />
+            </>
+          )}
           <span
             aria-hidden="true"
             className="absolute inset-0"
@@ -402,7 +413,7 @@ export default function PaginaEditorial({
     case "citacao":
       conteudo = (
         <>
-          <Foto foto={outra(2)} estilo={{ inset: 0 }} escura="toda" />
+          <Foto foto={outra(0)} estilo={{ inset: 0 }} escura="toda" />
           <Texto x={180} y={300} w={760} tam={52} serif linhas={3}>
             «{t.slogan ?? SITE.slogan}»
           </Texto>
@@ -413,7 +424,7 @@ export default function PaginaEditorial({
     case "orcamento":
       conteudo = (
         <>
-          <Foto foto={outra(3)} estilo={{ right: 0, top: 0, width: pct(400, W), height: "100%" }} />
+          <Foto foto={outra(0)} estilo={{ right: 0, top: 0, width: pct(400, W), height: "100%" }} />
           <Texto x={MARGEM} y={110} w={560} tam={40} serif>
             {pagina.continuacao ? "Orçamento (cont.)" : "Orçamento"}
           </Texto>
@@ -425,7 +436,7 @@ export default function PaginaEditorial({
     case "total":
       conteudo = (
         <>
-          <Foto foto={outra(4)} estilo={{ inset: 0 }} escura="esquerda" />
+          <Foto foto={outra(0)} estilo={{ inset: 0 }} escura="esquerda" />
           <Texto x={MARGEM} y={240} w={600} tam={13} acento maiusculas>
             Total a pagar
           </Texto>
@@ -443,7 +454,7 @@ export default function PaginaEditorial({
       const larg = (837 - MARGEM - 28 * (colunas - 1)) / colunas;
       conteudo = (
         <>
-          <Foto foto={outra(5)} estilo={{ right: 0, top: 0, width: pct(230, W), height: "100%" }} />
+          <Foto foto={outra(0)} estilo={{ right: 0, top: 0, width: pct(230, W), height: "100%" }} />
           <Texto x={MARGEM} y={70} w={700} tam={40} serif>
             {titulo}
           </Texto>
@@ -486,46 +497,30 @@ export default function PaginaEditorial({
 /**
  * De onde vêm as fotografias das miniaturas, para uma lista de páginas.
  *
- * Os temas usam as SUAS fotografias, pela ordem de desenho. A capa usa a que
- * ela escolheu (a primeira que houver em `coverImages`), ou, sem ela, a
- * primeira dos temas. Os separadores usam as do seu capítulo; os outros
- * painéis vão buscar uma dos temas, a rodar, para as páginas seguidas não
- * repetirem a mesma. É uma aproximação — ver o cabeçalho.
+ * Os temas usam as SUAS fotografias, pela ordem de desenho. As outras páginas
+ * usam as que o PDF lá põe (`doPdf`, pela chave de cada página — a resposta da
+ * rota `fotos-do-pdf`). Enquanto essa resposta não chega, a capa mostra a que
+ * ela escolheu e as outras ficam com o fundo liso: uma fotografia adivinhada
+ * era a que «não tem nada a ver».
  */
 export function fontesDasFolhas(
   doc: ProposalDoc,
   plano: readonly EntradaDoPlano[],
   urls: Record<string, string>,
   originais: Record<string, string> = {},
+  doPdf?: FotosDoPdf | null,
 ) {
-  const daRef = (ref?: string): FotoDaFolha | undefined =>
-    ref ? { url: urls[ref], original: originais[ref] } : undefined;
-  const todas: string[] = [];
-  const porCapitulo = new Map<number, string[]>();
-  let capitulo = -1;
-  plano.forEach((p, i) => {
-    if (p.tipo === "separador" && p.grupo) {
-      capitulo = i;
-      porCapitulo.set(i, []);
-    }
-    if (p.tipo === "tema") {
-      const refs = p.fotos
-        .map((k) => doc.moodBoards[p.bi]?.images?.[k])
-        .filter(Boolean) as string[];
-      todas.push(...refs);
-      if (capitulo >= 0) porCapitulo.get(capitulo)?.push(...refs);
-    }
-  });
-  const capaRef = (doc.coverImages ?? []).find((c) => c && c.trim()) || todas[0];
+  // Uma fotografia embutida no rascunho (`data:`) mostra-se a si própria — não
+  // tem miniatura no armazenamento, e o `img-src` da casa aceita `data:`.
+  const daRef = (ref?: string | null): FotoDaFolha | undefined =>
+    ref
+      ? { url: urls[ref] ?? (ref.startsWith("data:") ? ref : undefined), original: originais[ref] }
+      : undefined;
+  const chaves = chavesDasPaginas(plano);
+  const capaRef = (doc.coverImages ?? []).find((c) => c && c.trim());
   return {
-    capa: daRef(capaRef),
+    capa: daRef(doPdf?.capa?.[0]?.ref ?? capaRef),
     fotosDoTema: (bi: number, k: number) => daRef(doc.moodBoards[bi]?.images?.[k]),
-    outrasDa: (i: number) => (n: number) => {
-      const p = plano[i];
-      const doCapitulo = p?.tipo === "separador" && p.grupo ? porCapitulo.get(i) : undefined;
-      const lista = doCapitulo?.length ? doCapitulo : todas;
-      if (!lista.length) return undefined;
-      return daRef(lista[(doCapitulo ? n : i * 3 + n) % lista.length]);
-    },
+    outrasDa: (i: number) => (n: number) => daRef(doPdf?.[chaves[i]]?.[n]?.ref),
   };
 }
