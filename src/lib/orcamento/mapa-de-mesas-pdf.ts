@@ -16,6 +16,8 @@ import {
   dimensoes,
   iniciais,
   nomeDoLugar,
+  numerosDosLugares,
+  porNomeDaMesa,
   porSentar,
   quemEstaNaMesa,
   reconciliar,
@@ -153,8 +155,7 @@ function centrado(
 }
 
 /** Ordem das mesas na lista: «Mesa 2» antes de «Mesa 10». */
-const porNome = (a: { nome: string }, b: { nome: string }) =>
-  a.nome.localeCompare(b.nome, "pt", { numeric: true, sensitivity: "base" });
+const porNome = porNomeDaMesa;
 
 export async function mapaDeMesasEmPdf(dados: MapaParaPdf): Promise<Uint8Array | null> {
   const mapa = reconciliar(dados.mapa, dados.lista);
@@ -250,6 +251,7 @@ function desenharSala(
   marca: Awaited<ReturnType<PDFDocument["embedPng"]>>,
 ) {
   const c = contas(mapa, dados.lista);
+  const numeros = numerosDosLugares(mapa);
   const topo =
     cabecalho(pagina, dados, "Mapa de mesas", fontes, marca, `Sentados ${c.sentados}/${c.total}`) -
     14;
@@ -343,8 +345,17 @@ function desenharSala(
       CINZA,
     );
     const raio = (CADEIRA / 2) * s;
+    // O número do lugar (único na sala) e, por baixo, as iniciais — o pedido
+    // dela de 15/10, para duas «Mariana» não serem a mesma «MA». Numa sala tão
+    // grande que as duas linhas não cabem, fica só o número: é ele que
+    // desfaz a dúvida, e o nome está na lista.
+    const duasLinhas = raio >= 5.5;
+    const tamNumero = Math.max(3.5, Math.min(6.5, raio * (duasLinhas ? 0.8 : 1)));
+    const tamIniciais = Math.max(3, Math.min(5, raio * 0.6));
     for (const cad of cs) {
-      const oc = mapa.lugares[chaveDoLugar(mesa.id, cad.lugar)];
+      const chave = chaveDoLugar(mesa.id, cad.lugar);
+      const oc = mapa.lugares[chave];
+      const numero = String(numeros.get(chave) ?? "");
       pagina.drawCircle({
         x: px(cad.x),
         y: py(cad.y),
@@ -354,17 +365,19 @@ function desenharSala(
         borderWidth: 0.6,
         ...(oc ? {} : { borderDashArray: [1.5, 1.5] }),
       });
-      if (oc) {
-        const letra = Math.max(3.5, Math.min(8, raio * 0.85));
+      if (oc && duasLinhas) {
+        centrado(pagina, numero, px(cad.x), py(cad.y) + raio * 0.3, fontes.bold, tamNumero, MARCA);
         centrado(
           pagina,
           iniciais(nomeDoLugar(oc, dados.lista)),
           px(cad.x),
-          py(cad.y),
-          fontes.bold,
-          letra,
+          py(cad.y) - raio * 0.42,
+          fontes.reg,
+          tamIniciais,
           MARCA,
         );
+      } else {
+        centrado(pagina, numero, px(cad.x), py(cad.y), fontes.bold, tamNumero, oc ? MARCA : CINZA);
       }
     }
   }
@@ -385,7 +398,8 @@ function listaPorMesa(pdf: PDFDocument, dados: MapaParaPdf, mapa: MapaDeMesas, f
 
   const novaPagina = () => {
     pagina = pdf.addPage([LARGURA, ALTURA]);
-    topoDaPagina = cabecalho(pagina, dados, "Lista por mesa", fontes, null) - 18;
+    topoDaPagina =
+      cabecalho(pagina, dados, "Lista por mesa", fontes, null, "N.º = o lugar no desenho") - 18;
     coluna = 0;
     y = topoDaPagina;
   };
@@ -444,6 +458,7 @@ function listaPorMesa(pdf: PDFDocument, dados: MapaParaPdf, mapa: MapaDeMesas, f
     y -= 12;
   };
 
+  const numeros = numerosDosLugares(mapa);
   for (const mesa of [...mapa.mesas].sort(porNome)) {
     const lugares = quemEstaNaMesa(mapa, mesa);
     const sentados = lugares.filter((l) => l.ocupante).length;
@@ -451,7 +466,8 @@ function listaPorMesa(pdf: PDFDocument, dados: MapaParaPdf, mapa: MapaDeMesas, f
       mesa.nome,
       `${ROTULO_DA_FORMA[mesa.forma].toLowerCase()} · ${sentados}/${mesa.lugares}`,
       lugares.map((l) => ({
-        n: String(l.lugar + 1),
+        // O MESMO número que a cadeira tem no desenho (único na sala).
+        n: String(numeros.get(l.chave) ?? l.lugar + 1),
         texto: l.ocupante ? nomeDoLugar(l.ocupante, dados.lista) : "livre",
         livre: !l.ocupante,
       })),
@@ -470,8 +486,10 @@ function listaPorMesa(pdf: PDFDocument, dados: MapaParaPdf, mapa: MapaDeMesas, f
     bloco(
       "Por sentar",
       `${total} ${total === 1 ? "pessoa" : "pessoas"}`,
-      [...faltam.values()].map((g, i) => ({
-        n: String(i + 1),
+      // Sem número: quem não está sentado não tem lugar, e um «1» aqui
+      // confundia-se com o lugar 1 do desenho.
+      [...faltam.values()].map((g) => ({
+        n: "",
         texto: g.n > 1 ? `${g.nome} (${g.n})` : g.nome,
       })),
     );

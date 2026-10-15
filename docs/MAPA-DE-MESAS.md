@@ -75,6 +75,7 @@ Pedido dela (14/10), com a captura de um «Mapa de Mesas»:
 | A lista dos eventos: o dia em grande, quanto falta, «8 mesas · 64/74 sentados» com a barra, o próximo à cabeça, procura | **feito** |
 | **Partilhar (14/10, 3.ª volta):** «Partilhar ▾» na barra de cima (no telemóvel, dentro do «⋯») com Descarregar PDF, WhatsApp, Email e Imprimir | **feito** |
 | O PDF: o desenho numa A4 deitada, depois a lista por mesa a três colunas, e no fim quem ficou por sentar | **feito** |
+| **Um número em cada lugar (15/10):** «há mais do que uma Mariana… aparece só MA ou MB… coloca em cada lugar o número, para na lista sabermos que aquele número é para aquela pessoa». Ela escolheu um número **único na sala toda** (1, 2, 3…, mesa a mesa pela ordem do nome, os livres também contam — `numerosDosLugares`) e, no desenho, **o número e as iniciais**. A lista por mesa, o painel da mesa e a vista «Lista» do ecrã mostram o MESMO número; «Por sentar» deixou de numerar as linhas, para não se confundir com um lugar | **feito** |
 | WhatsApp: no telemóvel, o «Partilhar» do sistema já com o PDF; no computador, descarrega o PDF e abre o WhatsApp com a frase escrita | **feito** |
 | Email: vem com o email do casal e muda-se na hora (quinta, catering, equipa); o PDF segue em anexo, com a assinatura da casa; fica no histórico do pedido | **feito** |
 | Antes de pedir o PDF grava-se o que está por gravar — o PDF tem sempre a última mesa | **feito** |

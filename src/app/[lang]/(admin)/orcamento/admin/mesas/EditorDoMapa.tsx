@@ -25,6 +25,7 @@ import {
   novaMesa,
   novoElemento,
   porSentar,
+  numerosDosLugares,
   quemEstaNaMesa,
   reconciliar,
   refazer,
@@ -417,6 +418,8 @@ export default function EditorDoMapa({ pedido, onPedido, resumo, onSair }: Props
   const espera = useMemo(() => agrupar(porSentar(mapa, lista)), [mapa, lista]);
   const porSentarN = espera.reduce((s, g) => s + g.faltam, 0);
   const partidos = useMemo(() => gruposPartidos(mapa), [mapa]);
+  /** O número único de cada lugar (o mesmo do PDF) — ver `numerosDosLugares`. */
+  const numerosDaSala = useMemo(() => numerosDosLugares(mapa), [mapa]);
   const mesaEscolhida =
     seleccao?.tipo === "mesa" ? (mapa.mesas.find((m) => m.id === seleccao.id) ?? null) : null;
   const elementoEscolhido =
@@ -852,19 +855,21 @@ export default function EditorDoMapa({ pedido, onPedido, resumo, onSair }: Props
             <span className="text-xs text-[var(--bo-text-muted)]">Quem está sentado</span>
             <ol className="flex flex-col gap-1.5">
               {quemEstaNaMesa(mapa, mesaEscolhida).map(({ lugar, chave, ocupante }) => {
+                // O número único do lugar — o mesmo da cadeira no PDF.
+                const numero = numerosDaSala.get(chave) ?? lugar + 1;
                 const grupo = ocupante
                   ? lista.find((g) => g.id === ocupante.convidadoId)
                   : undefined;
                 return (
                   <li key={chave} className="flex items-center gap-2 text-sm">
-                    <span className="w-5 shrink-0 text-right text-xs tabular-nums text-[var(--bo-text-muted)]">
-                      {lugar + 1}
+                    <span className="w-7 shrink-0 text-right text-xs tabular-nums text-[var(--bo-text-muted)]">
+                      {numero}
                     </span>
                     {ocupante ? (
                       <>
                         {grupo && grupo.party > 1 ? (
                           <input
-                            aria-label={`Nome da pessoa no lugar ${lugar + 1}`}
+                            aria-label={`Nome da pessoa no lugar ${numero}`}
                             className="h-9 min-w-0 flex-1 rounded-lg border border-[var(--bo-hairline-strong)] bg-[var(--bo-surface)] px-2 text-sm"
                             placeholder={nomeDoLugar({ ...ocupante, nome: undefined }, lista)}
                             defaultValue={ocupante.nome ?? ""}
@@ -1407,6 +1412,8 @@ function VistaEmLista({
   if (mapa.mesas.length === 0) {
     return <p className="text-sm text-[var(--bo-text-muted)]">Ainda não há mesas.</p>;
   }
+  // O número único de cada lugar — o mesmo do PDF (o pedido dela de 15/10).
+  const numeros = numerosDosLugares(mapa);
   return (
     <div className="grid min-w-0 gap-3 @container sm:grid-cols-2 lg:grid-cols-3">
       {mapa.mesas.map((mesa) => {
@@ -1433,6 +1440,12 @@ function VistaEmLista({
                   const nome = nomeDoLugar(ocupante!, lista);
                   return (
                     <li key={chave} className="flex items-center gap-2 text-sm">
+                      <span
+                        className="w-7 shrink-0 text-right text-xs tabular-nums text-[var(--bo-text-muted)]"
+                        aria-label={`Lugar ${numeros.get(chave)}`}
+                      >
+                        {numeros.get(chave)}
+                      </span>
                       <span className="min-w-0 flex-1 truncate">{nome}</span>
                       <select
                         aria-label={`Mudar ${nome} para…`}

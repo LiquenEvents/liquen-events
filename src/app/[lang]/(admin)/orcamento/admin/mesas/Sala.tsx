@@ -11,6 +11,7 @@ import {
   SALA_MINIMA,
   unirCaixas,
   chaveDoLugar,
+  numerosDosLugares,
   dimensoes,
   iniciais,
   nomeCurto,
@@ -191,6 +192,8 @@ export default function Sala({
      do tamanho de uma sala grande para este ecrã — pelo quadro INTEIRO, para
      abrir um painel não mudar a sala —, unido ao que existe. Dentro dele,
      pôr e mover mesas não mexe em nada. */
+  /** O número único de cada lugar — o mesmo do PDF e da lista. */
+  const numeros = useMemo(() => numerosDosLugares(mapa), [mapa]);
   const caixa = useMemo(() => {
     const c = caixaDaSala(mapa);
     if (!cheio || quadro.w <= 40 || quadro.h <= 40) return c;
@@ -686,6 +689,7 @@ export default function Sala({
             mesa={mesa}
             mapa={mapa}
             lista={lista}
+            numeros={numeros}
             deslocamento={deslocado("mesa", mesa.id)}
             escolhida={seleccao?.tipo === "mesa" && seleccao.id === mesa.id}
             aSentar={aSentar}
@@ -850,6 +854,7 @@ function DesenhoDaMesa({
   mesa,
   mapa,
   lista,
+  numeros,
   deslocamento,
   escolhida,
   aSentar,
@@ -865,6 +870,8 @@ function DesenhoDaMesa({
   mesa: Mesa;
   mapa: MapaDeMesas;
   lista: readonly Guest[];
+  /** O número único de cada lugar (`numerosDosLugares`) — o mesmo do PDF. */
+  numeros: ReadonlyMap<string, number>;
   deslocamento: { dx: number; dy: number };
   escolhida: boolean;
   aSentar: boolean;
@@ -958,7 +965,7 @@ function DesenhoDaMesa({
             data-alvo={`lugar|${chave}`}
             role="button"
             tabIndex={escolhida ? 0 : -1}
-            aria-label={`Lugar ${c.lugar + 1} da ${mesa.nome}: ${nome ?? "livre"}`}
+            aria-label={`Lugar ${numeros.get(chave) ?? c.lugar + 1} da ${mesa.nome}: ${nome ?? "livre"}`}
             className={oc ? "cursor-grab" : "cursor-pointer"}
             opacity={levada === chave ? 0.35 : 1}
             onKeyDown={(e) => {
