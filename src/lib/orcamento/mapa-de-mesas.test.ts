@@ -325,3 +325,22 @@ describe("unir caixas (a sala parada, 14/10)", () => {
     });
   });
 });
+
+describe("o número de cada lugar (único na sala, o pedido dela de 15/10)", () => {
+  it("numera de 1 até ao fim da sala, mesa a mesa pela ordem do nome, e os livres contam", async () => {
+    const { numerosDosLugares, novaMesa, mapaVazio, mudarMesa, chaveDoLugar } =
+      await import("./mapa-de-mesas");
+    let m = mapaVazio();
+    for (let i = 0; i < 11; i++) m = novaMesa(m, "redonda", `m${i}`).mapa;
+    m = { ...m, mesas: m.mesas.map((x) => ({ ...x, lugares: 2 })) };
+    m = mudarMesa(m, "m10", { lugares: 3 });
+    const numeros = numerosDosLugares(m);
+    // «Mesa 2» vem antes de «Mesa 10».
+    const mesa = (nome: string) => m.mesas.find((x) => x.nome === nome)!;
+    expect(numeros.get(chaveDoLugar(mesa("Mesa 1").id, 0))).toBe(1);
+    expect(numeros.get(chaveDoLugar(mesa("Mesa 2").id, 1))).toBe(4);
+    expect(numeros.get(chaveDoLugar(mesa("Mesa 10").id, 0))).toBe(19);
+    expect(numeros.get(chaveDoLugar(mesa("Mesa 11").id, 2))).toBe(23);
+    expect(new Set(numeros.values()).size).toBe(numeros.size);
+  });
+});

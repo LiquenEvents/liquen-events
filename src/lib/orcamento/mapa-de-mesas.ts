@@ -874,6 +874,38 @@ export function apagarElemento(mapa: MapaDeMesas, id: string): MapaDeMesas {
   return { ...mapa, elementos: mapa.elementos.filter((e) => e.id !== id) };
 }
 
+/** A ordem das mesas nas listas: «Mesa 2» antes de «Mesa 10». */
+export const porNomeDaMesa = (a: { nome: string }, b: { nome: string }) =>
+  a.nome.localeCompare(b.nome, "pt", { numeric: true, sensitivity: "base" });
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O NÚMERO DE CADA LUGAR — ÚNICO NA SALA TODA
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Palavras dela (15/10): «há mais do que uma Mariana ou mais do que uma
+ * Mafalda. Nós não sabemos qual é que é naquele lugar, porque aparece só MA ou
+ * MB… coloca em cada lugar, para além do nome, o número. Para depois, na lista
+ * de baixo, sabermos que aquele número é para aquela pessoa.» E escolheu um
+ * número ÚNICO (1, 2, 3… até ao fim da sala), e não um que recomeça em cada
+ * mesa.
+ *
+ * As mesas pela ordem do nome (a das listas), os lugares de cada uma pela
+ * ordem das cadeiras (`cadeiras`). Os livres também contam: assim o número de
+ * quem está sentado não muda por alguém se sentar ao lado. O PDF e o ecrã leem
+ * daqui — nunca dois números para o mesmo lugar.
+ */
+export function numerosDosLugares(mapa: MapaDeMesas): Map<string, number> {
+  const numeros = new Map<string, number>();
+  let n = 0;
+  for (const mesa of [...mapa.mesas].sort(porNomeDaMesa)) {
+    for (let lugar = 0; lugar < mesa.lugares; lugar++) {
+      numeros.set(chaveDoLugar(mesa.id, lugar), ++n);
+    }
+  }
+  return numeros;
+}
+
 /** As pessoas de uma mesa, pela ordem dos lugares — a lista por mesa e o PDF. */
 export function quemEstaNaMesa(
   mapa: MapaDeMesas,

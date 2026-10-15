@@ -213,6 +213,14 @@ describe("o mapa de mesas", () => {
     expect(within(mesa).getByText("Ninguém sentado.")).toBeInTheDocument();
   });
 
+  it("na vista em lista, cada pessoa tem o número do seu lugar — o mesmo do PDF", async () => {
+    const user = userEvent.setup();
+    await abrir({ ...COM_UMA_MESA, lugares: { "m1:2": { convidadoId: "g2", n: 1 } } });
+    await user.click(screen.getByRole("radio", { name: "Lista" }));
+    const mesa = screen.getByRole("region", { name: "Mesa 1" });
+    expect(within(mesa).getByLabelText("Lugar 3")).toHaveTextContent("3");
+  });
+
   it("uma colisão (409) junta o gesto daqui ao mapa que lá estava", async () => {
     const outraMesa = {
       id: "m2",

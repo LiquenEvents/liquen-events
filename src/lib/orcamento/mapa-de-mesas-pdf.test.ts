@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { writeFileSync } from "node:fs";
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, PDFPage } from "pdf-lib";
 
 vi.mock("server-only", () => ({}));
 
@@ -78,6 +78,53 @@ describe("o mapa de mesas em PDF", () => {
     const bytes = await mapaDeMesasEmPdf({ cliente: "X", detalhe: "", mapa: m, lista: CONVIDADOS });
     const pdf = await PDFDocument.load(bytes!);
     expect(pdf.getPageCount()).toBeGreaterThanOrEqual(2);
+  });
+
+  it("cada lugar tem um número único, no desenho e na lista — duas «Mariana» deixam de ser a mesma «MA»", async () => {
+    // O pedido dela de 15/10.
+    const lista: Guest[] = [
+      { id: "a", name: "TESTE Mariana", party: 1, rsvp: "confirmado" },
+      { id: "b", name: "TESTE Mariana", party: 1, rsvp: "confirmado" },
+      { id: "c", name: "TESTE Rui", party: 1, rsvp: "confirmado" },
+    ];
+    let m = novaMesa(mapaVazio(), "redonda", "m1").mapa;
+    m = novaMesa(m, "redonda", "m2").mapa;
+    m = mudarMesa(mudarMesa(m, "m1", { lugares: 2 }), "m2", { lugares: 2 });
+    m = {
+      ...m,
+      lugares: {
+        [chaveDoLugar("m1", 1)]: { convidadoId: "a", n: 1 },
+        [chaveDoLugar("m2", 0)]: { convidadoId: "b", n: 1 },
+      },
+    };
+    // O texto desenhado em cada página.
+    const paginas: string[][] = [];
+    const vistas = new Map<PDFPage, number>();
+    const drawText = PDFPage.prototype.drawText;
+    PDFPage.prototype.drawText = function (t: string, o?: Parameters<typeof drawText>[1]) {
+      if (!vistas.has(this)) vistas.set(this, paginas.push([]) - 1);
+      paginas[vistas.get(this)!].push(t);
+      return drawText.call(this, t, o);
+    };
+    try {
+      await mapaDeMesasEmPdf({ cliente: "X", detalhe: "", mapa: m, lista });
+    } finally {
+      PDFPage.prototype.drawText = drawText;
+    }
+    const [desenho, ...resto] = paginas;
+    const lista1 = resto.flat();
+    // No desenho: 1 a 4 (os livres também têm número) e as iniciais das sentadas.
+    for (const n of ["1", "2", "3", "4"]) expect(desenho).toContain(n);
+    expect(desenho.filter((t) => t === "TM").length).toBe(2);
+    // Na lista, a Mariana da Mesa 1 é a 2 e a da Mesa 2 é a 3 — o mesmo número.
+    const linhaDe = (n: string) => lista1[lista1.indexOf(n) + 1];
+    expect(linhaDe("2")).toBe("TESTE Mariana");
+    expect(linhaDe("3")).toBe("TESTE Mariana");
+    expect(linhaDe("1")).toBe("livre");
+    expect(linhaDe("4")).toBe("livre");
+    // Quem está por sentar não leva número (confundia-se com um lugar).
+    expect(lista1[lista1.indexOf("TESTE Rui") - 1]).toBe("");
+    expect(lista1).toContain("N.º = o lugar no desenho");
   });
 
   it("o nome do ficheiro não tem acentos nem espaços", () => {
