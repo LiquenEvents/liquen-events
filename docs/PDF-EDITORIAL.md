@@ -133,6 +133,35 @@ do prompt aqui em baixo é o atualizado, que acompanha o exemplo novo.
    - **Fica por fazer:** o enquadramento à mão das fotografias escolhidas para
      as páginas (o `focos` já existe no documento e o PDF já o usa; falta a
      caixa de arrastar no estúdio, como a da capa).
+   - **E a disposição das fotos de cada tema escolhe-se outra vez (15/10).**
+     Palavras dela: «antigamente dava para escolher os mosaicos… a disposição
+     das fotos no slide… mas com o mesmo design que está agora no PDF», e
+     depois «quero poder escolher aquilo que eu quiser… um mosaico como nós
+     tínhamos no PDF anterior, mas agora para este novo». No editor de cada
+     tema há «Disposição das fotos», com um desenho pequeno de cada opção feito
+     pela MESMA `composicao()` do PDF (`EscolherDisposicao.tsx`). Fica no campo
+     novo `disposicao` do mood board — não no `layout` antigo, que as propostas
+     anteriores ao PDF novo têm gravado e que, se passasse a contar, lhes
+     mudava o PDF sozinho. Sem escolha, é a automática do quadro de
+     `mosaico.ts`, igual a antes. As disposições, todas com as peças do desenho
+     novo (o bloco de texto de 330 px, o vão de 4 px, a largura de cada foto na
+     proporção da sua forma):
+
+     | Disposição | Fotos por página | Como fica |
+     |---|---|---|
+     | Uma fila (a «fila única» antiga) | 2–5 | o texto de um lado, uma fila a toda a altura |
+     | Duas filas | 3–12 | o mosaico automático (com 4, o tijolo) |
+     | Três filas (as «filas» antigas) | 6–12 | o texto a toda a altura, três filas ao lado |
+     | Soltas | 3–6 | ao alto, desalinhadas; com 5 são as do exemplo, tal e qual |
+     | Destaque (o «destaque» antigo) | 3–7 | o texto, a ★ grande, as outras numa coluna |
+     | Grelha (o «mosaico» antigo) | 3–10 | cortes sucessivos numa grelha de 8 × 8, a maior célula para a ★ |
+     | Texto e imagem (o antigo) | 1–4 | o texto mais largo (45%), as fotos empilhadas ao lado |
+
+     Acima do máximo, o tema reparte-se por mais páginas (`repartir(n, d)`, o
+     MESMO no PDF e no plano — o `plano.test.ts` prende-o); uma página abaixo
+     do mínimo fica com a automática. O «Manter a forma (não corta)» do PDF
+     antigo não volta: cada célula do desenho novo já tem quase a forma da sua
+     foto.
 10. **As células do mosaico têm a forma da sua fotografia** (a largura é
     proporcional ao aspecto, como o `flex` do exemplo), e todas as de uma fila
     têm a mesma altura (395 px). Por isso a «troca por falta de resolução» que

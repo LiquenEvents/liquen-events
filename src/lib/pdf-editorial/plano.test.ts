@@ -146,6 +146,30 @@ describe("o plano das páginas é o do PDF", () => {
     expect(temas.map((t) => (t.tipo === "tema" ? t.fotos.length : 0))).toEqual([10, 10]);
   });
 
+  it("a disposição escolhida reparte o tema como o PDF (uma fila de 7 = 4 + 3)", async () => {
+    const { plano } = await batem(
+      doc({
+        moodBoards: [
+          { title: "Decoração Cerimónia", images: fotos(7), disposicao: "uma-fila" },
+          { title: "Decor Cocktail", images: fotos(5), disposicao: "destaque" },
+          { title: "Mesas de Jantar", images: fotos(9), disposicao: "soltas" },
+          { title: "Bar", images: fotos(2), disposicao: "grelha" },
+        ],
+      }),
+    );
+    // Pela ordem dos capítulos do dia: o «Bar» vai com o cocktail.
+    const temas = plano.filter((p) => p.tipo === "tema");
+    expect(temas.map((t) => (t.tipo === "tema" ? t.fotos.length : 0))).toEqual([4, 3, 5, 2, 5, 4]);
+    expect(temas.map((t) => (t.tipo === "tema" ? t.disposicao : null))).toEqual([
+      "uma-fila",
+      "uma-fila",
+      "destaque",
+      "grelha",
+      "soltas",
+      "soltas",
+    ]);
+  });
+
   it("um tema só com texto tem a sua página; um tema vazio não tem", async () => {
     const { plano } = await batem(
       doc({

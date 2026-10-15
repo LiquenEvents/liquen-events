@@ -8,6 +8,7 @@
  * standard wording; the back office overrides only what changes per event.
  */
 
+import type { Disposicao } from "./pdf-editorial/mosaico";
 import { SINAL_POR_OMISSAO } from "./money";
 import type { Escolha } from "./proposta-escolhas";
 import type { LayoutDeMoodboard } from "./proposal-geometria";
@@ -165,6 +166,15 @@ export interface MoodBoard {
    * de documentos já enviados.
    */
   layout?: LayoutDeMoodboard;
+  /**
+   * A DISPOSIÇÃO DAS FOTOGRAFIAS NO PDF NOVO, escolhida por ela (15/10).
+   *
+   * Ausente = a automática, pelo número de fotografias. É um campo novo, e não
+   * o `layout` de cima, porque as propostas feitas antes do PDF novo têm o
+   * `layout` gravado: se passasse a contar, o PDF delas mudava sozinho. Os
+   * valores e o que cada um desenha estão em `pdf-editorial/mosaico.ts`.
+   */
+  disposicao?: Disposicao;
   /**
    * ════════════════════════════════════════════════════════════════════════
    * AS CAIXAS TOMAM A FORMA DAS FOTOGRAFIAS
