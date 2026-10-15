@@ -5299,14 +5299,53 @@ body:has(.barra-consentimento) footer {
   }
 }
 
-/* Camada da foto do lightbox — mola de volta ao largar o arrasto (fechar em
-   telemóvel). Enquanto o dedo arrasta, o JS põe .lb-dragging para seguir o
-   toque sem lag; ao largar, a transição trata do resto. */
-.lb-photo-layer {
+/* O arrastar para baixo para fechar — mola de volta ao largar. Enquanto o
+   dedo arrasta, o JS põe .lb-dragging para seguir o toque sem lag; ao largar,
+   a transição trata do resto. Vivia na própria camada da foto; passou para
+   uma caixa só dela (GAL-2), porque a camada é a que se MEDE (o voo e o
+   «qualquer preto fecha») e o deslize lateral tem a sua (`.lb-pista`). */
+.lb-arrasto {
   transition: transform var(--transition-duration-elemento) var(--ease-out);
 }
-.lb-photo-layer.lb-dragging {
+.lb-arrasto.lb-dragging {
   transition: none;
+}
+
+/* A pista das três fotografias (GAL-2). Sem transição: quem a move é o dedo,
+   e ao largar a mola da casa em JS (`assentar`), que é a única que sabe a
+   velocidade com que o dedo saiu. */
+.lb-pista {
+  will-change: transform;
+}
+
+/* A FOTOGRAFIA OCUPA O ECRÃ (GAL-4). Antes ficava com o que sobrava depois da
+   barra de cima, da tira e da linha de dicas — 22 % da altura. Agora a barra
+   e a tira flutuam por cima, e a foto fica com o ecrã menos uma margem de
+   16 px (24 no computador) e as zonas seguras do telemóvel. */
+.lb-palco {
+  position: absolute;
+  top: calc(1rem + env(safe-area-inset-top));
+  right: calc(1rem + env(safe-area-inset-right));
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  left: calc(1rem + env(safe-area-inset-left));
+}
+@media (min-width: 768px) {
+  .lb-palco {
+    top: calc(1.5rem + env(safe-area-inset-top));
+    right: 1.5rem;
+    bottom: 1.5rem;
+    left: 1.5rem;
+  }
+}
+
+/* A barra, as setas e a tira escondem-se ao fim de 2,5 s parados (o JS põe
+   `data-escondido`, e `inert`). Só a opacidade: a caixa não se mexe, e um
+   toque traz tudo de volta no mesmo sítio. */
+.lb-cromagem {
+  transition: opacity var(--transition-duration-elemento) var(--ease-out);
+}
+.lb-cromagem[data-escondido] {
+  opacity: 0;
 }
 
 /* Indicador de "a carregar mais" do scroll infinito — três pontos que pulsam
@@ -5338,6 +5377,10 @@ body:has(.barra-consentimento) footer {
 .lb-scrim {
   background: linear-gradient(to bottom, rgba(0, 0, 0, 0.55), transparent);
 }
+/* O mesmo, por baixo da tira, agora que ela flutua sobre a foto (GAL-4). */
+.lb-scrim-baixo {
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.55), transparent);
+}
 
 @media (prefers-reduced-motion: reduce) {
   .g-reveal {
@@ -5354,7 +5397,8 @@ body:has(.barra-consentimento) footer {
   }
   /* A cor do fundo muda de foto para foto sem transitar. */
   .lb-backdrop,
-  .lb-photo-layer {
+  .lb-arrasto,
+  .lb-cromagem {
     transition: none;
   }
   .g-loading-dot {

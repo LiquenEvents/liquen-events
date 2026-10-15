@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import GaleriaClient from "./GaleriaClient";
 import { PHOTOS } from "./photos-data";
 import { pt } from "@/lib/i18n/pt";
@@ -257,20 +257,154 @@ describe("a tira de miniaturas (GAL-9)", () => {
 
   it("a 390 px cabem 5, e numa secretária 7", async () => {
     vi.stubGlobal("innerWidth", 390);
+    // A tira chega dois fotogramas depois de abrir (`chromeReady`): espera-se
+    // por ela, e não um número fixo de milissegundos — sob carga não chegava.
     abrir(3);
-    await esperar();
-    expect(tira()).toHaveLength(5);
+    await waitFor(() => expect(tira()).toHaveLength(5));
     cleanup();
     vi.stubGlobal("innerWidth", 1340);
     abrir(3);
-    await esperar();
-    expect(tira()).toHaveLength(7);
+    await waitFor(() => expect(tira()).toHaveLength(7));
   });
 
-  it("a dica do teclado vai com a classe que só aparece com rato", () => {
+  it("a dica do teclado vive num «?» que só aparece com rato (GAL-4)", () => {
     abrir();
-    const dica = screen.getByText(pt.galeria.keyboardHint);
-    expect(dica.className).toMatch(/\blb-dica\b/);
-    expect(dica.className).not.toMatch(/md:block/);
+    // A linha de dicas comia altura à foto: passou a um botão na barra.
+    expect(screen.queryByText(pt.galeria.keyboardHint)).toBeNull();
+    const botao = screen.getByRole("button", { name: pt.galeria.lbAtalhos });
+    expect(botao.className).toMatch(/\blb-dica\b/);
+    expect(botao.className).not.toMatch(/md:block/);
+    fireEvent.click(botao);
+    expect(botao.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByText(pt.galeria.keyboardHint)).toBeInTheDocument();
+    // Abrir as dicas não fecha o visualizador.
+    expect(dialogo()).not.toBeNull();
+  });
+});
+
+describe("navegar com o dedo, sem dar a volta (GAL-2)", () => {
+  /**
+   * Um gesto horizontal com o dedo, em eventos de ponteiro, que dura `ms`. O
+   * `timeStamp` de cada evento vem do relógio, por isso o relógio é falso e
+   * anda entre os passos — é dele que sai a velocidade.
+   */
+  function deslizar(dx: number, ms: number) {
+    const c = camada();
+    Object.defineProperty(c, "clientWidth", { configurable: true, value: 1000 });
+    const base = { pointerId: 7, pointerType: "touch", clientY: 300 };
+    const passos = 8;
+    fireEvent.pointerDown(c, { ...base, clientX: 500 });
+    for (let k = 1; k <= passos; k++) {
+      vi.advanceTimersByTime(ms / passos);
+      fireEvent.pointerMove(c, { ...base, clientX: 500 + (dx * k) / passos });
+    }
+    fireEvent.pointerUp(c, { ...base, clientX: 500 + dx });
+  }
+  beforeEach(() => void vi.useFakeTimers({ toFake: ["Date", "performance"] }));
+  afterEach(() => void vi.useRealTimers());
+
+  it("na primeira foto, ← e ‹ não vão para a última", () => {
+    abrir(0);
+    expect(fotoAberta()).toBe(1);
+    expect(screen.queryByRole("button", { name: pt.galeria.lbPrev })).toBeNull();
+    fireEvent.keyDown(window, { key: "ArrowLeft" });
+    expect(fotoAberta()).toBe(1);
+  });
+
+  it("na última foto, → não volta à primeira", () => {
+    abrir(photos.length - 1);
+    expect(fotoAberta()).toBe(photos.length);
+    expect(screen.queryByRole("button", { name: pt.galeria.lbNext })).toBeNull();
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    expect(fotoAberta()).toBe(photos.length);
+  });
+
+  it("um deslize de mais de 20 % passa à seguinte; um curto e lento não", () => {
+    abrir(2);
+    deslizar(-60, 400);
+    expect(fotoAberta(), "60 px devagar não chega").toBe(3);
+    deslizar(-300, 400);
+    expect(fotoAberta()).toBe(4);
+  });
+
+  it("deslizar para trás na primeira foto não sai dela", () => {
+    abrir(0);
+    deslizar(400, 200);
+    expect(fotoAberta()).toBe(1);
+  });
+
+  it("o deslize na tira não muda de foto (o gesto é só da foto)", async () => {
+    vi.useRealTimers();
+    abrir(2);
+    await esperar();
+    const tira = screen.getAllByRole("button", { name: /^foto \d+ de/ })[0].parentElement!;
+    fireEvent.pointerDown(tira, { pointerId: 3, pointerType: "touch", clientX: 500, clientY: 800 });
+    fireEvent.pointerMove(tira, { pointerId: 3, pointerType: "touch", clientX: 100, clientY: 800 });
+    fireEvent.pointerUp(tira, { pointerId: 3, pointerType: "touch", clientX: 100, clientY: 800 });
+    expect(fotoAberta()).toBe(3);
+  });
+});
+
+describe("mais fotografia no ecrã (GAL-4)", () => {
+  const cromagem = () => document.querySelector<HTMLElement>(".lb-cromagem")!;
+
+  it("a barra e a tira escondem-se aos 2,5 s, e ficam `inert`", () => {
+    vi.useFakeTimers();
+    try {
+      abrir(2);
+      expect(cromagem().hasAttribute("data-escondido")).toBe(false);
+      act(() => void vi.advanceTimersByTime(2_400));
+      expect(cromagem().hasAttribute("data-escondido")).toBe(false);
+      act(() => void vi.advanceTimersByTime(200));
+      expect(cromagem().hasAttribute("data-escondido")).toBe(true);
+      expect(cromagem().hasAttribute("inert")).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("um toque NA foto mostra ou esconde a barra; um toque fora fecha", () => {
+    abrir(2);
+    const c = camada();
+    c.getBoundingClientRect = () =>
+      ({
+        x: 0,
+        y: 0,
+        left: 0,
+        top: 0,
+        width: 1000,
+        height: 500,
+        right: 1000,
+        bottom: 500,
+      }) as DOMRect;
+    // 3:2 numa caixa de 1000×500: a foto pintada vai de x=125 a 875.
+    fireEvent.click(c, { clientX: 500, clientY: 250 });
+    expect(cromagem().hasAttribute("data-escondido")).toBe(true);
+    fireEvent.click(c, { clientX: 500, clientY: 250 });
+    expect(cromagem().hasAttribute("data-escondido")).toBe(false);
+    expect(dialogo()).not.toBeNull();
+  });
+
+  it("no telemóvel não há tira nem setas: ficam os gestos", () => {
+    vi.stubGlobal("matchMedia", (q: string) => ({
+      matches: q.includes("coarse"),
+      media: q,
+      addEventListener() {},
+      removeEventListener() {},
+      addListener() {},
+      removeListener() {},
+      onchange: null,
+      dispatchEvent: () => false,
+    }));
+    abrir(2);
+    expect(screen.queryAllByRole("button", { name: /^foto \d+ de/ })).toHaveLength(0);
+    expect(screen.queryByRole("button", { name: pt.galeria.lbNext })).toBeNull();
+    expect(screen.getByRole("button", { name: pt.galeria.lbClose })).toBeInTheDocument();
+  });
+
+  it("a foto ocupa a camada inteira: a barra e a tira flutuam por cima", () => {
+    abrir(2);
+    expect(camada().className).toMatch(/\blb-palco\b/);
+    expect(cromagem().contains(camada())).toBe(false);
   });
 });

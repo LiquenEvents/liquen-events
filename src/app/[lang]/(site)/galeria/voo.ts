@@ -137,3 +137,76 @@ export function janelaDaTira(index: number, total: number, n: number): number[] 
   const inicio = Math.max(0, Math.min(index - Math.floor(n / 2), total - n));
   return Array.from({ length: tamanho }, (_, k) => inicio + k);
 }
+
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * O DESLIZE ENTRE FOTOGRAFIAS (GAL-2)
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * O plano dela: «a foto acompanha o dedo com mola; muda com um gesto rápido,
+ * mesmo curto, ou a passar de 20 % da largura; nas pontas, resistência elástica
+ * em vez de saltar para a 917». Antes, a foto ficava parada debaixo do dedo e
+ * só mudava aos 50 px soltos — um gesto rápido e curto era ignorado.
+ */
+
+/** A fracção da largura a partir da qual largar muda de foto. */
+export const DESLIZE_FRACCAO = 0.2;
+/**
+ * Um gesto rápido (px/ms) muda de foto mesmo curto…
+ *
+ * Medido no browser, com toques simulados: 40 px em 120–150 ms dão 0,3–0,4
+ * px/ms, que é o que um polegar faz num gesto curto e decidido. Com 0,5 esses
+ * gestos eram ignorados — a mesma queixa de antes. Arrastar devagar (40 px em
+ * 300 ms ≈ 0,13) continua a não mudar.
+ */
+export const DESLIZE_RAPIDO_PX_MS = 0.3;
+/** …desde que tenha andado o suficiente para não ser um toque trémulo. */
+export const DESLIZE_RAPIDO_MIN_PX = 12;
+/** O intervalo entre duas fotografias na pista, em px. */
+export const DESLIZE_INTERVALO_PX = 24;
+
+/**
+ * Ao largar: −1 (anterior), +1 (seguinte) ou 0 (volta ao sítio).
+ *
+ * `dx` é quanto o dedo andou (negativo = para a esquerda = a seguinte), e
+ * `velocidade` é em px/ms, com o mesmo sinal. Um gesto rápido ao CONTRÁRIO do
+ * que se arrastou desiste — é o «afinal não» do polegar —, e nunca se vai
+ * para uma vizinha que não existe.
+ */
+export function decidirDeslize({
+  dx,
+  velocidade,
+  largura,
+  haAnterior,
+  haSeguinte,
+}: {
+  dx: number;
+  velocidade: number;
+  largura: number;
+  haAnterior: boolean;
+  haSeguinte: boolean;
+}): -1 | 0 | 1 {
+  if (dx === 0 || largura <= 0) return 0;
+  const sentido = dx < 0 ? 1 : -1;
+  if (!(sentido === 1 ? haSeguinte : haAnterior)) return 0;
+  const rapida = Math.abs(velocidade) >= DESLIZE_RAPIDO_PX_MS;
+  if (rapida && Math.sign(velocidade) !== Math.sign(dx)) return 0;
+  if (Math.abs(dx) > largura * DESLIZE_FRACCAO) return sentido;
+  if (rapida && Math.abs(dx) >= DESLIZE_RAPIDO_MIN_PX) return sentido;
+  return 0;
+}
+
+/**
+ * A resistência nas pontas: o dedo anda, a foto anda cada vez menos, e nunca
+ * passa de um terço da largura. É a curva das listas do iOS
+ * (`(1 − 1/(x·c/d + 1))·d`), com o declive inicial `c` = 0,55 — no primeiro
+ * píxel a foto ainda acompanha o dedo a meio gás, e por isso sente-se que há
+ * qualquer coisa ali, e não que o ecrã encravou.
+ */
+export function elastico(dx: number, largura: number): number {
+  if (dx === 0 || largura <= 0) return 0;
+  const tecto = largura / 3;
+  const c = 0.55;
+  const y = (1 - 1 / ((Math.abs(dx) * c) / tecto + 1)) * tecto;
+  return Math.sign(dx) * y;
+}
