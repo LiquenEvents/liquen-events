@@ -373,3 +373,34 @@ export const MARCA =
  * um `@keyframes` pode viver.
  */
 export const MOLA_DE_MARCAR = "motion-safe:animate-[bo-marca-mola_320ms_var(--ease-quick)]";
+
+/**
+ * ── O PULSO DE «ISTO ESTÁ A ACONTECER» ───────────────────────────────────
+ *
+ * 1,2 s, `1 → 0,45 → 1`, `--ease-in-out`, sem fim: o `pulse` do §8.2 do
+ * sistema de design. É o ponto do `EmCurso` e mais nada — o
+ * `controlos-pequenos.recusas.test.ts` já guarda que o pulso quer dizer
+ * «a acontecer agora» e não se gasta noutros sítios.
+ *
+ * Não entra na régua dos «nada acima de 400 ms» do `movimento.test.ts`, e de
+ * propósito: aquela régua é para TRANSIÇÕES (uma coisa que vai de um estado a
+ * outro e tem de chegar depressa). Isto não chega a lado nenhum: é um estado
+ * que dura enquanto a espera durar, e a respiração tem de ser lenta para não
+ * se ler como um alarme. O teste dele está à parte.
+ *
+ * Os fotogramas estão no `tema.css` (`@keyframes bo-pulso`).
+ */
+export const PULSO_MS = 1200;
+export const PULSO = "motion-safe:animate-[bo-pulso_1.2s_var(--ease-in-out)_infinite]";
+
+/**
+ * ── O FIM QUE SE VÊ ──────────────────────────────────────────────────────
+ *
+ * Quanto tempo o «pronto ✓» de uma espera fica à vista antes de sair. Antes
+ * não havia fim nenhum: a resposta chegava e o cartão desaparecia, e quem
+ * estava a olhar para a barra ficava sem saber se tinha acabado bem ou se
+ * tinha desistido. 600 ms chega para o olho apanhar o visto e a mola dele (a
+ * `MOLA_DE_MARCAR`, 320 ms) sem atrasar coisa nenhuma — o ficheiro já está a
+ * ser guardado enquanto isto se vê.
+ */
+export const FIM_VISIVEL_MS = 600;

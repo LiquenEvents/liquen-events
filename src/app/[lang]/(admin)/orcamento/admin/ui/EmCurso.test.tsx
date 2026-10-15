@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { EmCurso } from "./EmCurso";
+import { act, cleanup, fireEvent, render, renderHook, screen } from "@testing-library/react";
+import { EmCurso, contagemEmBytes, useFimVisivel } from "./EmCurso";
+import { FIM_VISIVEL_MS, PULSO } from "./movimento";
 import { TECTO_DA_BARRA } from "@/lib/espera-em-curso";
 
 /**
@@ -57,7 +58,9 @@ describe("a espera opaca", () => {
     expect(avanco()).toBe(0);
     act(() => void vi.advanceTimersByTime(5_000));
     const meio = avanco();
-    expect(meio).toBeGreaterThan(0.5);
+    // Avanço UNIFORME (§10): a meio do tempo estimado, a meio dos 85 %. Era
+    // uma curva que disparava (> 50 % aqui) e depois quase parava.
+    expect(meio).toBeCloseTo(0.425, 2);
     act(() => void vi.advanceTimersByTime(5_000));
     expect(avanco()).toBeGreaterThan(meio);
   });
@@ -125,5 +128,82 @@ describe("o desenho", () => {
     rerender(<EmCurso titulo="A importar…" feito={1} total={9} aoParar={aoParar} />);
     fireEvent.click(screen.getByRole("button", { name: "Parar" }));
     expect(aoParar).toHaveBeenCalled();
+  });
+});
+
+describe("segundo o sistema de design (§10 e §8.2)", () => {
+  it("a barra tem 4 px", () => {
+    render(<EmCurso titulo="A enviar…" estimadoMs={1_000} />);
+    const calha = document.querySelector("[data-barra=preenchimento]")!.parentElement!;
+    expect(calha.className).toContain("h-1");
+    expect(calha.className).not.toContain("h-[3px]");
+  });
+
+  it("o ponto pulsa com o pulso da casa, não o do Tailwind", () => {
+    render(<EmCurso titulo="A enviar…" />);
+    const ponto = document.querySelector("[data-em-curso=pulso]")!;
+    expect(ponto.className).toContain(PULSO);
+    expect(ponto.className).not.toContain("animate-pulse");
+  });
+});
+
+describe("o fim vê-se", () => {
+  it("`concluido` enche a barra, troca o ponto pelo visto e diz que está pronto", () => {
+    render(<EmCurso titulo="A gerar o PDF…" estimadoMs={10_000} concluido pronto="PDF pronto" />);
+    expect(avanco()).toBe(1);
+    expect(screen.getByText("PDF pronto")).toBeTruthy();
+    expect(screen.queryByText("A gerar o PDF…")).toBeNull();
+    expect(document.querySelector("[data-em-curso=visto]")).toBeTruthy();
+    expect(document.querySelector("[data-em-curso=pulso]")).toBeNull();
+  });
+
+  it("com bytes, a contagem fala em KB/MB", () => {
+    render(<EmCurso titulo="A descarregar…" feito={1_250_000} total={5_100_000} emBytes />);
+    expect(screen.getByText(contagemEmBytes(1_250_000, 5_100_000))).toBeTruthy();
+    expect(contagemEmBytes(1_250_000, 5_100_000)).toMatch(/MB$/);
+  });
+
+  it("o `useFimVisivel` fica no ecrã um instante depois de acabar, e sai", () => {
+    const { result, rerender } = renderHook(({ a, ok }) => useFimVisivel(a, ok), {
+      initialProps: { a: true, ok: true },
+    });
+    expect(result.current).toEqual({ mostrar: true, concluido: false });
+    rerender({ a: false, ok: true });
+    expect(result.current).toEqual({ mostrar: true, concluido: true });
+    act(() => void vi.advanceTimersByTime(FIM_VISIVEL_MS));
+    expect(result.current).toEqual({ mostrar: false, concluido: false });
+  });
+
+  it("uma falha não finge que acabou bem: sai logo, sem «pronto»", () => {
+    const { result, rerender } = renderHook(({ a, ok }) => useFimVisivel(a, ok), {
+      initialProps: { a: true, ok: false },
+    });
+    rerender({ a: false, ok: false });
+    expect(result.current).toEqual({ mostrar: false, concluido: false });
+  });
+});
+
+describe("às cegas e depois com o tamanho", () => {
+  /** Medido no mapa de mesas com a rede lenta: ia nos 95 % e caía para 32 %. */
+  it("quando os bytes chegam, a barra continua de onde estava — nunca anda para trás", () => {
+    const { rerender } = render(<EmCurso titulo="A preparar o PDF…" estimadoMs={1_000} />);
+    act(() => void vi.advanceTimersByTime(3_000));
+    const cego = avanco();
+    expect(cego).toBeGreaterThan(0.85);
+
+    rerender(<EmCurso titulo="A preparar o PDF…" estimadoMs={1_000} feito={10} total={100} />);
+    const comBytes = avanco();
+    expect(comBytes).toBeGreaterThanOrEqual(cego);
+    expect(comBytes).toBeLessThan(1);
+    // A contagem diz os bytes verdadeiros, não o traço.
+    expect(screen.getByText("10 de 100")).toBeTruthy();
+
+    rerender(<EmCurso titulo="A preparar o PDF…" estimadoMs={1_000} feito={100} total={100} />);
+    expect(avanco()).toBe(1);
+  });
+
+  it("sabida desde o início, conta como sempre contou", () => {
+    render(<EmCurso titulo="A importar fotos…" feito={47} total={312} />);
+    expect(avanco()).toBeCloseTo(47 / 312, 4);
   });
 });

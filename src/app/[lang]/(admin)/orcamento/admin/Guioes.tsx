@@ -19,7 +19,8 @@ import {
   type TipoDeSinal,
 } from "@/lib/orcamento/guioes";
 import type { ModeloDeGuiao, MomentoDeModelo } from "@/lib/orcamento/guiao-modelos";
-import { Button, EmptyState, Field, Segmented } from "./ui";
+import { Button, EmCurso, EmptyState, Field, Segmented } from "./ui";
+import { FalhaDaDescarga, useDescarga } from "./ui/descarregar";
 import { ESTADO, PRESSAO } from "./ui/movimento";
 import { AvisoDeFalha } from "./AvisoDeFalha";
 import { SkeletonList } from "./Skeleton";
@@ -295,45 +296,28 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
    * a fonte que escreve nomes portugueses já está carregada (ver o cabeçalho
    * da rota).
    *
-   * O `URL.createObjectURL` tem de ser revogado À MÃO: um blob que ninguém
-   * revoga fica de pé até a aba fechar, e ela abre horários o dia todo. O
-   * `setTimeout` de zero é para o clique já ter partido quando o endereço
-   * morre — revogar na mesma volta do laço deixava o download por fazer em
-   * alguns browsers.
+   * Passa pelo `descarregar` da casa (`ui/descarregar.ts`): a rota manda o
+   * `Content-Length`, e a barra do `EmCurso` diz quanto já chegou — e no fim
+   * diz «PDF pronto» (14/10, «a animação a descarregar… melhores mesmo
+   * muito»). A recusa da rota (uma timeline sem horas) continua a ser uma
+   * frase onde ela carregou.
    */
-  const [aDescarregar, setADescarregar] = useState(false);
+  const pdf = useDescarga();
+  const aDescarregar = pdf.aCorrer;
   const [falhaAoDescarregar, setFalhaAoDescarregar] = useState<string | null>(null);
 
   async function descarregarPdf(id: string) {
-    setADescarregar(true);
     setFalhaAoDescarregar(null);
     try {
-      const res = await fetch(`/api/guioes/${encodeURIComponent(id)}/pdf`);
-      if (!res.ok) {
-        const corpo: unknown = await res.json().catch(() => null);
-        const dito = (corpo as { error?: unknown } | null)?.error;
-        setFalhaAoDescarregar(
-          typeof dito === "string" && dito
-            ? dito
-            : "Não foi possível preparar o PDF. Tenta daqui a bocado.",
-        );
-        return;
-      }
-      const nome =
-        /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") ?? "")?.[1] ??
-        "horario.pdf";
-      const url = URL.createObjectURL(await res.blob());
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = nome;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 0);
-    } catch {
-      setFalhaAoDescarregar("Erro de ligação. Tenta novamente.");
-    } finally {
-      setADescarregar(false);
+      await pdf.correr(`/api/guioes/${encodeURIComponent(id)}/pdf`, "horario.pdf");
+    } catch (e) {
+      setFalhaAoDescarregar(
+        e instanceof FalhaDaDescarga && e.daRota
+          ? e.message
+          : e instanceof FalhaDaDescarga
+            ? "Não foi possível preparar o PDF. Tenta daqui a bocado."
+            : "Erro de ligação. Tenta novamente.",
+      );
     }
   }
   const [abertoId, setAbertoId] = useState<string | null>(null);
@@ -940,6 +924,15 @@ export default function Guioes({ carregarPedido, onQuoteAtualizado }: Props) {
               {/* A recusa do PDF fica onde ela carregou, e não numa página de
                   JSON fora do back office. Uma linha, `role="status"`, e some
                   assim que ela tenta outra vez. */}
+              {pdf.mostrar && (
+                <EmCurso
+                  className="mb-3"
+                  titulo="A descarregar o horário em PDF…"
+                  pronto="PDF pronto"
+                  estimadoMs={3_000}
+                  {...pdf.barra}
+                />
+              )}
               {falhaAoDescarregar && (
                 <p
                   role="status"

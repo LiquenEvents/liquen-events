@@ -124,6 +124,7 @@ import {
    global nenhuma: só desliga transições dentro de `prefers-reduced-motion` em
    três sítios muito concretos, e nenhum deles é este ficheiro. */
 import { ESTADO, MARCA, PRESSAO } from "./ui/movimento";
+import { useDescarga } from "./ui/descarregar";
 
 /**
  * A pele dos seis filtros da lista de pedidos, escrita UMA vez.
@@ -1863,6 +1864,24 @@ export default function AdminClient({
   const barraDeDestinosRef = useRef<HTMLElement | null>(null);
   const { toast } = useToast();
   const anular = useAnular();
+  // A cópia de segurança, de UMA maneira só: a barra lateral e a paleta
+  // chamavam-na cada uma à sua (um `<a href>` e um `location.href`), e
+  // nenhuma dizia nada enquanto o ficheiro vinha. Agora a barra conta os
+  // bytes contra o `Content-Length` da rota (D1, #211).
+  const copiaDeSeguranca = useDescarga();
+  const descarregarCopia = useCallback(() => {
+    if (copiaDeSeguranca.aCorrer) return;
+    copiaDeSeguranca
+      .correr("/api/backup", `liquen-backup-${new Date().toISOString().slice(0, 10)}.json`)
+      .catch((e: unknown) =>
+        toast(
+          e instanceof Error && e.message
+            ? e.message
+            : "Não foi possível descarregar a cópia de segurança.",
+          "error",
+        ),
+      );
+  }, [copiaDeSeguranca, toast]);
   // Apagar um pedido deixa-o 30 dias na Reciclagem (R3b), com «Anular».
   const depoisDeApagar = useDepoisDeApagar();
   const depoisDeApagarVarios = useDepoisDeApagarVarios();
@@ -3045,9 +3064,7 @@ export default function AdminClient({
         id: "action-backup",
         label: "Descarregar backup",
         group: "Ações",
-        run: () => {
-          window.location.href = "/api/backup";
-        },
+        run: descarregarCopia,
       },
       {
         // A outra metade do backup. Sai na paleta ao lado dele de propósito:
@@ -3064,7 +3081,7 @@ export default function AdminClient({
         run: () => setView(item.id),
       })),
     ],
-    [quotes, toast],
+    [quotes, toast, descarregarCopia],
   );
 
   /**
@@ -4634,6 +4651,21 @@ export default function AdminClient({
           }}
           toast={toast}
         />
+        {/* A cópia de segurança a chegar. Pedida da barra lateral OU da
+            paleta (que no telemóvel é o único caminho), por isso flutua num
+            sítio só, à esquerda, longe dos avisos que saem à direita. Opaca:
+            flutua por cima do conteúdo, e a única camada de vidro do ecrã é
+            o cabeçalho e a barra de destinos. */}
+        {copiaDeSeguranca.mostrar && (
+          <div className="fixed bottom-[calc(var(--bo-barra-inferior)+env(safe-area-inset-bottom)+0.75rem)] left-4 right-4 z-[79] rounded-xl bg-[var(--bo-elevado)] shadow-[var(--bo-sombra-suspensa)] sm:left-6 sm:right-auto sm:w-80">
+            <EmCurso
+              titulo="A descarregar a cópia de segurança…"
+              pronto="Cópia de segurança guardada"
+              estimadoMs={4000}
+              {...copiaDeSeguranca.barra}
+            />
+          </div>
+        )}
         <PasskeysDialog open={passkeysOpen} onClose={() => setPasskeysOpen(false)} toast={toast} />
         {/* Se a sessão cair a meio do trabalho, este painel abre POR CIMA e
             reautentica sem desmontar nada — ver o cabeçalho do ficheiro. Está
@@ -5006,11 +5038,10 @@ export default function AdminClient({
                   </svg>
                   Atalhos
                 </button>
-                {/* Plain <a> on purpose: this hits an API route that streams a
-                  file download, not a page — next/link would be wrong here. */}
-                {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-                <a
-                  href="/api/backup"
+                <button
+                  type="button"
+                  onClick={descarregarCopia}
+                  aria-busy={copiaDeSeguranca.aCorrer || undefined}
                   className={`alvo-toque flex-1 flex flex-col items-center justify-center gap-1 py-2 text-[var(--bo-text-faint)] text-[9px] tracking-[0.08em] uppercase rounded-lg hover:text-[var(--bo-text)] hover:bg-[var(--bo-surface-hover)] ${ESTADO} ${PRESSAO}`}
                   title="Exportar backup"
                 >
@@ -5029,7 +5060,7 @@ export default function AdminClient({
                     />
                   </svg>
                   Backup
-                </a>
+                </button>
                 {/* A outra metade do botão ao lado. Fica AQUI, encostado ao
                   Backup, porque é aqui que se procura num dia mau — e porque
                   uma cópia sem forma de a repor nunca foi uma cópia. */}

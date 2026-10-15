@@ -29,12 +29,16 @@ describe("o avanço da barra", () => {
     }
   });
 
-  it("abranda: o primeiro terço do tempo vale mais do que o último", () => {
-    // É isto que diz «está a andar, e não sei quanto falta» sem o dizer por
-    // palavras. Uma recta prometia uma precisão que não existe.
+  it("anda a passo certo até ao estimado, e depois abranda", () => {
+    // Era «o primeiro terço vale mais do que o último», e era a curva que
+    // dispara e depois se arrasta. O sistema de design (§10) pede o contrário
+    // — «distribui o avanço uniformemente» — e ela pediu a 14/10 a animação
+    // das esperas «melhor mesmo muito». Ver `espera-em-curso.ts`.
     const primeiro = avancoDoEnvio(ESTIMADO / 3, ESTIMADO);
     const ultimo = avancoDoEnvio(ESTIMADO, ESTIMADO) - avancoDoEnvio((2 * ESTIMADO) / 3, ESTIMADO);
-    expect(primeiro).toBeGreaterThan(ultimo * 2);
+    expect(primeiro).toBeCloseTo(ultimo, 6);
+    const depois = avancoDoEnvio(2 * ESTIMADO, ESTIMADO) - avancoDoEnvio(ESTIMADO, ESTIMADO);
+    expect(depois).toBeLessThan(ultimo * 3);
   });
 
   /** O que fecha a barra é a resposta. Nunca ela própria. */
