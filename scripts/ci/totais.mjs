@@ -15,6 +15,6 @@ if (!fs.existsSync(ficheiro)) {
 const r = JSON.parse(fs.readFileSync(ficheiro, "utf8"));
 const texto =
   tipo === "vitest"
-    ? `ficheiros=${r.numTotalTestSuites ?? r.testResults?.length} testes=${r.numTotalTests} passaram=${r.numPassedTests} falharam=${r.numFailedTests}`
+    ? `ficheiros=${r.testResults?.length} testes=${r.numTotalTests} passaram=${r.numPassedTests} falharam=${r.numFailedTests}`
     : `passeios=${(r.stats?.expected ?? 0) + (r.stats?.unexpected ?? 0) + (r.stats?.flaky ?? 0) + (r.stats?.skipped ?? 0)} passaram=${r.stats?.expected} falharam=${r.stats?.unexpected} instaveis=${r.stats?.flaky} saltados=${r.stats?.skipped}`;
 console.log(`::notice title=${titulo}::${texto}`);

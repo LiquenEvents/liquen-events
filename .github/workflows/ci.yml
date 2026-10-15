@@ -178,7 +178,8 @@ jobs:
         run: |
           # Os caminhos têm `[lang]` e `(admin)`: sem globbing, ficam tal e qual.
           set -f
-          comum="--shard=${{ matrix.parte }}/5 --passWithNoTests --reporter=default --reporter=json --outputFile.json=vitest.json"
+          # O `github-actions` escreve cada falha como anotação (com o nome do teste).
+          comum="--shard=${{ matrix.parte }}/5 --passWithNoTests --reporter=default --reporter=github-actions --reporter=json --outputFile.json=vitest.json"
           if [ "$UNIDADE" = "tudo" ] || [ -z "$LIGADOS" ]; then
             npx vitest run $comum
           else
