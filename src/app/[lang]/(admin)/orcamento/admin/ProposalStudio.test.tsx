@@ -1545,13 +1545,13 @@ describe("um tema com mais fotografias do que uma página leva", () => {
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * O QUE O PDF FAZ COM CADA TEMA — DITO, E NÃO ESCOLHIDO
+ * O QUE O PDF FAZ COM CADA TEMA — E A DISPOSIÇÃO À ESCOLHA
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * O selector das disposições e o «Manter a forma de cada fotografia» saíram:
- * o PDF novo decide a composição pelo número de fotografias, e cada célula tem
- * quase a forma da sua foto. O cartão diz o capítulo e a composição, só de
- * leitura.
+ * Sem escolha, o PDF decide a composição pelo número de fotografias, e o cartão
+ * di-lo. A 15/10 ela pediu de volta o selector das disposições, com as
+ * composições do PDF novo (`EscolherDisposicao`). O «Manter a forma de cada
+ * fotografia» do PDF antigo não volta.
  */
 describe("a composição de cada tema", () => {
   it("diz o capítulo e a composição, e acompanha o número de fotos", async () => {
@@ -1561,11 +1561,56 @@ describe("a composição de cada tema", () => {
     expect(linha.textContent).toMatch(/Cinco ao alto/);
   });
 
-  it("já não há selector de disposição nem interruptor de recorte", async () => {
+  it("escolher uma disposição grava-a no tema, e a linha di-lo", async () => {
+    seedDraft(5);
+    renderStudio("Inspiração");
+    const user = userEvent.setup();
+    const grupo = await screen.findByRole("radiogroup", { name: "Disposição das fotos na página" });
+    expect(within(grupo).getByRole("radio", { name: "Automática" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    await user.click(within(grupo).getByRole("radio", { name: "Destaque" }));
+    await waitFor(() => {
+      expect(corpos("proposta-rascunho").at(-1) ?? "").toContain('"disposicao":"destaque"');
+    });
+    const linha = (await screen.findAllByText(/^Capítulo:/))[0].closest("p")!;
+    expect(linha.textContent).toMatch(/Destaque/);
+    expect(within(grupo).getByRole("radio", { name: "Destaque" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+  });
+
+  it("uma disposição que não serve para tão poucas fotos está desligada e diz porquê", async () => {
+    seedDraft(2);
+    renderStudio("Inspiração");
+    const grupo = await screen.findByRole("radiogroup", { name: "Disposição das fotos na página" });
+    expect(
+      within(grupo).getByRole("radio", { name: /^Soltas — precisa de pelo menos 3 fotografias$/ }),
+    ).toBeDisabled();
+    expect(within(grupo).getByRole("radio", { name: "Uma fila" })).toBeEnabled();
+  });
+
+  it("«Anular» repõe a automática", async () => {
+    seedDraft(5);
+    renderStudio("Inspiração");
+    const user = userEvent.setup();
+    const grupo = await screen.findByRole("radiogroup", { name: "Disposição das fotos na página" });
+    await user.click(within(grupo).getByRole("radio", { name: "Grelha" }));
+    await user.click(await screen.findByRole("button", { name: "Anular" }));
+    await waitFor(() =>
+      expect(within(grupo).getByRole("radio", { name: "Automática" })).toHaveAttribute(
+        "aria-checked",
+        "true",
+      ),
+    );
+  });
+
+  it("não volta o interruptor de recorte do PDF antigo", async () => {
     seedDraft(5);
     renderStudio();
     await screen.findAllByText(/^Capítulo:/);
-    expect(screen.queryByRole("radio", { name: "Mosaico" })).toBeNull();
     expect(screen.queryByRole("checkbox", { name: /manter a forma/i })).toBeNull();
   });
 
@@ -1870,10 +1915,18 @@ describe("fotos da biblioteca em estado provisório", () => {
      *
      * Descontam-se as duas pelo que são (escritas), e não pelo instante em que
      * calham: um teste afinado ao relógio da máquina volta a falhar sozinho.
+     *
+     * ── E UMA PERGUNTA ATRASADA, A DAS FOTOGRAFIAS DO PDF (15/10) ───────
+     * O estúdio pergunta à rota `fotos-do-pdf` que fotografia vai em cada
+     * página, 900 ms depois de o documento mudar (`useFotosDoPdf`). Também não
+     * é a miniatura: é a mesma família, e com a máquina carregada cai dentro
+     * da janela.
      */
     const escrita = (p: (typeof pedidos)[number]) => {
       const metodo = p.init?.method ?? "GET";
-      return p.url.includes("proposta-rascunho") || metodo === "PATCH";
+      return (
+        p.url.includes("proposta-rascunho") || p.url.includes("fotos-do-pdf") || metodo === "PATCH"
+      );
     };
     const semGravacoes = (ps: typeof pedidos) => ps.filter((p) => !escrita(p)).length;
     const antes = semGravacoes(pedidos);

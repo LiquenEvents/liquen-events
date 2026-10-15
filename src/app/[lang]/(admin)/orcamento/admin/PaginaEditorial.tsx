@@ -349,7 +349,7 @@ export default function PaginaEditorial({
     case "tema": {
       const b = doc.moodBoards[pagina.bi];
       const forma = (i: number) => aspetos?.[b?.images?.[i] ?? ""] ?? ASPETO_POR_OMISSAO;
-      const c = composicao(pagina.fotos.map(forma), pagina.vez % 2 === 0);
+      const c = composicao(pagina.fotos.map(forma), pagina.vez % 2 === 0, pagina.disposicao);
       const titulo = pagina.parte ? `${pagina.titulo} · Mais ideias…` : pagina.titulo;
       if (c.tipo === "texto") {
         conteudo = (

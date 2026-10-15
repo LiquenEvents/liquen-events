@@ -9,7 +9,14 @@ import { totaisDaProposta } from "@/lib/proposal-budget";
 import { chaveDeRubrica, ordemDeSaida } from "@/lib/proposal-ordem";
 import { capitulos as capitulosDaInspiracao, grupoDoTema } from "./grupos";
 import { eCasamento } from "../proposal-evento";
-import { MAXIMO_POR_PAGINA, repartir as repartirFotos } from "./mosaico";
+import {
+  FOTOS_DA_DISPOSICAO,
+  MAXIMO_POR_PAGINA,
+  NOME_DA_DISPOSICAO,
+  disposicaoDoTema,
+  repartir as repartirFotos,
+  type Disposicao,
+} from "./mosaico";
 import { textosEditoriais } from "./textos";
 
 export { MAXIMO_POR_PAGINA };
@@ -75,6 +82,8 @@ export type PaginaDoPlano =
       partes: number;
       /** As fotografias desta página, pela ordem de desenho (índices de `images`). */
       fotos: readonly number[];
+      /** A disposição que ela escolheu (`null` = a automática). */
+      disposicao: Disposicao | null;
     }
   | { tipo: "citacao" }
   | { tipo: "orcamento"; linhas: number; continuacao: boolean }
@@ -339,7 +348,8 @@ export function planoDaProposta(doc: ProposalDoc): EntradaDoPlano[] {
       vez++;
       const b = boards[bi];
       const fotos = fotosDoTema(b);
-      const porPagina = fotos.length ? repartirFotos(fotos.length) : [0];
+      const disposicao = disposicaoDoTema(b);
+      const porPagina = fotos.length ? repartirFotos(fotos.length, disposicao) : [0];
       let feitas = 0;
       porPagina.forEach((quantas, parte) => {
         paginas.push({
@@ -351,6 +361,7 @@ export function planoDaProposta(doc: ProposalDoc): EntradaDoPlano[] {
           parte,
           partes: porPagina.length,
           fotos: fotos.slice(feitas, feitas + quantas),
+          disposicao,
           nome: parte
             ? `${(b.title ?? "").trim() || `Tema ${vez}`} · ${te.maisIdeias}`
             : (b.title ?? "").trim() || `Tema ${vez}`,
@@ -549,10 +560,15 @@ export const paginasDoPlano = (doc: ProposalDoc) => planoDaProposta(doc).length;
 
 /**
  * A composição que o PDF dá a um tema com `n` fotografias, por palavras — o
- * quadro de `mosaico.ts`. No desenho novo a disposição não se escolhe: sai do
- * número de fotografias, e o estúdio di-lo em vez de oferecer um selector.
+ * quadro de `mosaico.ts`. Sem `disposicao` é a automática, pelo número de
+ * fotografias; com ela, o nome da que ela escolheu (e em quantas páginas).
  */
-export function composicaoEmPalavras(n: number): string {
+export function composicaoEmPalavras(n: number, disposicao?: Disposicao | null): string {
+  if (disposicao && n >= FOTOS_DA_DISPOSICAO[disposicao].min) {
+    const paginas = repartirFotos(n, disposicao).length;
+    const nome = NOME_DA_DISPOSICAO[disposicao];
+    return paginas > 1 ? `${nome}, em ${paginas} páginas` : nome;
+  }
   if (n <= 0) return "Só texto, com uma fotografia de outro tema ao lado";
   if (n === 1) return "Uma fotografia a página inteira";
   if (n <= 3) return "Uma fila a toda a altura, com o texto ao lado";
@@ -579,4 +595,5 @@ export function capituloDoTema(
 }
 
 /** Quantas páginas um tema ocupa no PDF (0 fotos é uma página de texto). */
-export const paginasDoTema = (n: number) => (n > 0 ? repartirFotos(n).length : 1);
+export const paginasDoTema = (n: number, disposicao?: Disposicao | null) =>
+  n > 0 ? repartirFotos(n, disposicao).length : 1;
