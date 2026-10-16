@@ -10,7 +10,7 @@ import { test, expect } from "@playwright/test";
  * EntradaEmVideo.test.tsx); aqui prova-se o que só um browser mostra:
  *   · o vídeo chega a TOCAR (o tempo avança) e fica à vista por cima da foto;
  *   · a fotografia continua por baixo — é o LCP, e é o que fica sem vídeo;
- *   · com movimento reduzido não se pede vídeo nenhum.
+ *   · com movimento reduzido o vídeo toca na mesma (decisão dela, 16/10).
  *
  * O Chromium dos testes não tem H.264, por isso toca a rede em WebM — o mesmo
  * componente, o mesmo caminho, outro ficheiro. Tem a etiqueta `@movimento`
@@ -22,9 +22,11 @@ test.describe("@movimento a entrada em vídeo", () => {
     test.setTimeout(60_000);
     await page.goto("/");
     const primeiro = page.locator('[data-entrada-video="0"]');
-    // Espera pela cortina, pelo zoom da foto e pelo `onIdle`.
+    // Arranca sozinho, do HTML, sem esperar por nada (pedido dela, 16/10).
     await expect(primeiro).toHaveCSS("opacity", "1", { timeout: 25_000 });
-    await expect(primeiro).toHaveAttribute("src", /\/videos\/entrada\/v1\/entrada-1-/);
+    expect(await primeiro.evaluate((v: HTMLVideoElement) => v.currentSrc)).toMatch(
+      /\/videos\/entrada\/v2\/entrada-1-1080\./,
+    );
 
     const t1 = await primeiro.evaluate((v: HTMLVideoElement) => v.currentTime);
     await page.waitForTimeout(800);
@@ -38,17 +40,17 @@ test.describe("@movimento a entrada em vídeo", () => {
     await expect(page.locator("section img.hero-settle")).toHaveCount(1);
   });
 
-  test("com movimento reduzido fica só a fotografia", async ({ browser }) => {
+  // Decisão dela (16/10): os vídeos tocam MESMO com «reduzir movimento».
+  test("com movimento reduzido o vídeo toca na mesma", async ({ browser }) => {
+    test.setTimeout(60_000);
     const ctx = await browser.newContext({ reducedMotion: "reduce" });
     const page = await ctx.newPage();
-    const pedidos: string[] = [];
-    page.on("request", (r) => {
-      if (r.url().includes("/videos/")) pedidos.push(r.url());
-    });
     await page.goto("/");
-    await page.waitForTimeout(6_000);
-    await expect(page.locator("video[data-entrada-video]")).toHaveCount(0);
-    expect(pedidos, "pediu vídeo com movimento reduzido").toEqual([]);
+    const primeiro = page.locator('[data-entrada-video="0"]');
+    await expect(primeiro).toHaveCSS("opacity", "1", { timeout: 25_000 });
+    const t1 = await primeiro.evaluate((v: HTMLVideoElement) => v.currentTime);
+    await page.waitForTimeout(800);
+    expect(await primeiro.evaluate((v: HTMLVideoElement) => v.currentTime)).toBeGreaterThan(t1);
     await ctx.close();
   });
 });

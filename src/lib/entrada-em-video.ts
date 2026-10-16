@@ -10,18 +10,25 @@
  * O componente (`EntradaEmVideo.tsx`) faz o trabalho com os `<video>`; aqui
  * ficam só as decisões, para se poderem provar num teste sem browser:
  *   · que ficheiro vem a seguir (1 → 2 → 3 → 1…);
- *   · que versão se pede (720p no telemóvel, 1080p no resto);
- *   · quando é que NÃO se toca vídeo nenhum, e fica a fotografia.
+ *   · que versão se pede (1080p para todos; 720p só a quem poupa dados);
+ *   · que formato este browser toca (H.264, ou VP9 como rede).
  *
- * Os ficheiros estão em `public/videos/entrada/v1/`. Foram preparados a partir
- * dos originais dela (35 MB com som) assim: sem som, H.264 (que todos os
+ * Os ficheiros estão em `public/videos/entrada/v2/`. Foram preparados a partir
+ * dos originais dela (1080p, com som) assim: sem som, H.264 (que todos os
  * telemóveis descodificam no chip, por isso não pesa no processador), um
  * fotograma-chave por segundo e `+faststart` (começa a tocar antes de acabar de
- * descarregar). O `v1` na pasta deixa servir com cache de um ano: um vídeo novo
- * vai para `v2`, nunca por cima.
+ * descarregar).
+ *
+ * ── PORQUE É QUE É `v2` ────────────────────────────────────────────────────
+ * A `v1` saiu leve demais (1080p a ~3 Mbit/s, e 720p nos telemóveis), e ela
+ * viu-a: «estão com muito pouca qualidade» (16/10). A `v2` é 1080p a CRF 18
+ * (perto do original) para TODOS, telemóvel incluído — num telemóvel ao alto o
+ * vídeo é recortado e ampliado, e era aí que os 720p se viam piores. A pasta
+ * tem versão porque os vídeos são servidos com cache de um ano: quem viu a
+ * `v1` na pré-visualização nunca mais receberia a nova com o mesmo nome.
  */
 
-export const PASTA_DOS_VIDEOS = "/videos/entrada/v1";
+export const PASTA_DOS_VIDEOS = "/videos/entrada/v2";
 
 /** Quantos vídeos há. Os ficheiros são `entrada-<1..N>-<altura>.mp4`. */
 export const NUMERO_DE_VIDEOS = 3;
@@ -36,7 +43,7 @@ export type Formato = "mp4" | "webm";
 /**
  * O formato que este browser toca. **H.264 primeiro**: é o que todos os
  * browsers correntes têm, e é descodificado pelo chip — é por isso que corre
- * sem travar. O WebM (VP9, só em 720p) é a rede para os poucos que não têm
+ * sem travar. O WebM (VP9, em 1080p) é a rede para os poucos que não têm
  * H.264: o Chromium de código aberto (o dos testes) e alguns Linux. Sem
  * nenhum dos dois, não há vídeo e fica a fotografia.
  */
@@ -46,9 +53,9 @@ export function formatoQueToca(podeTocar: (tipo: string) => string): Formato | n
   return null;
 }
 
-/** O endereço de um vídeo (`i` começa em 0). O WebM só existe em 720p. */
+/** O endereço de um vídeo (`i` começa em 0). O WebM só existe em 1080p. */
 export function enderecoDoVideo(i: number, altura: Altura, formato: Formato = "mp4"): string {
-  const a = formato === "webm" ? 720 : altura;
+  const a = formato === "webm" ? 1080 : altura;
   return `${PASTA_DOS_VIDEOS}/entrada-${(i % NUMERO_DE_VIDEOS) + 1}-${a}.${formato}`;
 }
 
@@ -58,40 +65,22 @@ export function proximoVideo(i: number): number {
 }
 
 /**
- * 720p até 900 px de largura (telemóveis e tablets pequenos, onde os 720p
- * pesam metade e a diferença não se vê debaixo do véu), 1080p no resto.
- * Com «Poupar dados» ou numa ligação 3G pede-se sempre o mais leve.
+ * 1080p para todos — o telemóvel incluído (ver «porque é que é v2»). Só quem
+ * pediu «Poupar dados» ou está numa ligação lenta recebe os 720p.
  */
-export function alturaParaOEcra(larguraCss: number, ligacaoLenta = false): Altura {
-  if (ligacaoLenta) return 720;
-  return larguraCss <= 900 ? 720 : 1080;
-}
-
-export interface Condicoes {
-  /** `prefers-reduced-motion: reduce`. */
-  movimentoReduzido: boolean;
-  /** `navigator.connection.saveData`. */
-  pouparDados?: boolean;
-  /** `navigator.connection.effectiveType` («slow-2g», «2g», «3g», «4g»). */
-  tipoDeLigacao?: string;
+export function alturaParaOEcra(ligacaoLenta = false): Altura {
+  return ligacaoLenta ? 720 : 1080;
 }
 
 /**
- * Se deve haver vídeo. Não há com movimento reduzido (é exactamente o que essa
- * preferência pede), com «Poupar dados», nem numa ligação 2G — nesses casos
- * fica a fotografia, que é o primeiro fotograma do vídeo 1 e, por isso, a
- * mesma imagem com que o vídeo começaria.
+ * A ligação é lenta (ou a pessoa pediu «Poupar dados») o bastante para pedir
+ * só os 720p. NÃO desliga o vídeo: decisão dela (16/10) — «quero que mesmo
+ * para telemóveis ou PCs que tenham estas coisas, e também poupanças de
+ * energia, os vídeos continuem a correr». Nestes casos vai a versão mais leve.
  */
-export function deveHaverVideo(c: Condicoes): boolean {
-  if (c.movimentoReduzido) return false;
-  if (c.pouparDados) return false;
-  if (c.tipoDeLigacao === "slow-2g" || c.tipoDeLigacao === "2g") return false;
-  return true;
-}
-
-/** A ligação é lenta o bastante para pedir só os 720p. */
-export function ligacaoLenta(tipoDeLigacao?: string): boolean {
-  return tipoDeLigacao === "3g";
+export function ligacaoLenta(tipoDeLigacao?: string, pouparDados = false): boolean {
+  if (pouparDados) return true;
+  return tipoDeLigacao === "3g" || tipoDeLigacao === "2g" || tipoDeLigacao === "slow-2g";
 }
 
 /**

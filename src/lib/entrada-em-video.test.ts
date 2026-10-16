@@ -4,7 +4,6 @@ import {
   NUMERO_DE_VIDEOS,
   PASSAGEM_MS,
   alturaParaOEcra,
-  deveHaverVideo,
   eHoraDePassar,
   enderecoDoVideo,
   formatoQueToca,
@@ -26,8 +25,9 @@ describe("os vídeos da entrada — as regras", () => {
       expect(existsSync(grande), grande).toBe(true);
       expect(existsSync(leve), leve).toBe(true);
       expect(statSync(leve).size).toBeLessThan(statSync(grande).size);
-      // Nenhum passa de 8 MB: é o tecto que deixa o 4G começar a tocar logo.
-      expect(statSync(grande).size).toBeLessThan(8 * 1024 * 1024);
+      // A qualidade subiu (v2, ~6 Mbit/s, perto do original), mas nenhum passa
+      // de 16 MB: acima disso o 4G deixava de o tocar sem parar a carregar.
+      expect(statSync(grande).size).toBeLessThan(16 * 1024 * 1024);
       // E a rede para quem não tem H.264.
       expect(existsSync(`public${enderecoDoVideo(i, 1080, "webm")}`)).toBe(true);
     }
@@ -37,26 +37,22 @@ describe("os vídeos da entrada — as regras", () => {
     expect(formatoQueToca(() => "probably")).toBe("mp4");
     expect(formatoQueToca((t) => (t.includes("webm") ? "maybe" : ""))).toBe("webm");
     expect(formatoQueToca(() => "")).toBeNull();
-    // O WebM existe só em 720p, mesmo num ecrã grande.
-    expect(enderecoDoVideo(0, 1080, "webm")).toMatch(/entrada-1-720\.webm$/);
+    // O WebM existe só em 1080p.
+    expect(enderecoDoVideo(0, 720, "webm")).toMatch(/entrada-1-1080\.webm$/);
   });
 
-  it("720p no telemóvel, 1080p no computador, 720p numa ligação lenta", () => {
-    expect(alturaParaOEcra(390)).toBe(720);
-    expect(alturaParaOEcra(900)).toBe(720);
-    expect(alturaParaOEcra(1440)).toBe(1080);
-    expect(alturaParaOEcra(1440, true)).toBe(720);
+  it("1080p para todos, telemóvel incluído; 720p só numa ligação lenta", () => {
+    expect(alturaParaOEcra()).toBe(1080);
+    expect(alturaParaOEcra(true)).toBe(720);
     expect(ligacaoLenta("3g")).toBe(true);
     expect(ligacaoLenta("4g")).toBe(false);
   });
 
-  it("sem vídeo com movimento reduzido, «Poupar dados» ou 2G", () => {
-    expect(deveHaverVideo({ movimentoReduzido: false })).toBe(true);
-    expect(deveHaverVideo({ movimentoReduzido: true })).toBe(false);
-    expect(deveHaverVideo({ movimentoReduzido: false, pouparDados: true })).toBe(false);
-    expect(deveHaverVideo({ movimentoReduzido: false, tipoDeLigacao: "2g" })).toBe(false);
-    expect(deveHaverVideo({ movimentoReduzido: false, tipoDeLigacao: "slow-2g" })).toBe(false);
-    expect(deveHaverVideo({ movimentoReduzido: false, tipoDeLigacao: "4g" })).toBe(true);
+  it("«Poupar dados» e ligações lentas não desligam o vídeo: pedem o mais leve", () => {
+    expect(ligacaoLenta("4g", true)).toBe(true);
+    expect(ligacaoLenta("2g")).toBe(true);
+    expect(ligacaoLenta("slow-2g")).toBe(true);
+    expect(alturaParaOEcra(ligacaoLenta("2g"))).toBe(720);
   });
 
   it("a passagem começa quando falta o tempo dela para o fim", () => {

@@ -1,40 +1,33 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, cleanup } from "@testing-library/react";
-
-const movimento = vi.hoisted(() => ({ reduzido: false }));
-vi.mock("@/lib/motion/useReducedMotion", () => ({
-  useReducedMotion: () => movimento.reduzido,
-  prefersReducedMotion: () => movimento.reduzido,
-}));
-// O `onIdle` corre já: o que se testa é o que acontece depois dele.
-vi.mock("@/lib/onIdle", () => ({
-  onIdle: (cb: () => void) => {
-    cb();
-    return () => {};
-  },
-}));
+import { renderToStaticMarkup } from "react-dom/server";
 
 import EntradaEmVideo from "./EntradaEmVideo";
 
 let play: ReturnType<typeof vi.fn>;
+let pausa: ReturnType<typeof vi.fn>;
 let tiposQueToca: string[];
+let vista: ((e: Array<{ isIntersecting: boolean }>) => void) | null;
 
 beforeEach(() => {
-  movimento.reduzido = false;
   tiposQueToca = ["mp4"];
+  vista = null;
+  play = vi.fn(() => Promise.resolve());
+  pausa = vi.fn();
   Object.defineProperty(HTMLMediaElement.prototype, "canPlayType", {
     configurable: true,
     value: (tipo: string) => (tiposQueToca.some((t) => tipo.includes(t)) ? "probably" : ""),
   });
-  play = vi.fn(() => Promise.resolve());
   Object.defineProperty(HTMLMediaElement.prototype, "play", { configurable: true, value: play });
-  Object.defineProperty(HTMLMediaElement.prototype, "pause", {
-    configurable: true,
-    value: vi.fn(),
-  });
+  Object.defineProperty(HTMLMediaElement.prototype, "pause", { configurable: true, value: pausa });
   Object.defineProperty(HTMLMediaElement.prototype, "load", { configurable: true, value: vi.fn() });
+  // Com o construtor de verdade (callback, opções): guarda-se o callback para
+  // o teste poder dizer «a entrada saiu do ecrã».
   (globalThis as Record<string, unknown>).IntersectionObserver = class {
+    constructor(cb: (e: Array<{ isIntersecting: boolean }>) => void, _opcoes?: unknown) {
+      vista = cb;
+    }
     observe() {}
     disconnect() {}
   };
@@ -43,14 +36,12 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
-  vi.useRealTimers();
 });
 
-/** Monta e deixa as esperas (load, cortina, zoom) resolverem. */
 async function montar() {
   const r = render(<EntradaEmVideo />);
   await act(async () => {
-    for (let k = 0; k < 6; k++) await Promise.resolve();
+    for (let k = 0; k < 4; k++) await Promise.resolve();
   });
   return r;
 }
@@ -58,60 +49,63 @@ async function montar() {
 const videos = (c: HTMLElement) => [...c.querySelectorAll("video")] as HTMLVideoElement[];
 
 describe("EntradaEmVideo", () => {
-  it("com movimento reduzido não há vídeo nenhum — fica a fotografia", async () => {
-    movimento.reduzido = true;
-    const { container } = await montar();
-    expect(videos(container)).toHaveLength(0);
+  /**
+   * O pedido dela: «mal entremos no site, o vídeo comece logo a correr». A
+   * prova é o HTML que vem do servidor: o vídeo 1 já lá está, a tocar sozinho,
+   * antes de qualquer JavaScript.
+   */
+  it("o vídeo 1 vem no HTML do servidor, mudo e a arrancar sozinho", () => {
+    const html = renderToStaticMarkup(<EntradaEmVideo />);
+    const primeiro = html.match(/<video data-entrada-video="0"[^>]*>/)?.[0] ?? "";
+    expect(primeiro).toMatch(/\bautoplay\b/);
+    expect(primeiro).toMatch(/\bmuted\b/);
+    expect(primeiro).toMatch(/\bplaysinline\b/);
+    expect(primeiro).toMatch(/aria-hidden="true"/);
+    expect(primeiro).toMatch(/tabindex="-1"/);
+    expect(primeiro).not.toMatch(/\bcontrols\b/);
+    // H.264 primeiro, VP9 como rede — os dois em 1080p.
+    expect(html).toMatch(
+      /<source src="\/videos\/entrada\/v2\/entrada-1-1080\.mp4"[^>]*>.*entrada-1-1080\.webm/,
+    );
+    // O 2.º não descarrega nada até ser preciso.
+    expect(html).toMatch(/<video data-entrada-video="1" preload="none"/);
   });
 
-  it("com «Poupar dados» também não", async () => {
-    Object.defineProperty(navigator, "connection", {
-      configurable: true,
-      value: { saveData: true },
-    });
-    const { container } = await montar();
-    expect(videos(container)).toHaveLength(0);
-  });
-
-  it("um browser que não toca nem H.264 nem VP9 fica com a fotografia", async () => {
-    tiposQueToca = [];
-    const { container } = await montar();
-    expect(videos(container)).toHaveLength(0);
-  });
-
-  it("sem H.264 (o Chromium dos testes), pede o WebM de 720p", async () => {
-    tiposQueToca = ["webm"];
-    const { container } = await montar();
-    expect(videos(container)[0].getAttribute("src")).toMatch(/entrada-1-720\.webm$/);
-  });
-
-  it("dois vídeos mudos, em linha, escondidos do leitor de ecrã e do Tab", async () => {
-    const { container } = await montar();
-    const vs = videos(container);
-    expect(vs).toHaveLength(2);
-    for (const v of vs) {
-      expect(v.muted).toBe(true);
-      expect(v.hasAttribute("muted")).toBe(true);
-      expect(v.hasAttribute("playsinline")).toBe(true);
-      expect(v.getAttribute("aria-hidden")).toBe("true");
-      expect(v.tabIndex).toBe(-1);
-      expect(v.hasAttribute("controls")).toBe(false);
-    }
-    expect(container.firstElementChild?.getAttribute("aria-hidden")).toBe("true");
-  });
-
-  it("o vídeo 1 só aparece quando JÁ está a tocar, e o 2 começa logo a carregar", async () => {
+  it("aparece por cima da fotografia quando JÁ está a tocar, e o 2 começa logo a carregar", async () => {
     const { container } = await montar();
     const [a, b] = videos(container);
-    expect(a.getAttribute("src")).toMatch(/\/videos\/entrada\/v1\/entrada-1-(720|1080)\.mp4$/);
     expect(play).toHaveBeenCalled();
-    // Ainda não está a tocar: continua invisível, por cima da fotografia.
     expect(a.style.opacity).toBe("0");
     expect(b.getAttribute("src")).toBeNull();
 
     act(() => void a.dispatchEvent(new Event("playing")));
     expect(a.style.opacity).toBe("1");
-    expect(b.getAttribute("src")).toMatch(/entrada-2-/);
+    expect(b.getAttribute("src")).toBe("/videos/entrada/v2/entrada-2-1080.mp4");
+  });
+
+  it("com «Poupar dados», os seguintes vêm na versão leve (720p)", async () => {
+    Object.defineProperty(navigator, "connection", {
+      configurable: true,
+      value: { saveData: true },
+    });
+    const { container } = await montar();
+    const [a, b] = videos(container);
+    act(() => void a.dispatchEvent(new Event("playing")));
+    expect(b.getAttribute("src")).toMatch(/entrada-2-720\.mp4$/);
+  });
+
+  it("sem H.264 (o Chromium dos testes), os seguintes vêm em WebM", async () => {
+    tiposQueToca = ["webm"];
+    const { container } = await montar();
+    const [a, b] = videos(container);
+    act(() => void a.dispatchEvent(new Event("playing")));
+    expect(b.getAttribute("src")).toMatch(/entrada-2-1080\.webm$/);
+  });
+
+  it("um browser que não toca nenhum dos formatos fica com a fotografia", async () => {
+    tiposQueToca = [];
+    await montar();
+    expect(play).not.toHaveBeenCalled();
   });
 
   it("perto do fim, o seguinte entra por cima só com opacidade", async () => {
@@ -132,27 +126,42 @@ describe("EntradaEmVideo", () => {
     expect(Number(b.style.zIndex)).toBeGreaterThan(Number(a.style.zIndex));
   });
 
-  it("se o browser recusar o play() (poupança de bateria), desiste e fica a fotografia", async () => {
-    vi.useFakeTimers({ toFake: ["setTimeout"] });
-    play.mockImplementation(() =>
+  it("pára quando a entrada sai do ecrã e retoma quando volta", async () => {
+    const { container } = await montar();
+    act(() => void videos(container)[0].dispatchEvent(new Event("playing")));
+    play.mockClear();
+
+    act(() => vista?.([{ isIntersecting: false }]));
+    expect(pausa).toHaveBeenCalled();
+
+    act(() => vista?.([{ isIntersecting: true }]));
+    expect(play).toHaveBeenCalled();
+  });
+
+  it("se o aparelho recusar arrancar sozinho (poupança de bateria), arranca ao primeiro toque", async () => {
+    play.mockImplementationOnce(() =>
       Promise.reject(Object.assign(new Error("no"), { name: "NotAllowedError" })),
     );
-    const { container } = await montar();
-    await act(async () => {
-      for (let k = 0; k < 4; k++) await Promise.resolve();
-    });
-    act(() => void vi.advanceTimersByTime(2000));
-    expect(videos(container)).toHaveLength(0);
+    await montar();
+    play.mockClear();
+    act(() => void window.dispatchEvent(new Event("pointerdown")));
+    expect(play).toHaveBeenCalledTimes(1);
   });
 
   it("um pause() a meio do arranque (AbortError) não é recusa", async () => {
-    play.mockImplementation(() =>
+    play.mockImplementationOnce(() =>
       Promise.reject(Object.assign(new Error("x"), { name: "AbortError" })),
     );
     const { container } = await montar();
-    await act(async () => {
-      for (let k = 0; k < 4; k++) await Promise.resolve();
-    });
-    expect(videos(container)).toHaveLength(2);
+    act(() => void videos(container)[0].dispatchEvent(new Event("playing")));
+    expect(videos(container)[0].style.opacity).toBe("1");
+  });
+
+  it("um erro no ficheiro do vídeo seguinte deixa a fotografia", async () => {
+    const { container } = await montar();
+    const [a, b] = videos(container);
+    act(() => void a.dispatchEvent(new Event("playing")));
+    act(() => void b.dispatchEvent(new Event("error")));
+    expect(a.style.opacity).toBe("0");
   });
 });
