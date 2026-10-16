@@ -26,7 +26,7 @@ import { heroImageUrl } from "@/lib/hero-image-loader";
 // Public route → its hero image source (kept in sync with each page's hero and
 // with HERO_SOURCES in src/lib/hero-image-loader.ts).
 const HERO_BY_ROUTE: Record<string, string> = {
-  "/": "/imagens/JOAO_E_PEDRO_DJI_20250628213855_0002_D.jpg",
+  "/": "/imagens/entrada-floresta.jpg",
   "/sobre": "/imagens/hd-edited.jpg",
   "/servicos": "/imagens/EW1_1330.jpg",
   "/galeria": "/imagens/DaniGui_Preview20.jpg",

@@ -174,7 +174,8 @@ describe("service worker — o que uma navegação deixa na cache", () => {
    * caches cujo nome não conhece.
    */
   it("o nome da cache subiu, para limpar as páginas de erro já gravadas", () => {
-    expect(FONTE).toContain('CACHE = "liquen-cache-v4"');
+    // v5 desde 15/10 (os vídeos da entrada): continua a ser uma subida.
+    expect(FONTE).toMatch(/CACHE = "liquen-cache-v([4-9]|\d{2,})"/);
   });
 
   it("sem rede, e sem nada guardado, sobra o ecrã de offline", async () => {

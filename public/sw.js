@@ -19,7 +19,7 @@
 // `vaiParaOInvolucro`). O nome sobe porque a correcção não chega a quem já tem
 // um 500 ou um redireccionamento gravado — é o `activate` que apaga as caches
 // que não conhece, e sem esta subida essa página de erro ficava lá.
-const CACHE = "liquen-cache-v4";
+const CACHE = "liquen-cache-v5";
 
 /* ═══════════════════════════════════════════════════════════════════════════
    AS MINIATURAS DA BIBLIOTECA DE TEMAS, GUARDADAS SEM O TOKEN
@@ -240,7 +240,25 @@ function isStaticAsset(url) {
     url.pathname.startsWith("/_next/static/") ||
     url.pathname.startsWith("/_img/") ||
     url.pathname.startsWith("/imagens/") ||
-    /\.(?:woff2?|ttf|otf|png|jpg|jpeg|webp|avif|svg|ico|mp4)$/.test(url.pathname)
+    /\.(?:woff2?|ttf|otf|png|jpg|jpeg|webp|avif|svg|ico)$/.test(url.pathname)
+  );
+}
+
+/* OS VÍDEOS NÃO PASSAM POR AQUI (os da entrada, 15/10).
+ *
+ * Um `<video>` pede o ficheiro aos bocados (`Range`), e o servidor responde
+ * `206` com um bocado só. Guardar isso na Cache Storage é guardar um pedaço com
+ * a chave do ficheiro inteiro — e servi-lo depois a um pedido de outro bocado
+ * parte o vídeo, o que o Safari faz em silêncio (fica preto). Por isso o `mp4`
+ * saiu da lista acima, e qualquer pedido de vídeo ou com `Range` vai directo à
+ * rede: quem guarda os vídeos é a cache do próprio browser, com a cache longa
+ * que o `next.config.ts` lhes dá. A cache passou a `v5` para esquecer algum
+ * `mp4` que a `v4` tenha guardado. */
+function ehVideo(request, url) {
+  return (
+    request.destination === "video" ||
+    Boolean(request.headers && request.headers.has("range")) ||
+    /\.(?:mp4|webm|mov|m4v)$/.test(url.pathname)
   );
 }
 
@@ -268,6 +286,7 @@ self.addEventListener("fetch", (event) => {
   // Only same-origin; leave cross-origin (analytics, etc.) to the network.
   if (url.origin !== self.location.origin) return;
   if (isBypassed(url)) return;
+  if (ehVideo(request, url)) return;
 
   // Navigations: network-first with a cached fallback, then the offline shell.
   if (request.mode === "navigate") {

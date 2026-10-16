@@ -96,6 +96,18 @@ async function abrirMenuDoPedido(pedido: Quote = PEDIDO, noPainel = false) {
       await screen.findByRole("button", { name: /^Abrir o pedido$/ }, { timeout: 10_000 }),
     );
   }
+  // A lista pode aterrar no ecrã «Fazer proposta» em vez do painel (é o que
+  // faz hoje com um pedido novo); nesse caso abre-se o pedido por lá — o mesmo
+  // caminho do `noPainel`. Sem isto, o teste que corresse primeiro sem o
+  // `noPainel` não encontrava o «Mais» e falhava sempre (CI do #233, 16/10).
+  if (!noPainel) {
+    const abrir = await screen
+      .findByRole("button", { name: /^Abrir o pedido$/ }, { timeout: 1500 })
+      .catch(() => null);
+    if (abrir && screen.queryAllByRole("button", { name: /^Mais$/i }).length === 0) {
+      await userEvent.click(abrir);
+    }
+  }
   await waitFor(() => expect(screen.queryByText(/a abrir o pedido de/i)).toBeNull());
   // Há mais do que um «Mais» no ecrã (a lista tem o seu); o do painel de
   // detalhe é o último a ser desenhado.

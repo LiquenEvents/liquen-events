@@ -658,9 +658,11 @@ const nextConfig: NextConfig = {
         // comercial, não uma correcção de segurança, por isso não é feita aqui.
         //
         // As restantes são capacidades que o sítio comprovadamente nunca usa
-        // (não há `<video>`, nem `requestFullscreen`, nem Web USB/Serial/HID/
-        // MIDI/Bluetooth em lado nenhum do código) — `(self)` em vez de `()` no
-        // fullscreen/autoplay só para não amarrar o lightbox da galeria.
+        // (não há `requestFullscreen`, nem Web USB/Serial/HID/MIDI/Bluetooth
+        // em lado nenhum do código) — `(self)` em vez de `()` no fullscreen só
+        // para não amarrar o lightbox da galeria. O `autoplay=(self)` é preciso
+        // DE VERDADE desde 15/10: os vídeos da entrada (EntradaEmVideo) tocam
+        // sozinhos, mudos, e são servidos pelo próprio sítio.
         key: "Permissions-Policy",
         value: [
           "accelerometer=()",
@@ -701,6 +703,14 @@ const nextConfig: NextConfig = {
       { source: "/:path*", headers: securityHeaders },
       {
         source: "/imagens/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
+      {
+        // Os vídeos da entrada (public/videos/entrada/v1). A pasta tem versão:
+        // um vídeo novo vai para `v2`, nunca por cima, portanto um ano é seguro.
+        // Sem isto eram servidos com `max-age=0` e o browser revalidava-os em
+        // cada visita — ~14 MB a pedir licença outra vez.
+        source: "/videos/:path*",
         headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
       },
       {
