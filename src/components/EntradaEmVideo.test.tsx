@@ -77,11 +77,18 @@ function descarregado(el: HTMLVideoElement, ate: number, dur = 18) {
   });
 }
 
-/** O take de entrada começa a tocar e já chegou inteiro. */
+/**
+ * O take de entrada começa a tocar e já chegou inteiro. A ANDAR de verdade
+ * (`paused` falso): o motor só põe à vista um vídeo que anda — um parado à
+ * vista é onde o iPhone desenha o botão ▶.
+ */
 function comecar(el: HTMLVideoElement) {
   descarregado(el, el.duration || 18);
+  Object.defineProperty(el, "paused", { configurable: true, value: false });
   act(() => void el.dispatchEvent(new Event("playing")));
   act(() => void el.dispatchEvent(new Event("canplaythrough")));
+  // Largado (tem reserva): volta a andar, e o browser avisa outra vez.
+  act(() => void el.dispatchEvent(new Event("playing")));
 }
 
 describe("EntradaEmVideo", () => {
@@ -126,7 +133,7 @@ describe("EntradaEmVideo", () => {
     expect(GUIAO_DA_ENTRADA).not.toContain("av1");
   });
 
-  describe("o take de entrada alterna de visita para visita", () => {
+  describe("a entrada é sempre na floresta (decisão dela, 16/10)", () => {
     /** Uma entrada no sítio: o HTML do servidor e o guião a correr nele. */
     function entrar() {
       document.body.innerHTML = `<div data-entrada="">${HTML_DOS_VIDEOS}</div>`;
@@ -153,24 +160,12 @@ describe("EntradaEmVideo", () => {
       expect(play).toHaveBeenCalled();
     });
 
-    it("as seguintes entram num take que nunca é o da entrada anterior, e passam por todos", () => {
+    it("todas as entradas abrem na floresta — também quem já cá esteve", () => {
       vi.spyOn(Math, "random").mockRestore();
-      let anterior = entrar().n;
-      const vistos = new Set<number>([anterior]);
-      for (let k = 0; k < 40; k++) {
-        const { n } = entrar();
-        expect(n).not.toBe(anterior);
-        vistos.add(n);
-        anterior = n;
-      }
-      expect(vistos).toEqual(new Set([0, 1, 2]));
-    });
-
-    it("com o armazenamento bloqueado (janela privada), entra na floresta e não rebenta", () => {
-      vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
-        throw new Error("bloqueado");
-      });
-      expect(entrar().n).toBe(0);
+      // O que a alternância antiga deixava guardado não conta.
+      localStorage.setItem("liquen-entrada-ultimo", "0");
+      for (let k = 0; k < 20; k++) expect(entrar().n).toBe(0);
+      expect(localStorage.getItem("liquen-entrada-ultimo")).toBe("0"); // nada escrito de novo
     });
   });
 
@@ -193,7 +188,7 @@ describe("EntradaEmVideo", () => {
       });
       arrancarEntrada(
         [...Array(3)].map(() => "<source src='x.mp4' type='video/mp4'>"),
-        "k",
+        0,
         2500,
       );
       const v = document.querySelector<HTMLVideoElement>("[data-primeiro]")!;
@@ -253,7 +248,7 @@ describe("EntradaEmVideo", () => {
       document.body.innerHTML = `<div class="cortina cortina--fora"></div><div data-entrada="">${HTML_DOS_VIDEOS}</div>`;
       arrancarEntrada(
         [...Array(3)].map(() => "<source src='x.mp4' type='video/mp4'>"),
-        "k",
+        0,
         2500,
       );
       const v = document.querySelector<HTMLVideoElement>("[data-primeiro]")!;
@@ -274,7 +269,7 @@ describe("EntradaEmVideo", () => {
       document.body.innerHTML = `<div class="cortina cortina--fora"></div><div data-entrada="">${HTML_DOS_VIDEOS}</div>`;
       arrancarEntrada(
         [...Array(3)].map(() => "<source src='x.mp4' type='video/mp4'>"),
-        "k",
+        0,
         2500,
       );
       const v = document.querySelector<HTMLVideoElement>("[data-primeiro]")!;
@@ -546,6 +541,77 @@ describe("EntradaEmVideo", () => {
     expect(play).toHaveBeenCalledTimes(1);
   });
 
+  describe("recusado (iPhone com poupança de energia): nunca o botão ▶ do sistema", () => {
+    const recusar = () =>
+      play.mockImplementation(() =>
+        Promise.reject(Object.assign(new Error("no"), { name: "NotAllowedError" })),
+      );
+    const comoNoIphone = () =>
+      Object.defineProperty(navigator, "vendor", {
+        configurable: true,
+        value: "Apple Computer, Inc.",
+      });
+    afterEach(() => {
+      Reflect.deleteProperty(navigator, "vendor");
+    });
+
+    it("um vídeo parado no 1.º fotograma nunca fica à vista (é onde o iPhone põe o ▶)", async () => {
+      const { container } = await montar();
+      const [a] = videos(container);
+      Object.defineProperty(a, "readyState", { configurable: true, value: 2 });
+      act(() => void a.dispatchEvent(new Event("loadeddata")));
+      act(() => void a.dispatchEvent(new Event("playing"))); // o guião pára-o logo
+      expect(a.style.opacity).toBe("0");
+    });
+
+    it("no iPhone, recusado: nenhum vídeo à vista e a floresta entra como imagem animada", async () => {
+      comoNoIphone();
+      recusar();
+      const { container } = await montar();
+      expect(videos(container).every((v) => v.style.opacity === "0")).toBe(true);
+      const img = container.querySelector<HTMLImageElement>("img[data-entrada-imagem]");
+      expect(img?.getAttribute("src")).toBe("/videos/entrada/v4/entrada-1-paisagem.mp4");
+      expect(img?.getAttribute("aria-hidden")).toBe("true");
+      expect(img?.style.opacity).toBe("0");
+      act(() => void img!.dispatchEvent(new Event("load")));
+      expect(img?.style.opacity).toBe("1");
+    });
+
+    it("ao alto, a imagem animada é a versão leve (menos peso)", async () => {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+      Object.defineProperty(window, "innerHeight", { configurable: true, value: 844 });
+      comoNoIphone();
+      recusar();
+      const { container } = await montar();
+      expect(container.querySelector("img[data-entrada-imagem]")?.getAttribute("src")).toBe(
+        "/videos/entrada/v4/entrada-1-retrato-leve.mp4",
+      );
+    });
+
+    it("fora do Safari não há imagem animada (só ele toca um MP4 num <img>)", async () => {
+      Object.defineProperty(navigator, "vendor", { configurable: true, value: "Google Inc." });
+      recusar();
+      const { container } = await montar();
+      expect(container.querySelector("img[data-entrada-imagem]")).toBeNull();
+      expect(videos(container).every((v) => v.style.opacity === "0")).toBe(true);
+    });
+
+    it("ao primeiro toque o vídeo volta, sobe quando anda, e a imagem sai", async () => {
+      comoNoIphone();
+      recusar();
+      const { container } = await montar();
+      const [a] = videos(container);
+      play.mockImplementation(() => Promise.resolve());
+      act(() => void window.dispatchEvent(new Event("pointerdown")));
+      Object.defineProperty(a, "paused", { configurable: true, value: false });
+      act(() => void a.dispatchEvent(new Event("playing")));
+      expect(a.style.opacity).toBe("1");
+      expect(
+        container.querySelector<HTMLImageElement>("img[data-entrada-imagem]")?.style.opacity,
+      ).toBe("0");
+    });
+  });
+
   describe("o formato dos seguintes: pergunta-se ao aparelho", () => {
     type Resp = { supported: boolean; smooth: boolean; powerEfficient: boolean };
     const SIM: Resp = { supported: true, smooth: true, powerEfficient: true };
@@ -684,8 +750,10 @@ describe("EntradaEmVideo", () => {
       const { container } = await montar();
       const [a] = videos(container);
       descarregado(a, 6);
+      Object.defineProperty(a, "paused", { configurable: true, value: false });
       act(() => void a.dispatchEvent(new Event("playing")));
       act(() => void a.dispatchEvent(new Event("canplaythrough")));
+      act(() => void a.dispatchEvent(new Event("playing"))); // largado: anda
       act(() => void a.dispatchEvent(new Event("progress")));
       expect(pedidos).toEqual([]); // tem dados para seguir, mas ainda não todos
       descarregado(a, 18);
@@ -756,6 +824,8 @@ describe("EntradaEmVideo", () => {
       const [a] = videos(container);
       comecar(a);
       play.mockClear();
+      // O sistema parou-o: fica parado até o motor o voltar a pôr a andar.
+      Object.defineProperty(a, "paused", { configurable: true, value: true });
       act(() => void a.dispatchEvent(new Event("pause")));
       expect(play).toHaveBeenCalledTimes(1); // logo, sem esperar pelo vigia
       act(() => void vi.advanceTimersByTime(300));

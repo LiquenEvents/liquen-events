@@ -229,7 +229,7 @@ function baralhar(lista: number[], sorteio: () => number): number[] {
 /**
  * ── A ORDEM VAI MUDANDO ────────────────────────────────────────────────────
  * Ela (16/10): «vai alterando os vídeos para não estarem sempre com a mesma
- * ordem». A primeira volta começa no take de entrada (ver `escolherPrimeiro`),
+ * ordem». A primeira volta começa no take de entrada (`TAKE_DE_ENTRADA`, a floresta),
  * e os outros vêm por uma ordem sorteada. As voltas seguintes são sorteadas
  * inteiras, com uma regra: nunca o mesmo vídeo duas vezes seguidas na passagem
  * de uma volta para a outra.
@@ -239,31 +239,18 @@ export function primeiraVolta(primeiro = 0, sorteio: () => number = Math.random)
   return [primeiro, ...baralhar(resto, sorteio)];
 }
 
-/** Onde o browser guarda o take com que a pessoa entrou da última vez. */
-export const CHAVE_DO_ULTIMO = "liquen-entrada-ultimo";
-
 /**
- * ── O TAKE DE ENTRADA ALTERNA DE VISITA PARA VISITA ────────────────────────
- * Ela (16/10): «para as pessoas não se fartarem, sempre que entram no site
- * veem sempre o mesmo take… vai alternando de takes na entrada do site».
- * A primeira visita de sempre abre na floresta vista de cima (o pedido dela
- * de 15/10, e a fotografia da capa é esse fotograma); a partir daí, cada
- * entrada abre num take sorteado que NUNCA é o da entrada anterior.
- *
- * `ultimo` é o que ficou guardado no browser (`null` na primeira visita).
- * O guião que corre no HTML (`EntradaEmVideo.tsx`) faz a mesma conta.
+ * ── A ENTRADA É SEMPRE NA FLORESTA ─────────────────────────────────────────
+ * Decisão dela (16/10, depois de entrar pelo Instagram e cair no castelo):
+ * «quero que a primeira vez que a pessoa entra no site seja sempre o vídeo da
+ * floresta com o carro» — e, perguntada, «sempre a floresta», em TODAS as
+ * entradas. Substitui a alternância de visita para visita (que guardava no
+ * browser o take da entrada anterior). A variedade fica na ordem dos outros
+ * dois, sorteada a cada volta (`primeiraVolta`/`novaVolta`). A fotografia da
+ * capa é o primeiro fotograma deste take: a passagem da foto para o vídeo não
+ * se nota.
  */
-export function escolherPrimeiro(
-  ultimo: number | null,
-  sorteio: () => number = Math.random,
-): number {
-  if (ultimo === null || !Number.isInteger(ultimo) || ultimo < 0 || ultimo >= NUMERO_DE_VIDEOS) {
-    return 0;
-  }
-  let n = Math.floor(sorteio() * (NUMERO_DE_VIDEOS - 1));
-  if (n >= ultimo) n++;
-  return Math.min(n, NUMERO_DE_VIDEOS - 1);
-}
+export const TAKE_DE_ENTRADA = 0;
 
 /**
  * Quantos segundos antes do fim do take à vista se prepara o seguinte para
