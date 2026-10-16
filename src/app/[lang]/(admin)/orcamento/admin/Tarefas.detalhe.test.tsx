@@ -397,7 +397,11 @@ describe("fase 09 — o menu da linha, o mover e o teclado", () => {
     primeira.focus();
     fireEvent.keyDown(primeira, { key: "Backspace", metaKey: true });
 
-    const caixa = await screen.findByRole("dialog");
+    // 5 s e não o segundo de omissão: no CI (#232, 16/10) a pergunta demorou
+    // mais do que isso a montar numa parte com 177 ficheiros a correr ao lado,
+    // e aqui passa sempre. O que se prova é que a pergunta APARECE e que nada
+    // se apaga antes dela — não quanto tempo leva numa máquina carregada.
+    const caixa = await screen.findByRole("dialog", undefined, { timeout: 5000 });
     expect(caixa).toHaveTextContent("Confirmar florista");
     // Nada foi eliminado enquanto a pergunta está aberta.
     expect(escritas.some((e) => e.metodo === "DELETE")).toBe(false);
