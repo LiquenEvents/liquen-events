@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { describe } from "../../../../../../test/em-partes";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ToastProvider } from "./Toast";
@@ -2179,7 +2180,15 @@ describe("O valor é UM só — o do pedido", () => {
     // gravações.
     await vi.advanceTimersByTimeAsync(800);
 
-    const gravacoes = fetchMock.mock.calls.filter(([, init]) => init?.method === "PATCH");
+    // Só contam as gravações do que ela ESCREVEU: um estúdio de um teste
+    // anterior ainda pode mandar o preço com que abriu (3000) por um relógio
+    // que ficou a correr — descobriu-se ao correr este ficheiro em partes, com
+    // outra ordem (`test/em-partes.ts`).
+    const gravacoes = fetchMock.mock.calls.filter(
+      ([, init]) =>
+        init?.method === "PATCH" &&
+        (JSON.parse(String(init.body)) as { quotedPrice?: number }).quotedPrice !== 3000,
+    );
     expect(gravacoes.length, "escreveu uma vez por tecla").toBe(1);
     expect(JSON.parse(String(gravacoes[0][1]?.body))).toMatchObject({ quotedPrice: 4200 });
     vi.useRealTimers();

@@ -64,6 +64,81 @@ mudou**. As partes deixaram de esperar em fila, e cada uma tem o seu runner.
 - **Mais minutos de runner no total.** O repositório é público, e os minutos do
   GitHub Actions não se pagam.
 
-## Os tempos depois
+## Os tempos depois da 1.ª volta (#231, medidos)
 
-Medidos no PR desta mudança, preenchidos quando o CI dele acabou.
+| Job | Tempo |
+|---|---|
+| Lint · Typecheck · Build | 3:43 |
+| Testes unitários 1/3 · 2/3 · 3/3 | 2:55 · 3:49 · **7:59** |
+| E2E · imagens 1/2 · 2/2 | 4:07 · 5:21 |
+| E2E · peso, galeria, molas, vidro, sem rede | 4:44 |
+| E2E · telemóvel, propostas, passkeys | 3:37 |
+| E2E · dados | 6:59 |
+
+Espera total de cerca de 8 minutos, contra 28. Os dois mais lentos eram a parte
+3/3 dos testes de unidade (lá calhou o ficheiro do estúdio, que levava ~6
+minutos sozinho) e os `dados`.
+
+## A 2.ª volta: inteligente (15/10)
+
+Ela pediu «2 minutos, 3 minutos… quero tornar o sistema mesmo inteligente», e
+escolheu **«inteligente + completa depois»**:
+
+- **Num PR, verifica-se o que a mudança pode afectar.** Quem decide é o job
+  `decidir`, com a regra em `scripts/ci/o-que-correr.mjs` (um teste por caso;
+  na dúvida, corre tudo):
+  - **só documentos** (`docs/`, `*.md`) → só o lint, o typecheck e o build;
+  - **os testes de unidade** → só os ligados a um ficheiro mudado (`vitest
+    related`, que segue o grafo de imports);
+  - **os passeios no browser, por área** → uma mudança só no sítio público não
+    corre os passeios que gravam do back office (`dados`, telemóvel, propostas,
+    passkeys); uma mudança no back office corre tudo o que é browser; o que é
+    partilhado (`src/lib`…) corre tudo;
+  - **configuração, dependências, o próprio CI, os passeios** → tudo.
+- **Depois de juntar, todas as noites (03:17) e à mão** → a verificação
+  **completa**. É isto que a rapidez troca: uma avaria que um PR inteligente
+  não apanhasse aparece na corrida seguinte do `main`, e o GitHub avisa por
+  email.
+- **Mais depressa mesmo quando corre tudo:**
+  - o ficheiro do estúdio (339 testes, ~6 min) e o do `montar` (~2 min) correm
+    em partes (`test/em-partes.ts`): os casos ficam num `*.casos.test.tsx` (que o vitest não corre sozinho), e cada
+    `*.parte-N.test.tsx` corre uma fatia dos `describe`;
+  - testes de unidade em 5 partes, imagens em 3, `dados` em 3, informativo
+    em 4;
+  - lint e typecheck ao mesmo tempo, com cache (`eslint --cache`,
+    `tsc --incremental`);
+  - o Chromium guardado entre corridas.
+- **Os totais à vista:** cada parte de unidade, de imagens e de dados escreve
+  uma anotação com o que correu, para se conferir que a soma é tudo (887
+  ficheiros de unidade desde esta volta).
+
+## Os tempos da 2.ª volta (#232, medidos no próprio PR, que corre tudo)
+
+O PR muda o `.github/`, por isso o `decidir` mandou correr **tudo** — é o pior
+caso, o mesmo que corre depois de juntar e à noite.
+
+| Job | Tempo |
+|---|---|
+| O que verificar (`decidir`) | 0:19 |
+| Lint · Typecheck · Build | 2:18 |
+| Testes unitários 1/5 · 2/5 · 3/5 · 4/5 · 5/5 | 1:58 · **4:12** · 3:38 · 2:54 · 2:04 |
+| E2E · imagens 1/3 · 2/3 · 3/3 | 3:33 · 3:40 · 3:07 |
+| E2E · dados 1/3 · 2/3 · 3/3 | 2:46 · 2:53 · 2:36 |
+| E2E · peso, galeria, molas, vidro, sem rede | 4:24 |
+| E2E · telemóvel, propostas, passkeys | 3:41 |
+
+**Espera para juntar: 6 minutos** (do empurrão ao último job que bloqueia),
+contra 8 na 1.ª volta e 28 antes. Os totais conferem: as cinco partes de
+unidade somam **887 ficheiros**, 11 861 testes passados, 3 saltados, 0 falhas;
+as três de imagens somam 128 passeios, 0 falhas.
+
+**O que ainda segura o tempo, e porquê:** o GitHub só corre **20 jobs ao mesmo
+tempo** num repositório público, e uma corrida completa pede 25. As partes 1/5
+e 3/5 dos testes esperaram 1 a 2 minutos por um runner livre antes de
+começarem. Num PR típico (só o sítio, ou só o back office) correm menos jobs, e
+essa fila não existe.
+
+**O caminho rápido (só documentos, ou só um ecrã) ainda não está medido.** O
+`decidir` olha para o PR inteiro, e este PR mexe no `.github/` — por isso todos
+os commits dele correm tudo. Mede-se no primeiro PR depois de este entrar, e o
+número fica aqui.

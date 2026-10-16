@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   pull_request:
+  # A verificação COMPLETA também corre todas as noites e à mão (a escolha
+  # dela de 15/10: «inteligente + completa depois» — ver `decidir`).
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
 
 # Least privilege: this workflow only needs to read the repo.
 permissions:
@@ -33,6 +38,42 @@ jobs:
   # todas as suas partes passarem. Assim, se o GitHub exigir esses nomes para
   # juntar, continua a exigi-los com o mesmo significado. Os números e o
   # porquê de cada job estão em `docs/VERIFICACOES.md`.
+
+  # ── O QUE ESTA MUDANÇA PRECISA DE VERIFICAR (15/10, 2.ª volta) ──────────
+  # Ela escolheu «inteligente + completa depois»: num PR corre o que a mudança
+  # pode afectar — os testes de unidade ligados a um ficheiro mudado, e os
+  # passeios da área que ela toca; em `push` ao `main`, à noite e à mão corre
+  # TUDO. A regra é `scripts/ci/o-que-correr.mjs`, com um teste por caso; na
+  # dúvida, tudo.
+  decidir:
+    name: O que verificar
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      tudo: ${{ steps.d.outputs.tudo }}
+      unidade: ${{ steps.d.outputs.unidade }}
+      sitio: ${{ steps.d.outputs.sitio }}
+      back_office: ${{ steps.d.outputs.back_office }}
+      e2e: ${{ steps.d.outputs.e2e }}
+      ligados: ${{ steps.d.outputs.ligados }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Os ficheiros que o PR muda
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --paginate --jq '.[].filename' > ficheiros-do-pr.txt
+      - name: Decidir
+        id: d
+        env:
+          EVENTO: ${{ github.event_name }}
+          FICHEIROS_DO_PR_EM: ficheiros-do-pr.txt
+        run: |
+          touch ficheiros-do-pr.txt
+          node scripts/ci/o-que-correr.mjs
 
   estatico:
     name: Lint · Typecheck · Build
@@ -68,11 +109,30 @@ jobs:
         # dependencies without blocking on dev-only tooling advisories.
         run: npm audit --audit-level=high --omit=dev
 
-      - name: Lint
-        run: npm run lint
+      # A cache do lint e do typecheck: entre corridas só se volta a ver o que
+      # mudou. A chave muda com a configuração e as dependências; o
+      # `restore-keys` traz a última, e a ferramenta revê o que for diferente.
+      - name: Cache do lint e do typecheck
+        uses: actions/cache@v4
+        with:
+          path: |
+            .eslintcache
+            .tsbuildinfo-ci
+          key: lint-tsc-${{ runner.os }}-${{ hashFiles('package-lock.json', 'eslint.config.*', 'tsconfig.json') }}-${{ github.sha }}
+          restore-keys: |
+            lint-tsc-${{ runner.os }}-${{ hashFiles('package-lock.json', 'eslint.config.*', 'tsconfig.json') }}-
 
-      - name: Typecheck
-        run: npm run typecheck
+      # Os dois ao mesmo tempo: não dependem um do outro.
+      - name: Lint e typecheck
+        run: |
+          npx eslint --cache --cache-location .eslintcache --cache-strategy content &
+          lint=$!
+          npx tsc --noEmit --incremental --tsBuildInfoFile .tsbuildinfo-ci &
+          tsc=$!
+          wait $lint; l=$?
+          wait $tsc; t=$?
+          echo "lint=$l typecheck=$t"
+          test $l -eq 0 && test $t -eq 0
 
       - name: Build
         run: npm run build
@@ -90,16 +150,21 @@ jobs:
       - name: Peso das rotas (bloqueante)
         run: node scripts/peso-das-rotas.mjs
 
-  # Os ~880 ficheiros de testes de unidade, em três partes ao mesmo tempo
-  # (`vitest --shard`): levavam 9 a 12 minutos num só processo.
+  # Os testes de unidade, em cinco partes ao mesmo tempo (`vitest --shard`).
+  # Num PR, só os LIGADOS a um ficheiro mudado (`vitest related`, o grafo de
+  # imports do próprio vitest); depois de juntar, todos. Os dois ficheiros
+  # gigantes (o estúdio, ~6 min sozinho, e o `montar`) correm em partes —
+  # `test/em-partes.ts`.
   unitarios:
-    name: Testes unitários (${{ matrix.parte }}/3)
+    name: Testes unitários (${{ matrix.parte }}/5)
+    needs: decidir
+    if: needs.decidir.outputs.unidade != 'nada'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        parte: [1, 2, 3]
+        parte: [1, 2, 3, 4, 5]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/preparar
@@ -107,20 +172,41 @@ jobs:
           miniaturas: "false"
 
       - name: Unit tests
-        run: npm test -- --shard=${{ matrix.parte }}/3
+        env:
+          UNIDADE: ${{ needs.decidir.outputs.unidade }}
+          LIGADOS: ${{ needs.decidir.outputs.ligados }}
+        run: |
+          # Os caminhos têm `[lang]` e `(admin)`: sem globbing, ficam tal e qual.
+          set -f
+          # O `github-actions` escreve cada falha como anotação (com o nome do teste).
+          comum="--shard=${{ matrix.parte }}/5 --passWithNoTests --reporter=default --reporter=github-actions --reporter=json --outputFile.json=vitest.json"
+          if [ "$UNIDADE" = "tudo" ] || [ -z "$LIGADOS" ]; then
+            npx vitest run $comum
+          else
+            npx vitest related $LIGADOS --run $comum
+          fi
+
+      - name: Totais desta parte
+        if: always()
+        run: node scripts/ci/totais.mjs vitest vitest.json "Unidade ${{ matrix.parte }}/5"
 
   quality:
     name: Lint · Typecheck · Test · Build
-    # O nome de sempre: passa só se o lint, o typecheck, o build e as três partes dos testes passarem.
-    needs: [estatico, unitarios]
+    # O nome de sempre: passa só se o lint, o typecheck, o build e as partes
+    # dos testes passarem — ou se foram saltadas porque o `decidir` (que tem de
+    # ter passado) disse que a mudança não lhes chega.
+    needs: [decidir, estatico, unitarios]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Todas as partes passaram?
         run: |
-          echo "estatico=${{ needs.estatico.result }} unitarios=${{ needs.unitarios.result }}"
-          if [ "${{ needs.estatico.result }}" != success ] || [ "${{ needs.unitarios.result }}" != success ]; then exit 1; fi
+          echo "decidir=${{ needs.decidir.result }} estatico=${{ needs.estatico.result }} unitarios=${{ needs.unitarios.result }}"
+          test "${{ needs.decidir.result }}" = success || exit 1
+          for r in "${{ needs.estatico.result }}" "${{ needs.unitarios.result }}"; do
+            case "$r" in success|skipped) ;; *) exit 1 ;; esac
+          done
 
   # ── O PACOTE DAS MINIATURAS, PARA A VERCEL ──────────────────────────────
   # A 13/10 nenhum deploy acabava: a Vercel restaurou uma cache de build sem
@@ -176,13 +262,15 @@ jobs:
   # agora em três jobs paralelos, ao lado dos que bloqueiam, e continua igual:
   # o resultado vê-se, e não pára nada.
   e2e-informativo:
-    name: E2E informativo (${{ matrix.parte }}/3)
+    name: E2E informativo (${{ matrix.parte }}/4)
+    needs: decidir
+    if: needs.decidir.outputs.e2e == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        parte: [1, 2, 3]
+        parte: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/preparar
@@ -197,7 +285,7 @@ jobs:
         # `@propostas` corre no seu próprio passo bloqueante, com config e
         # servidor próprios — aqui só duplicaria trabalho, e falharia, porque
         # este servidor é o de produção e recusa escritas sem Supabase.
-        run: npx playwright test --grep-invert "@imagens|@movel|@propostas|@galeria|@desempenho|@movimento|@semrede|@vidro" --shard=${{ matrix.parte }}/3
+        run: npx playwright test --grep-invert "@imagens|@movel|@propostas|@galeria|@desempenho|@movimento|@semrede|@vidro" --shard=${{ matrix.parte }}/4
         env:
           CI: "true"
           # Test-only admin auth so the back-office smoke can log in against the
@@ -209,13 +297,15 @@ jobs:
 
   # BLOQUEANTE, em dois jobs: os 118 passeios das imagens, metade em cada.
   e2e-imagens:
-    name: E2E · imagens (${{ matrix.parte }}/2)
+    name: E2E · imagens (${{ matrix.parte }}/3)
+    needs: decidir
+    if: needs.decidir.outputs.e2e == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        parte: [1, 2]
+        parte: [1, 2, 3]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/preparar
@@ -225,13 +315,18 @@ jobs:
 
       # BLOQUEANTE. Uma imagem que não pinte em qualquer página, em telemóvel ou
       # em computador, com o menu fechado ou aberto, põe o PR vermelho. Corre em
-      # dois jobs paralelos (`--shard`), cada um com metade dos passeios.
+      # três jobs paralelos (`--shard`), cada um com um terço dos passeios.
       - name: Imagens — nenhuma imagem partida em nenhuma página
-        run: npx playwright test --grep "@imagens" --shard=${{ matrix.parte }}/2
+        run: npx playwright test --grep "@imagens" --shard=${{ matrix.parte }}/3 --reporter=list,html,json
         env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: playwright.json
           CI: "true"
           ADMIN_PASSWORD_HASH: "$2b$10$eSAkm9hz/JUpFYWRdPrA9.YJP.Gjry2IwVwgZa3hjvHcvV/r27n7u"
           SESSION_SECRET: "e2e-ci-session-secret-not-for-production-use"
+
+      - name: Totais desta parte
+        if: always()
+        run: node scripts/ci/totais.mjs playwright playwright.json "Imagens ${{ matrix.parte }}/3"
 
       - name: Upload report on failure
         if: failure()
@@ -245,6 +340,8 @@ jobs:
   # cada um é de segundos, e juntos cabem num job.
   e2e-producao:
     name: E2E · peso, galeria, molas, vidro, sem rede
+    needs: decidir
+    if: needs.decidir.outputs.e2e == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -391,9 +488,17 @@ jobs:
   # BLOQUEANTE. Os passeios que GRAVAM, com o servidor de desenvolvimento
   # (cada config arranca o seu `npm run dev`): não precisam do build.
   e2e-dados:
-    name: E2E · dados
+    name: E2E · dados (${{ matrix.parte }}/3)
+    needs: decidir
+    if: needs.decidir.outputs.back_office == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Em três partes: cada uma tem o seu runner, o seu servidor `dev` e os seus
+    # dados — o `workers: 1` da config continua verdadeiro dentro de cada uma.
+    strategy:
+      fail-fast: false
+      matrix:
+        parte: [1, 2, 3]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/preparar
@@ -411,22 +516,29 @@ jobs:
       # telemóvel, e os alvos de 13 px. Nenhum deles se vê sem navegador, e o
       # de Faturas nem sequer se vê sem uma fatura grande semeada.
       - name: Geometria e dados — os passeios que gravam (bloqueante)
-        run: npm run test:e2e:dados
+        run: npm run test:e2e:dados -- --shard=${{ matrix.parte }}/3 --reporter=list,html,json
         env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: playwright.json
           CI: "true"
           ADMIN_PASSWORD_HASH: "$2b$10$eSAkm9hz/JUpFYWRdPrA9.YJP.Gjry2IwVwgZa3hjvHcvV/r27n7u"
           SESSION_SECRET: "e2e-ci-session-secret-not-for-production-use"
+
+      - name: Totais desta parte
+        if: always()
+        run: node scripts/ci/totais.mjs playwright playwright.json "Dados ${{ matrix.parte }}/3"
 
       - name: Upload report on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report-dados
+          name: playwright-report-dados-${{ matrix.parte }}
           path: playwright-report/
           retention-days: 7
 
   e2e-gravam:
     name: E2E · telemóvel, propostas, passkeys
+    needs: decidir
+    if: needs.decidir.outputs.back_office == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -502,15 +614,18 @@ jobs:
   e2e:
     name: E2E (Playwright)
     # O nome de sempre: passa só se todos os passeios que bloqueiam passarem. O informativo fica de fora, como sempre ficou.
-    needs: [e2e-imagens, e2e-producao, e2e-dados, e2e-gravam]
+    needs: [decidir, e2e-imagens, e2e-producao, e2e-dados, e2e-gravam]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Todas as partes passaram?
         run: |
-          echo "e2e-imagens=${{ needs.e2e-imagens.result }} e2e-producao=${{ needs.e2e-producao.result }} e2e-dados=${{ needs.e2e-dados.result }} e2e-gravam=${{ needs.e2e-gravam.result }}"
-          if [ "${{ needs.e2e-imagens.result }}" != success ] || [ "${{ needs.e2e-producao.result }}" != success ] || [ "${{ needs.e2e-dados.result }}" != success ] || [ "${{ needs.e2e-gravam.result }}" != success ]; then exit 1; fi
+          echo "decidir=${{ needs.decidir.result }} e2e-imagens=${{ needs.e2e-imagens.result }} e2e-producao=${{ needs.e2e-producao.result }} e2e-dados=${{ needs.e2e-dados.result }} e2e-gravam=${{ needs.e2e-gravam.result }}"
+          test "${{ needs.decidir.result }}" = success || exit 1
+          for r in "${{ needs.e2e-imagens.result }}" "${{ needs.e2e-producao.result }}" "${{ needs.e2e-dados.result }}" "${{ needs.e2e-gravam.result }}"; do
+            case "$r" in success|skipped) ;; *) exit 1 ;; esac
+          done
 
   # A história do tecto do job E2E antigo (para quem vier a seguir):
     # ── 60, E É A SEGUNDA VEZ QUE ESTE NÚMERO SOBE ────────────────────────

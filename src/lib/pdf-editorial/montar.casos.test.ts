@@ -1,4 +1,5 @@
-import { describe, expect, it, vi, beforeAll } from "vitest";
+import { expect, it, vi, beforeAll } from "vitest";
+import { describe } from "../../../test/em-partes";
 import { PDFDocument, PDFPage, PDFName, PDFDict, PDFRawStream, PDFNumber } from "pdf-lib";
 import sharp from "sharp";
 import { withProposalDefaults, resolveValidUntil, type ProposalDoc } from "@/lib/proposal-doc";

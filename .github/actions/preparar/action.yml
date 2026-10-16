@@ -37,10 +37,25 @@ runs:
     # duas corridas canceladas sem um teste executado. Daí um tecto de 8
     # minutos e um caminho alternativo SEM apt: a imagem `ubuntu-latest` já
     # traz as bibliotecas de que o Chromium precisa.
+    # O Chromium fica guardado entre corridas, pela versão do lockfile. Com ele
+    # em cache, instala-se sem o apt (as bibliotecas já vêm na imagem).
+    - name: Cache do Chromium
+      id: chromium
+      if: inputs.navegador == 'true'
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: chromium-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
     - name: Install Playwright browser
       if: inputs.navegador == 'true'
       shell: bash
-      run: timeout 8m npx playwright install --with-deps chromium || timeout 5m npx playwright install chromium
+      run: |
+        if [ "${{ steps.chromium.outputs.cache-hit }}" = "true" ]; then
+          npx playwright install chromium
+        else
+          timeout 8m npx playwright install --with-deps chromium || timeout 5m npx playwright install chromium
+        fi
 
     # ── A CACHE DAS DERIVADAS ──────────────────────────────────────────────
     # Sem isto, cada corrida re-encoda as 2785 miniaturas do zero (~13 minutos
