@@ -25,7 +25,7 @@ test.describe("@movimento a entrada em vídeo", () => {
     // Arranca sozinho, do HTML, sem esperar por nada (pedido dela, 16/10).
     await expect(primeiro).toHaveCSS("opacity", "1", { timeout: 25_000 });
     expect(await primeiro.evaluate((v: HTMLVideoElement) => v.currentSrc)).toMatch(
-      /\/videos\/entrada\/v2\/entrada-1-1080\./,
+      /\/videos\/entrada\/v3\/entrada-1-(paisagem|retrato)\./,
     );
 
     const t1 = await primeiro.evaluate((v: HTMLVideoElement) => v.currentTime);

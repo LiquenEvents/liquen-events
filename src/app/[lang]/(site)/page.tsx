@@ -21,7 +21,7 @@ import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
 // image here is a wide ~1.5:1 frame — EW1_1408 and JantarFesta_27 were portraits
 // that centre-cropped to a sliver, so they're swapped for landscape siblings.
 /** O 1.º fotograma do vídeo 1 da entrada (`public/videos/entrada/v1`). */
-const FOTO_DA_ENTRADA = "/imagens/entrada-video-1.jpg";
+const FOTO_DA_ENTRADA = "/imagens/entrada-floresta.jpg";
 
 const serviceLinks = [
   { image: "/imagens/DaniGui_Preview20.jpg", href: "/servicos/casamentos" },

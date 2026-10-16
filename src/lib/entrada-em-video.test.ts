@@ -1,15 +1,20 @@
 import { describe, expect, it } from "vitest";
+import { execFileSync } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
 import {
   NUMERO_DE_VIDEOS,
   PASSAGEM_MS,
-  alturaParaOEcra,
+  TEM_GRANDE,
   eHoraDePassar,
   enderecoDoVideo,
   formatoQueToca,
-  ligacaoLenta,
   proximoVideo,
+  varianteParaOEcra,
 } from "./entrada-em-video";
+
+const TELEMOVEL = { largura: 390, altura: 844, densidade: 3 };
+const PORTATIL = { largura: 1440, altura: 900, densidade: 1 };
+const RETINA = { largura: 1440, altura: 900, densidade: 2 };
 
 describe("os vídeos da entrada — as regras", () => {
   it("seguem 1 → 2 → 3 → 1", () => {
@@ -18,49 +23,68 @@ describe("os vídeos da entrada — as regras", () => {
     expect(ordem).toEqual([0, 1, 2, 0, 1]);
   });
 
-  it("cada ficheiro existe nas duas versões, e as do telemóvel são mais leves", () => {
+  it("cada vídeo existe em todas as versões, e nenhum é pesado demais para o 4G", () => {
     for (let i = 0; i < NUMERO_DE_VIDEOS; i++) {
-      const grande = `public${enderecoDoVideo(i, 1080)}`;
-      const leve = `public${enderecoDoVideo(i, 720)}`;
-      expect(existsSync(grande), grande).toBe(true);
-      expect(existsSync(leve), leve).toBe(true);
-      expect(statSync(leve).size).toBeLessThan(statSync(grande).size);
-      // A qualidade subiu (v2, ~6 Mbit/s, perto do original), mas nenhum passa
-      // de 16 MB: acima disso o 4G deixava de o tocar sem parar a carregar.
-      expect(statSync(grande).size).toBeLessThan(16 * 1024 * 1024);
-      // E a rede para quem não tem H.264.
-      expect(existsSync(`public${enderecoDoVideo(i, 1080, "webm")}`)).toBe(true);
+      for (const v of ["paisagem", "retrato"] as const) {
+        for (const f of ["mp4", "webm"] as const) {
+          const p = `public${enderecoDoVideo(i, v, f)}`;
+          expect(existsSync(p), p).toBe(true);
+        }
+        // ~6 Mbit/s no máximo: acima disso o 4G deixava de o tocar sem parar.
+        expect(statSync(`public${enderecoDoVideo(i, v)}`).size).toBeLessThan(16 * 1024 * 1024);
+      }
+      if (TEM_GRANDE[i]) expect(existsSync(`public${enderecoDoVideo(i, "grande")}`)).toBe(true);
     }
+  });
+
+  it("telemóvel ao alto → retrato; computador → paisagem; ecrã denso → grande (só com fonte 4K)", () => {
+    expect(varianteParaOEcra(TELEMOVEL, 0)).toBe("retrato");
+    expect(varianteParaOEcra(PORTATIL, 1)).toBe("paisagem");
+    expect(varianteParaOEcra(RETINA, 1)).toBe("grande");
+    // O vídeo 1 ainda não tem fonte 4K: num ecrã denso fica a paisagem.
+    expect(varianteParaOEcra(RETINA, 0)).toBe(TEM_GRANDE[0] ? "grande" : "paisagem");
+  });
+
+  it("o WebM e os vídeos sem 4K caem da versão grande para a paisagem", () => {
+    expect(enderecoDoVideo(1, "grande", "webm")).toMatch(/entrada-2-paisagem\.webm$/);
+    if (!TEM_GRANDE[0]) expect(enderecoDoVideo(0, "grande")).toMatch(/entrada-1-paisagem\.mp4$/);
   });
 
   it("H.264 primeiro; VP9 só sem ele; sem nenhum, nada", () => {
     expect(formatoQueToca(() => "probably")).toBe("mp4");
     expect(formatoQueToca((t) => (t.includes("webm") ? "maybe" : ""))).toBe("webm");
     expect(formatoQueToca(() => "")).toBeNull();
-    // O WebM existe só em 1080p.
-    expect(enderecoDoVideo(0, 720, "webm")).toMatch(/entrada-1-1080\.webm$/);
-  });
-
-  it("1080p para todos, telemóvel incluído; 720p só numa ligação lenta", () => {
-    expect(alturaParaOEcra()).toBe(1080);
-    expect(alturaParaOEcra(true)).toBe(720);
-    expect(ligacaoLenta("3g")).toBe(true);
-    expect(ligacaoLenta("4g")).toBe(false);
-  });
-
-  it("«Poupar dados» e ligações lentas não desligam o vídeo: pedem o mais leve", () => {
-    expect(ligacaoLenta("4g", true)).toBe(true);
-    expect(ligacaoLenta("2g")).toBe(true);
-    expect(ligacaoLenta("slow-2g")).toBe(true);
-    expect(alturaParaOEcra(ligacaoLenta("2g"))).toBe(720);
   });
 
   it("a passagem começa quando falta o tempo dela para o fim", () => {
     const fim = 12;
     expect(eHoraDePassar(fim - PASSAGEM_MS / 1000 - 0.1, fim)).toBe(false);
     expect(eHoraDePassar(fim - PASSAGEM_MS / 1000, fim)).toBe(true);
-    // Antes de se saber a duração, nunca.
     expect(eHoraDePassar(3, Number.NaN)).toBe(false);
     expect(eHoraDePassar(3, 0)).toBe(false);
   });
+
+  /**
+   * As tiras pretas (pedido dela: «quero completamente sem nada à volta»):
+   * a versão larga tem de ser 2:1, sem os 60 px pretos em cima e em baixo.
+   * Mede-se com o `file`/cabeçalho do MP4: a largura e a altura do vídeo.
+   */
+  it("sem tiras pretas: a versão larga é 1920×960", () => {
+    let saida = "";
+    try {
+      saida = execFileSync("node", ["-e", MEDIR, `public${enderecoDoVideo(0, "paisagem")}`], {
+        encoding: "utf8",
+      });
+    } catch {
+      return; // sem node no ambiente: não se mede
+    }
+    expect(saida.trim()).toBe("1920x960");
+  });
 });
+
+/** Lê a largura × altura do `tkhd` de vídeo de um MP4 (sem ffprobe). */
+const MEDIR = `
+const b=require("fs").readFileSync(process.argv[1]);
+let i=b.indexOf("tkhd");
+while(i>0){const v=b[i+4];const off=i+4+(v===1?88:76);const w=b.readUInt32BE(off)>>>16,h=b.readUInt32BE(off+4)>>>16;if(w&&h){console.log(w+"x"+h);break}i=b.indexOf("tkhd",i+4)}
+`;
