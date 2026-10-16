@@ -30,6 +30,15 @@ import {
   tipoDoFormato,
   varianteParaOEcra,
 } from "@/lib/entrada-em-video";
+import {
+  ROTA_DO_DIAGNOSTICO,
+  RegistoDoVideo,
+  aparelho,
+  diagnosticoLigado,
+  formatoDoSrc,
+  novaSessao,
+  type EstadoDoVideo,
+} from "@/lib/diagnostico-video";
 
 /**
  * ════════════════════════════════════════════════════════════════════════════
@@ -582,6 +591,38 @@ function criarMotor(raiz: HTMLElement): Motor | null {
     densidade: window.devicePixelRatio || 1,
   });
 
+  // ── O REGISTO ANÓNIMO (ver `src/lib/diagnostico-video.ts`) ─────────────
+  // Só observa: nada do que o motor faz depende dele.
+  const registo =
+    diagnosticoLigado() &&
+    typeof navigator !== "undefined" &&
+    typeof navigator.sendBeacon === "function"
+      ? new RegistoDoVideo({
+          agora: () => performance.now(),
+          enviar: (corpo) => {
+            try {
+              navigator.sendBeacon(
+                ROTA_DO_DIAGNOSTICO,
+                new Blob([corpo], { type: "application/json" }),
+              );
+            } catch {
+              // sem registo, sem problema
+            }
+          },
+          depois: (ms, fn) => depois(ms, fn),
+          aparelho: aparelho(
+            navigator.userAgent,
+            ecraDeAgora(),
+            (navigator as ComLigacao).connection?.effectiveType ?? null,
+          ),
+          sessao: novaSessao(),
+          fotogramasFinos:
+            typeof HTMLVideoElement !== "undefined" &&
+            "requestVideoFrameCallback" in HTMLVideoElement.prototype,
+        })
+      : null;
+  const marcar = (k: string, v?: number) => registo?.acontecimento(k, v);
+
   const podeTocar = () => ligado && naTela && separadorVisivel;
   /** O take de entrada à espera da cortina: é o guião do HTML que o larga. */
   const aEsperaDaCortina = (el: HTMLVideoElement) => el.hasAttribute("data-a-espera");
@@ -638,6 +679,7 @@ function criarMotor(raiz: HTMLElement): Motor | null {
     // browser arrancou-o pelo `autoplay` e recusou só um `play()` a mais) não
     // espera por nada — e esperar desligava o vigia.
     if (!videos[atual].paused) return;
+    if (!aEsperarGesto) marcar("recusa", atual);
     esconderVideos();
     imagemAnimada();
     if (aEsperarGesto) return;
@@ -716,6 +758,7 @@ function criarMotor(raiz: HTMLElement): Motor | null {
     const src = fonte[i];
     if (aquecido[i] || !src) return;
     aquecido[i] = true;
+    marcar("aquecer", i);
     const el = videos[i];
     el.preload = "auto";
     el.src = src;
@@ -875,6 +918,7 @@ function criarMotor(raiz: HTMLElement): Motor | null {
    * aquecido (da memória, ou da rede) quando for a sua vez.
    */
   function refazer(i: number) {
+    marcar("refazer", i);
     const el = videos[i];
     pausar(el);
     aTocar.delete(el);
@@ -900,6 +944,7 @@ function criarMotor(raiz: HTMLElement): Motor | null {
    */
   function cancelarPassagem() {
     if (!aPassar || !passagem || passagem.subiu) return;
+    marcar("cancelar", proximo());
     const velho = videos[atual];
     aPassar = false;
     passagem = null;
@@ -929,7 +974,16 @@ function criarMotor(raiz: HTMLElement): Motor | null {
       return;
     }
     aPassar = true;
-    velho.loop = false;
+    marcar("passar", seguinte);
+    // ── O QUE SAI NUNCA FICA PARADO NO FIM ───────────────────────────────
+    // Ela (16/10, iPhone, depois do #243): «continua a parar» — «pára um
+    // bocadinho» ao mudar de vídeo. Era a rede de segurança do #243: o
+    // seguinte atrasava-se, o que sai chegava ao fim e ficava 0,4 s no último
+    // fotograma antes de a passagem desistir (MEDIDO: 0,43–0,45 s, uma vez
+    // por volta). Agora, enquanto espera pelo seguinte, o que sai REPETE-SE:
+    // se o seguinte se atrasar, continua a andar (volta ao início) em vez de
+    // congelar. Só deixa de repetir quando o seguinte já sobe por cima.
+    velho.loop = true;
     // O prazo: o que falta ao que sai (normalmente ~1,5 s), mas nunca mais do
     // que isso — numa passagem forçada a meio (o vigia, sem dados) o que sai
     // está parado, e o resto dele não passa.
@@ -943,6 +997,9 @@ function criarMotor(raiz: HTMLElement): Motor | null {
     const subir = () => {
       if (!vivo || esta.subiu || passagem !== esta) return;
       esta.subiu = true;
+      marcar("subir", seguinte);
+      velho.loop = false;
+      novo.loop = false;
       velho.style.zIndex = "1";
       // Arrancou tarde (descodificador a acordar, CPU ocupada)? A subida
       // encolhe para acabar antes de o que sai chegar ao fim — um fotograma
@@ -1010,6 +1067,13 @@ function criarMotor(raiz: HTMLElement): Motor | null {
       },
       true,
     );
+    // O prazo, por relógio: com o que sai em repetição o `ended` não chega.
+    // Se o seguinte já anda (o tempo saiu do 0), sobe; senão desiste-se.
+    depois(espera * 1000 + PASSAGEM_PRESA_MS, () => {
+      if (passagem !== esta || esta.subiu) return;
+      if (novo.readyState >= 2 && novo.currentTime > 0) subir();
+      else cancelarPassagem();
+    });
     novo.currentTime = 0;
     tocar(novo);
   };
@@ -1061,6 +1125,7 @@ function criarMotor(raiz: HTMLElement): Motor | null {
     ouvir(el, "error", () => {
       if (!vivo) return;
       const i = videos.indexOf(el);
+      marcar("erro", i);
       if (!fonte[i]) return; // as `<source>` do HTML: o browser tenta as outras
       if (daMemoria[i]) {
         const u = fonte[i];
@@ -1253,6 +1318,7 @@ function criarMotor(raiz: HTMLElement): Motor | null {
     if (el.networkState === el.NETWORK_LOADING && el.readyState < 3) return;
     // Recarrega este no mesmo ponto (o de entrada volta a tentar as suas
     // fontes; os outros a sua, da memória ou da rede).
+    marcar("recarregar", atual);
     if (el === primeiro && !fonte[atual]) el.load();
     else {
       el.src =
@@ -1262,6 +1328,103 @@ function criarMotor(raiz: HTMLElement): Motor | null {
     ouvir(el, "loadedmetadata", () => void (el.currentTime = t), true);
     tocar(el);
   };
+  // ── O registo: os acontecimentos do vídeo, cada fotograma pintado do que
+  // está à vista, e as paragens (de 250 em 250 ms). ─────────────────────────
+  /** O estado do vídeo à vista, para a paragem que abre agora. */
+  const estadoDoVideo = (): EstadoDoVideo => {
+    const el = videos[atual];
+    const src = el.currentSrc || el.getAttribute("src") || "";
+    const b = el.buffered;
+    let aFrente = 0;
+    for (let k = 0; b && k < b.length; k++) {
+      if (b.start(k) <= el.currentTime + 0.05 && b.end(k) >= el.currentTime) {
+        aFrente = b.end(k) - el.currentTime;
+      }
+    }
+    const blob = src.startsWith("blob:");
+    return {
+      take: atual,
+      ct: el.currentTime,
+      dur: Number.isFinite(el.duration) ? el.duration : null,
+      rs: el.readyState,
+      ns: el.networkState,
+      paused: el.paused,
+      ended: el.ended,
+      fonte: blob
+        ? "blob"
+        : el.getAttribute("src")
+          ? "rede"
+          : el.querySelector("source")
+            ? "source"
+            : "nenhuma",
+      // Da memória (`blob:`), o formato é o que o motor escolheu para os seguintes.
+      formato: blob ? formato : formatoDoSrc(src),
+      leve: el.hasAttribute("data-leve"),
+      aPassar,
+      aFrente,
+    };
+  };
+  if (registo) {
+    for (const el of videos) {
+      for (const k of ["waiting", "stalled", "pause", "playing"] as const) {
+        ouvir(el, k, () => marcar(k, videos.indexOf(el)));
+      }
+      const doVideoAVista = () => el === videos[atual] && el.style.opacity !== "0";
+      const comFotogramas = el as HTMLVideoElement & {
+        requestVideoFrameCallback?: (cb: () => void) => number;
+      };
+      if (typeof comFotogramas.requestVideoFrameCallback === "function") {
+        const cb = () => {
+          if (!vivo) return;
+          if (doVideoAVista()) registo.fotograma();
+          comFotogramas.requestVideoFrameCallback?.(cb);
+        };
+        comFotogramas.requestVideoFrameCallback(cb);
+      } else {
+        // Sem fotogramas finos: o tempo a avançar conta como fotograma.
+        let ultimo = -1;
+        ouvir(el, "timeupdate", () => {
+          if (!doVideoAVista() || el.currentTime === ultimo) return;
+          ultimo = el.currentTime;
+          registo.fotograma();
+        });
+      }
+    }
+  }
+  let relogioDoRegisto = 0;
+  const verificarRegisto = () => {
+    if (!registo || !vivo) return;
+    const ativo =
+      podeTocar() &&
+      !aEsperarGesto &&
+      mostrado &&
+      document.visibilityState === "visible" &&
+      !aEsperaDaCortina(videos[atual]);
+    registo.verificar(ativo, estadoDoVideo);
+  };
+  /** Ao sair (página escondida, fechada, ou outra página do sítio): envia o resumo. */
+  const enviarResumo = () => {
+    if (!registo) return;
+    let perdidos = 0;
+    let total = 0;
+    for (const el of videos) {
+      const q = (
+        el as HTMLVideoElement & {
+          getVideoPlaybackQuality?: () => { droppedVideoFrames: number; totalVideoFrames: number };
+        }
+      ).getVideoPlaybackQuality?.();
+      if (q) {
+        perdidos += q.droppedVideoFrames;
+        total += q.totalVideoFrames;
+      }
+    }
+    registo.medirQualidade(perdidos, total);
+    registo.enviar("saida");
+  };
+  const aoEsconder = () => {
+    if (document.visibilityState === "hidden") enviarResumo();
+  };
+
   let relogio = 0;
   const io = new IntersectionObserver(
     ([e]) => {
@@ -1282,6 +1445,11 @@ function criarMotor(raiz: HTMLElement): Motor | null {
     if (!ligado) return;
     ligado = false;
     window.clearInterval(relogio);
+    window.clearInterval(relogioDoRegisto);
+    registo?.pausa();
+    enviarResumo();
+    document.removeEventListener("visibilitychange", aoEsconder);
+    window.removeEventListener("pagehide", enviarResumo);
     io.disconnect();
     document.removeEventListener("visibilitychange", aoMudarSeparador);
     document.removeEventListener("resume", aoRegressar);
@@ -1301,6 +1469,11 @@ function criarMotor(raiz: HTMLElement): Motor | null {
       naTela = true;
       separadorVisivel = document.visibilityState !== "hidden";
       relogio = window.setInterval(vigiar, 1000);
+      if (registo) {
+        relogioDoRegisto = window.setInterval(verificarRegisto, 250);
+        document.addEventListener("visibilitychange", aoEsconder);
+        window.addEventListener("pagehide", enviarResumo);
+      }
       io.observe(r);
       document.addEventListener("visibilitychange", aoMudarSeparador);
       // `resume`: o Chrome do Android «congela» a página por trás de outra
