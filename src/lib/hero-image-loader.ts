@@ -41,6 +41,8 @@ export const HERO_WIDTHS = [640, 1080, 1536, 2048] as const;
 export const HERO_SOURCES = new Set([
   // Os seis heróis de página originais.
   "/imagens/JOAO_E_PEDRO_DJI_20250628213855_0002_D.jpg",
+  // A entrada da página inicial: o 1.º fotograma do vídeo 1 (EntradaEmVideo).
+  "/imagens/entrada-video-1.jpg",
   "/imagens/hd-edited.jpg",
   "/imagens/EW1_1330.jpg",
   "/imagens/DaniGui_Preview20.jpg",

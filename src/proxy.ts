@@ -176,6 +176,6 @@ export const config = {
   // de raciocínio: é de sequência — o `/_img` nasceu com o pré-gerador, depois
   // de esta linha estar escrita.
   matcher: [
-    "/((?!_next/static|_next/image|_img/|imagens/|logos/|favicon\\.ico|icon\\.png|apple-icon\\.png|manifest\\.webmanifest|sitemap\\.xml|robots\\.txt).*)",
+    "/((?!_next/static|_next/image|_img/|imagens/|videos/|logos/|favicon\\.ico|icon\\.png|apple-icon\\.png|manifest\\.webmanifest|sitemap\\.xml|robots\\.txt).*)",
   ],
 };

@@ -2,6 +2,7 @@ import Link from "next/link";
 import SafeImage from "@/components/SafeImage";
 import SetaDeDescer from "@/components/motion/SetaDeDescer";
 import HeroImage from "@/components/HeroImage";
+import EntradaEmVideo from "@/components/EntradaEmVideo";
 import TrackedLink from "@/components/TrackedLink";
 import AnimateIn from "@/components/AnimateIn";
 import Parallax from "@/components/Parallax";
@@ -19,6 +20,9 @@ import { OUTLINE_LIGHT_BUTTON_CLASS } from "@/lib/ui-classes";
 // Full-screen SpaceX-style chapters crop landscape (desktop viewport), so every
 // image here is a wide ~1.5:1 frame — EW1_1408 and JantarFesta_27 were portraits
 // that centre-cropped to a sliver, so they're swapped for landscape siblings.
+/** O 1.º fotograma do vídeo 1 da entrada (`public/videos/entrada/v1`). */
+const FOTO_DA_ENTRADA = "/imagens/entrada-video-1.jpg";
+
 const serviceLinks = [
   { image: "/imagens/DaniGui_Preview20.jpg", href: "/servicos/casamentos" },
   { image: "/imagens/EW1_1332.jpg", href: "/servicos/eventos-corporativos" },
@@ -52,9 +56,12 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
           caixa. Ver `--reserva-consentimento` em globals.css. */}
       <section className="recuo-consentimento relative -mt-24 min-h-[100svh] flex flex-col justify-end overflow-hidden">
         <Parallax speed={0.14} drift className="absolute inset-0">
+          {/* A fotografia é o 1.º fotograma do vídeo 1: é o LCP (AVIF,
+              pré-carregada) e é por cima dela que os vídeos entram sem salto.
+              Ver EntradaEmVideo. */}
           <HeroImage
-            src="/imagens/JOAO_E_PEDRO_DJI_20250628213855_0002_D.jpg"
-            {...blurFor("/imagens/JOAO_E_PEDRO_DJI_20250628213855_0002_D.jpg")}
+            src={FOTO_DA_ENTRADA}
+            {...blurFor(FOTO_DA_ENTRADA)}
             alt={t.common.imageAlt.homeHero}
             fill
             priority
@@ -62,13 +69,12 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
             quality={75}
             className="object-cover object-center hero-settle"
           />
+          {/* Os três vídeos dela, por cima da fotografia e por baixo do véu. */}
+          <EntradaEmVideo />
         </Parallax>
         {/* WebGL layer over the static hero image (fades in when ready; absent
             under reduced motion / no-WebGL). */}
-        <HeroWebGL
-          src="/imagens/JOAO_E_PEDRO_DJI_20250628213855_0002_D.jpg"
-          className="absolute inset-0 h-full w-full"
-        />
+        <HeroWebGL src={FOTO_DA_ENTRADA} className="absolute inset-0 h-full w-full" />
         {/* Two hero veils merged into one layer (multiple backgrounds paint
             first-listed on top, so the former upper div is listed first): same
             pixels, one paint/composite pass instead of two. */}

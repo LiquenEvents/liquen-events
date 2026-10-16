@@ -48,7 +48,8 @@ const MANIFESTO = path.join(process.cwd(), "scripts", "pregen-heroes.manifest.js
 // The six full-bleed page heroes (kept in sync with each page + HeroWarm).
 const HERO_SOURCES = [
   // Os seis heróis de página originais.
-  "/imagens/JOAO_E_PEDRO_DJI_20250628213855_0002_D.jpg", // home
+  "/imagens/JOAO_E_PEDRO_DJI_20250628213855_0002_D.jpg", // antiga capa da home (continua em uso)
+  "/imagens/entrada-video-1.jpg", // home: 1.º fotograma do vídeo da entrada
   "/imagens/hd-edited.jpg", // sobre
   "/imagens/EW1_1330.jpg", // servicos
   "/imagens/DaniGui_Preview20.jpg", // galeria
