@@ -5484,20 +5484,22 @@ body:has(.barra-consentimento) footer {
 
 /* Entrance reveal. The hidden "from" state exists only once JS arms it
    (.cl-armed), so no-JS visitors never face a blank wall. */
+/* Só opacidade e movimento. Tinha também um `filter: blur(6px)` a desfazer-se
+   em 0,75 s — um desfoque animado obriga a repintar o logótipo em cada
+   fotograma, e a parede tem dezenas deles a entrar ao mesmo tempo. MEDIDO num
+   telemóvel estrangulado: o pior fotograma ao chegar a /clientes era 450 ms.
+   Ela (16/10): «quero o site super fluido… com animações em tudo». */
 .cl-armed .cl-reveal {
   opacity: 0;
   transform: translateY(16px) scale(0.985);
-  filter: blur(6px);
-  will-change: opacity, transform, filter;
+  will-change: opacity, transform;
 }
 .cl-armed.cl-in .cl-reveal {
   opacity: 1;
   transform: none;
-  filter: blur(0);
   transition:
     opacity 0.75s var(--ease-out),
-    transform 0.75s var(--ease-out),
-    filter 0.75s var(--ease-out);
+    transform 0.75s var(--ease-out);
   transition-delay: var(--cl-delay, 0ms);
 }
 

@@ -110,9 +110,68 @@ export function promoverQuandoAVista(ancora: Element | null, img: HTMLImageEleme
  */
 export function esquecer(img: HTMLImageElement | null): void {
   if (!img) return;
+  // Também a antecipação (ver em baixo): um mosaico que sai da grelha não pode
+  // ficar preso no observador.
+  const antecipada = ancoraAntecipada.get(img);
+  if (antecipada) {
+    ancoraAntecipada.delete(img);
+    aAntecipar.delete(antecipada);
+    antecipador?.unobserve(antecipada);
+  }
   const ancora = ancoraDe.get(img);
   ancoraDe.delete(img);
   if (!ancora) return;
   aEsperar.delete(ancora);
   observador?.unobserve(ancora);
+}
+
+/**
+ * ── E A FOTOGRAFIA COMEÇA A CHEGAR UM ECRÃ E MEIO ANTES ───────────────────
+ *
+ * Ela (16/10): «à medida que fazemos scroll… ainda dá para ver a foto
+ * desfocada, ainda não dá para ver bem a foto». As fotografias da grelha são
+ * `loading="lazy"`, e a distância a que o browser começa a descarregá-las é
+ * dele: o Chrome começa longe, mas o Safari do iPhone só muito perto do ecrã —
+ * num dedo rápido, a foto ainda está a chegar quando já está à vista.
+ *
+ * Aqui, quando o mosaico fica a um ecrã e meio de distância (nos dois
+ * sentidos), a fotografia passa a `eager`: o pedido parte já, com a prioridade
+ * baixa que tinha (o `promoverQuandoAVista` sobe-a quando chega ao ecrã).
+ * Um observador para a grelha inteira, como o de cima.
+ */
+const aAntecipar = new WeakMap<Element, HTMLImageElement>();
+const ancoraAntecipada = new WeakMap<HTMLImageElement, Element>();
+let antecipador: IntersectionObserver | null = null;
+
+function obterAntecipador(): IntersectionObserver | null {
+  if (typeof IntersectionObserver === "undefined") return null;
+  if (antecipador) return antecipador;
+  antecipador = new IntersectionObserver(
+    (entradas) => {
+      for (const entrada of entradas) {
+        if (!entrada.isIntersecting) continue;
+        const img = aAntecipar.get(entrada.target);
+        antecipador?.unobserve(entrada.target);
+        aAntecipar.delete(entrada.target);
+        if (img) ancoraAntecipada.delete(img);
+        // Só se o browser ainda NÃO começou a pedi-la (`currentSrc` vazio):
+        // mudar o `loading` de um pedido em curso corta-o, e o corte conta
+        // como erro — MEDIDO no Chromium, que começa o lazy de longe: as fotos
+        // passavam à escada de recuperação (`?r=1`). Onde o browser já a pediu,
+        // não há nada a antecipar.
+        if (img && img.loading === "lazy" && !img.currentSrc) img.loading = "eager";
+      }
+    },
+    { rootMargin: "150% 0px" },
+  );
+  return antecipador;
+}
+
+export function anteciparQuandoPerto(ancora: Element | null, img: HTMLImageElement | null): void {
+  if (!img || img.loading !== "lazy") return;
+  const io = obterAntecipador();
+  if (!io || !ancora) return; // sem observador, fica o lazy do browser
+  aAntecipar.set(ancora, img);
+  ancoraAntecipada.set(img, ancora);
+  io.observe(ancora);
 }

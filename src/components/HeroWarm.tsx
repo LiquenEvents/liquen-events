@@ -3,7 +3,32 @@
 import { useEffect } from "react";
 import { usePublicPathname } from "@/lib/use-public-pathname";
 import { onIdle } from "@/lib/onIdle";
-import { heroImageUrl } from "@/lib/hero-image-loader";
+import { heroAvifUrl, heroImageUrl } from "@/lib/hero-image-loader";
+
+/**
+ * O browser sabe mostrar AVIF? Pergunta-se uma vez, descodificando um AVIF de
+ * 1×1 (279 bytes, escrito aqui). É a mesma escolha que o `<picture>` dos heróis
+ * faz pelo `type` da `<source>`.
+ *
+ * Antes isto não existia, e o aquecimento pedia SEMPRE o WebP — que, num
+ * browser com AVIF (todos os correntes), a página seguinte nunca usava: o
+ * herói dela vinha a frio, por trás do desfoque. Ela (16/10): «ainda dá para
+ * ver a foto desfocada, ainda não dá para ver bem a foto».
+ */
+const AVIF_1X1 =
+  "data:image/avif;base64,AAAAHGZ0eXBhdmlmAAAAAG1pZjFhdmlmbWlhZgAAANZtZXRhAAAAAAAAACFoZGxyAAAAAAAAAABwaWN0AAAAAAAAAAAAAAAAAAAAACJpbG9jAAAAAERAAAEAAQAAAAAA+gABAAAAAAAAAB0AAAAjaWluZgAAAAAAAQAAABVpbmZlAgAAAAABAABhdjAxAAAAAA5waXRtAAAAAAABAAAAVmlwcnAAAAA4aXBjbwAAAAxhdjFDgSACAAAAABRpc3BlAAAAAAAAAAEAAAABAAAAEHBpeGkAAAAAAwgICAAAABZpcG1hAAAAAAAAAAEAAQOBAgMAAAAlbWRhdBIACgc4AAaQENBpMhAcQmLk4AAWAACQNY48fohQ";
+let temAvif: Promise<boolean> | null = null;
+export function browserTemAvif(): Promise<boolean> {
+  if (!temAvif) {
+    temAvif = new Promise((ok) => {
+      const img = new Image();
+      img.onload = () => ok(img.width > 0);
+      img.onerror = () => ok(false);
+      img.src = AVIF_1X1;
+    });
+  }
+  return temAvif;
+}
 
 /**
  * Warms the OTHER marketing pages' hero images in the background so navigating
@@ -72,17 +97,26 @@ export default function HeroWarm() {
     ).connection;
     if (conn?.saveData || (conn?.effectiveType && /(^|-)(2g|3g)$/.test(conn.effectiveType))) return;
 
-    return onIdle(() => {
-      const dpr = window.devicePixelRatio || 1;
-      const target = window.innerWidth * dpr;
-      for (const [route, src] of Object.entries(HERO_BY_ROUTE)) {
-        if (route === pathname) continue; // this page's hero is already loading
-        const img = new Image();
-        img.decoding = "async";
-        // Match the hero <HeroImage> loader output exactly (same snapped width).
-        img.src = heroImageUrl(src, target);
-      }
+    let vivo = true;
+    const largar = onIdle(() => {
+      void browserTemAvif().then((avif) => {
+        if (!vivo) return;
+        const dpr = window.devicePixelRatio || 1;
+        const target = window.innerWidth * dpr;
+        for (const [route, src] of Object.entries(HERO_BY_ROUTE)) {
+          if (route === pathname) continue; // this page's hero is already loading
+          const img = new Image();
+          img.decoding = "async";
+          // O MESMO ficheiro que o `<picture>` da página vai escolher (a mesma
+          // largura arredondada, e o AVIF onde o browser o lê).
+          img.src = (avif && heroAvifUrl(src, target)) || heroImageUrl(src, target);
+        }
+      });
     });
+    return () => {
+      vivo = false;
+      largar();
+    };
   }, [pathname]);
 
   return null;
