@@ -6,7 +6,6 @@ import type { Quote, TimelineItem } from "@/lib/orcamento/types";
 import { ToastProvider } from "./Toast";
 import Guioes from "./Guioes";
 import { __resetListCache } from "./useCachedList";
-import { escolher } from "./ui/escolher.testkit";
 import { MODELOS_DA_CASA } from "@/lib/orcamento/guiao-modelos";
 
 /**
@@ -161,6 +160,36 @@ afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
+
+/**
+ * Escolher um modelo no controlo que está lá AGORA, com o relógio a andar.
+ *
+ * Falhou na passagem completa do CI a 16/10 (zero gravações), e reproduz-se
+ * aqui com seis cópias deste ficheiro ao mesmo tempo. Medido, a causa é esta:
+ * o painel volta a desenhar-se quando chega a leitura dos fornecedores, e o
+ * `Escolha` em que o teste carregou JÁ NÃO ESTÁ na página (`isConnected`
+ * falso). O clique ia para um botão órfão, a lista nunca abria, e o `escolher`
+ * do kit — que guarda o elemento e espera no relógio falso — não tinha como
+ * dar por isso.
+ *
+ * Aqui volta-se a procurar o controlo a cada volta, carrega-se nele se a
+ * lista estiver fechada, e faz-se o relógio andar (a lição do comentário dos
+ * testes de baixo) até a opção aparecer. É o que ela faz: carrega no campo
+ * que vê.
+ */
+async function escolherModelo(user: ReturnType<typeof userEvent.setup>, nome: string) {
+  let opcao: HTMLElement | null = null;
+  for (let i = 0; i < 40 && !opcao; i++) {
+    const controlo = await screen.findByRole("combobox", {
+      name: "Juntar um modelo a esta timeline",
+    });
+    if (controlo.getAttribute("aria-expanded") !== "true") await user.click(controlo);
+    await vi.advanceTimersByTimeAsync(25);
+    opcao = screen.queryByRole("option", { name: nome });
+  }
+  expect(opcao, `a lista dos modelos não abriu com «${nome}»`).not.toBeNull();
+  await user.click(opcao!);
+}
 
 /** A linha de um evento na lista, encontrada pelo nome acessível. */
 function linhaDe(cliente: string | RegExp) {
@@ -350,9 +379,8 @@ describe("Timelines — abrir e editar", () => {
     await user.click(linhaDe("Carla e Diogo"));
     await waitFor(() => expect(screen.getByText("Cronograma do Dia")).toBeTruthy());
 
-    const escolha = await screen.findByLabelText("Juntar um modelo a esta timeline");
     const modelo = MODELOS_DA_CASA[0];
-    await escolher(user, escolha, modelo.nome);
+    await escolherModelo(user, modelo.nome);
 
     /* ── ESPERAR NÃO É A FERRAMENTA CERTA AQUI, E JÁ FALHOU TRÊS VEZES ───
          Este ficheiro corre com `useFakeTimers({ shouldAdvanceTime: true })`: o
@@ -394,14 +422,8 @@ describe("Timelines — abrir e editar", () => {
     await user.click(linhaDe("Carla e Diogo"));
     await waitFor(() => expect(screen.getByText("Cronograma do Dia")).toBeTruthy());
 
-    // `findByRole` e não `findByLabelText`: sob carga, o rótulo pode achar
-    // primeiro o `<select>` provisório que o `Escolha` desenha antes de montar,
-    // e o `escolher` operava nele em vez de no controlo verdadeiro.
-    await escolher(
-      user,
-      await screen.findByRole("combobox", { name: "Juntar um modelo a esta timeline" }),
-      MODELOS_DA_CASA[0].nome,
-    );
+    // Pelo `escolherModelo`, que faz o relógio andar até a lista abrir (ver lá).
+    await escolherModelo(user, MODELOS_DA_CASA[0].nome);
 
     /**
      * Dois sítios a dizer coisas diferentes sobre o mesmo dia é o defeito que
