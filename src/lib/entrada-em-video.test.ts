@@ -2,11 +2,17 @@ import { describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
 import {
+  ARRANQUE_S,
+  MEDIR_REDE_MS,
   NUMERO_DE_VIDEOS,
   PASSAGEM_MS,
   TEM_GRANDE,
+  duracaoDaSubida,
   eHoraDePassar,
+  eRedeLenta,
   enderecoDoVideo,
+  enderecoLeve,
+  ligacaoLenta,
   escolherPrimeiro,
   formatoDoEndereco,
   formatoQueToca,
@@ -37,6 +43,14 @@ describe("os vídeos da entrada — as regras", () => {
         }
         // ~6 Mbit/s no máximo: acima disso o 4G deixava de o tocar sem parar.
         expect(statSync(`public${enderecoDoVideo(i, v)}`).size).toBeLessThan(16 * 1024 * 1024);
+      }
+      // A versão leve, só ao alto (rede fraca): ~2 a 3 Mbit/s, metade da normal.
+      for (const f of ["hevc", "mp4"] as const) {
+        const p = `public${enderecoLeve(i, f)}`;
+        expect(existsSync(p), p).toBe(true);
+        expect(statSync(p).size, p).toBeLessThan(
+          statSync(`public${enderecoDoVideo(i, "retrato", f)}`).size * 0.6,
+        );
       }
       if (TEM_GRANDE[i]) {
         for (const f of ["mp4", "hevc", "av1"] as const) {
@@ -127,12 +141,47 @@ describe("os vídeos da entrada — as regras", () => {
     });
   });
 
-  it("a passagem começa quando falta o tempo dela para o fim", () => {
+  it("a passagem começa quando falta o tempo dela, mais a folga do arranque, para o fim", () => {
     const fim = 12;
-    expect(eHoraDePassar(fim - PASSAGEM_MS / 1000 - 0.1, fim)).toBe(false);
-    expect(eHoraDePassar(fim - PASSAGEM_MS / 1000, fim)).toBe(true);
+    const comeca = fim - PASSAGEM_MS / 1000 - ARRANQUE_S;
+    expect(eHoraDePassar(comeca - 0.1, fim)).toBe(false);
+    expect(eHoraDePassar(comeca, fim)).toBe(true);
+    // A folga existe: o seguinte arranca ANTES de faltar só a subida (era aí
+    // que o que saía chegava ao fim e parava no último fotograma).
+    expect(eHoraDePassar(fim - PASSAGEM_MS / 1000 - 0.05, fim)).toBe(true);
+    expect(ARRANQUE_S).toBeGreaterThanOrEqual(0.5);
     expect(eHoraDePassar(3, Number.NaN)).toBe(false);
     expect(eHoraDePassar(3, 0)).toBe(false);
+  });
+
+  it("uma subida que começa tarde encolhe para acabar antes de o que sai parar", () => {
+    expect(duracaoDaSubida(1.5)).toBe(PASSAGEM_MS); // a tempo: a de sempre
+    expect(duracaoDaSubida(0.5)).toBe(450); // tarde: 90 % do que falta
+    expect(duracaoDaSubida(0.1)).toBe(200); // muito tarde: nunca menos de 200 ms
+    expect(duracaoDaSubida(Number.NaN)).toBe(PASSAGEM_MS);
+  });
+
+  it("a versão leve: só ao alto, em HEVC ou H.264", () => {
+    expect(enderecoLeve(0, "hevc")).toBe("/videos/entrada/v4/entrada-1-retrato-leve-hevc.mp4");
+    expect(enderecoLeve(2, "mp4")).toBe("/videos/entrada/v4/entrada-3-retrato-leve.mp4");
+    expect(formatoDoEndereco(enderecoLeve(1, "hevc"))).toBe("hevc");
+  });
+
+  it("a ligação diz-se lenta: poupar dados, 2G/3G, ou menos de 5 Mbit/s", () => {
+    expect(ligacaoLenta(undefined)).toBe(false); // o iPhone não diz nada
+    expect(ligacaoLenta({ effectiveType: "4g", downlink: 10 })).toBe(false);
+    expect(ligacaoLenta({ effectiveType: "4g", downlink: 3.2 })).toBe(true);
+    expect(ligacaoLenta({ effectiveType: "3g" })).toBe(true);
+    expect(ligacaoLenta({ effectiveType: "slow-2g" })).toBe(true);
+    expect(ligacaoLenta({ saveData: true })).toBe(true);
+    expect(ligacaoLenta({ downlink: 0 })).toBe(false); // 0 = não sabe
+  });
+
+  it("a rede medida no arranque: menos de 1,3 s de vídeo por segundo de espera é lenta", () => {
+    expect(eRedeLenta(0, MEDIR_REDE_MS - 1)).toBe(false); // cedo de mais para decidir
+    expect(eRedeLenta(0.5, MEDIR_REDE_MS)).toBe(true);
+    expect(eRedeLenta(1.2, 1500)).toBe(true); // 0,8 s por segundo
+    expect(eRedeLenta(4, 1500)).toBe(false); // 2,7 s por segundo
   });
 
   /**

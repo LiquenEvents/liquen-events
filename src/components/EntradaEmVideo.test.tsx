@@ -286,6 +286,92 @@ describe("EntradaEmVideo", () => {
     });
   });
 
+  describe("ao alto numa rede fraca, arranca na versão leve", () => {
+    let ligacao: Record<string, unknown> | undefined;
+    beforeEach(() => {
+      tiposQueToca = ["hvc1", "avc1", "mp4"];
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+      vi.stubGlobal("matchMedia", (q: string) => ({ matches: q.includes("portrait") }));
+      ligacao = undefined;
+      Object.defineProperty(navigator, "connection", {
+        configurable: true,
+        get: () => ligacao,
+      });
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+      Reflect.deleteProperty(navigator, "connection");
+      document.body.innerHTML = "";
+    });
+    function entrarSemCortina() {
+      document.body.innerHTML = `<div class="cortina cortina--fora"></div><div data-entrada="">${HTML_DOS_VIDEOS}</div>`;
+      new Function(GUIAO_DA_ENTRADA)();
+      return document.querySelector<HTMLVideoElement>("[data-primeiro]")!;
+    }
+    const fontes = (v: HTMLVideoElement) =>
+      [...v.querySelectorAll("source")].map((f) => f.getAttribute("src"));
+
+    it("se o aparelho diz que a ligação é lenta, começa logo na leve", () => {
+      ligacao = { effectiveType: "4g", downlink: 2.5 };
+      const v = entrarSemCortina();
+      expect(fontes(v)).toEqual([
+        "/videos/entrada/v4/entrada-1-retrato-leve-hevc.mp4",
+        "/videos/entrada/v4/entrada-1-retrato-leve.mp4",
+      ]);
+      expect(v.hasAttribute("data-leve")).toBe(true);
+    });
+
+    it("o iPhone não diz: mede-se 1,2 s, e se a rede não chega passa à leve antes de se ver", () => {
+      const v = entrarSemCortina();
+      expect(fontes(v)[0]).toBe("/videos/entrada/v4/entrada-1-retrato-hevc.mp4");
+      // Em 1,2 s chegou 0,6 s de vídeo: a versão normal pararia.
+      Object.defineProperty(v, "buffered", {
+        configurable: true,
+        value: { length: 1, start: () => 0, end: () => 0.6 },
+      });
+      play.mockClear();
+      vi.advanceTimersByTime(1200);
+      expect(v.hasAttribute("data-leve")).toBe(true);
+      expect(fontes(v)[0]).toBe("/videos/entrada/v4/entrada-1-retrato-leve-hevc.mp4");
+      expect(play).toHaveBeenCalled();
+      expect(v.hasAttribute("data-a-espera")).toBe(true); // ainda escondido
+    });
+
+    it("com rede que chega, fica na versão normal", () => {
+      const v = entrarSemCortina();
+      Object.defineProperty(v, "buffered", {
+        configurable: true,
+        value: { length: 1, start: () => 0, end: () => 6 },
+      });
+      vi.advanceTimersByTime(1200);
+      expect(v.hasAttribute("data-leve")).toBe(false);
+      expect(fontes(v)[0]).toBe("/videos/entrada/v4/entrada-1-retrato-hevc.mp4");
+    });
+
+    it("um browser que só toca WebM nunca passa à leve (ficava sem vídeo)", () => {
+      tiposQueToca = ["webm"];
+      ligacao = { effectiveType: "3g" };
+      const v = entrarSemCortina();
+      expect(v.hasAttribute("data-leve")).toBe(false);
+      Object.defineProperty(v, "buffered", {
+        configurable: true,
+        value: { length: 1, start: () => 0, end: () => 0.2 },
+      });
+      vi.advanceTimersByTime(1200);
+      expect(v.hasAttribute("data-leve")).toBe(false);
+      expect(fontes(v).some((f) => f?.endsWith(".webm"))).toBe(true);
+    });
+
+    it("deitado (computador) nunca usa a leve", () => {
+      vi.stubGlobal("matchMedia", () => ({ matches: false }));
+      ligacao = { effectiveType: "3g" };
+      const v = entrarSemCortina();
+      expect(v.hasAttribute("data-leve")).toBe(false);
+      vi.advanceTimersByTime(1200);
+      expect(v.hasAttribute("data-leve")).toBe(false);
+    });
+  });
+
   it("aparece por cima da fotografia quando JÁ está a tocar, e o 2 começa logo a carregar", async () => {
     const { container } = await montar();
     const [a, b] = videos(container);
@@ -357,6 +443,40 @@ describe("EntradaEmVideo", () => {
     act(() => void b.dispatchEvent(new Event("playing")));
     expect(b.style.opacity).toBe("1");
     expect(Number(b.style.zIndex)).toBeGreaterThan(Number(a.style.zIndex));
+  });
+
+  it("a passagem começa 1,5 s antes do fim, e se o seguinte arrancar tarde a subida encolhe", async () => {
+    const { container } = await montar();
+    const [a, b] = videos(container);
+    comecar(a);
+    act(() => void b.dispatchEvent(new Event("canplaythrough")));
+    Object.defineProperty(a, "duration", { configurable: true, value: 18 });
+    Object.defineProperty(a, "currentTime", { configurable: true, value: 16.5, writable: true });
+    play.mockClear();
+    act(() => void a.dispatchEvent(new Event("timeupdate")));
+    expect(play).toHaveBeenCalledTimes(1); // a 1,5 s do fim já arranca o seguinte
+    // O descodificador demorou: faltam 0,4 s ao que sai quando o novo anda.
+    a.currentTime = 17.6;
+    act(() => void b.dispatchEvent(new Event("playing")));
+    expect(b.style.opacity).toBe("1");
+    expect(b.style.transitionDuration).toBe("360ms");
+  });
+
+  it("se o que sai acaba antes de o novo avisar que anda, o novo sobe já (não fica parado à vista)", async () => {
+    const { container } = await montar();
+    const [a, b] = videos(container);
+    comecar(a);
+    act(() => void b.dispatchEvent(new Event("canplaythrough")));
+    Object.defineProperty(a, "duration", { configurable: true, value: 18 });
+    Object.defineProperty(a, "currentTime", { configurable: true, value: 16.5, writable: true });
+    act(() => void a.dispatchEvent(new Event("timeupdate")));
+    expect(b.style.opacity).toBe("0");
+    // O novo já tem imagem, mas o «playing» ainda não chegou; o velho acabou.
+    Object.defineProperty(b, "readyState", { configurable: true, value: 3 });
+    a.currentTime = 18;
+    act(() => void a.dispatchEvent(new Event("ended")));
+    expect(b.style.opacity).toBe("1");
+    expect(b.style.transitionDuration).toBe("200ms");
   });
 
   it("se o seguinte ainda não chegou, o actual REPETE-SE em vez de parar", async () => {
@@ -512,6 +632,43 @@ describe("EntradaEmVideo", () => {
       expect(b.getAttribute("src")).toBe("blob:take-1");
       // E o seguinte da fila começa a descarregar quando este chegou.
       expect(pedidos[1]).toBe("/videos/entrada/v4/entrada-3-paisagem.mp4");
+    });
+
+    it("o take de abertura também vai para a memória, depois dos outros, e troca fora da vista", async () => {
+      const { container } = await montar();
+      const [a, b] = videos(container);
+      Object.defineProperty(a, "duration", { configurable: true, value: 18 });
+      Object.defineProperty(a, "currentTime", { configurable: true, value: 2, writable: true });
+      comecar(a);
+      responder(true); // o 2
+      await esperar();
+      responder(true); // o 3
+      await esperar();
+      // Os outros já estão: agora a cópia do de abertura (o mesmo ficheiro).
+      expect(pedidos).toEqual([
+        "/videos/entrada/v4/entrada-2-paisagem.mp4",
+        "/videos/entrada/v4/entrada-3-paisagem.mp4",
+        "/videos/entrada/v4/entrada-1-paisagem.mp4",
+      ]);
+      responder(true);
+      await esperar();
+      // Está à vista: não se lhe mexe a meio.
+      expect(a.querySelectorAll("source").length).toBeGreaterThan(0);
+
+      // A passagem para o 2: quando acaba, o de abertura passa à cópia.
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      try {
+        a.currentTime = 16.5;
+        act(() => void a.dispatchEvent(new Event("timeupdate")));
+        act(() => void b.dispatchEvent(new Event("canplaythrough")));
+        act(() => void a.dispatchEvent(new Event("timeupdate")));
+        act(() => void b.dispatchEvent(new Event("playing")));
+        act(() => void vi.advanceTimersByTime(1000));
+      } finally {
+        vi.useRealTimers();
+      }
+      expect(b.style.opacity).toBe("1");
+      expect(a.querySelectorAll("source")).toHaveLength(0);
     });
 
     it("se o download falhar, toca da rede como antes", async () => {
@@ -691,6 +848,50 @@ describe("EntradaEmVideo", () => {
       act(() => void b.dispatchEvent(new Event("canplaythrough")));
       play.mockClear();
       act(() => void vi.advanceTimersByTime(5000));
+      expect(play).toHaveBeenCalled();
+      act(() => void b.dispatchEvent(new Event("playing")));
+      expect(b.style.opacity).toBe("1");
+    });
+
+    it("sem dados (rede) e o seguinte já pronto: passa em 0,4 s em vez de ficar parado", async () => {
+      const { container } = await montar();
+      const [a, b] = videos(container);
+      comecar(a);
+      act(() => void b.dispatchEvent(new Event("canplaythrough")));
+      Object.defineProperty(a, "currentTime", { configurable: true, value: 4, writable: true });
+      Object.defineProperty(a, "readyState", { configurable: true, value: 2 });
+      play.mockClear();
+      act(() => void a.dispatchEvent(new Event("waiting")));
+      act(() => void vi.advanceTimersByTime(450));
+      expect(play).toHaveBeenCalledTimes(1);
+      act(() => void b.dispatchEvent(new Event("playing")));
+      expect(b.style.opacity).toBe("1");
+    });
+
+    it("sem dados e sem para onde ir: espera (não há take na memória)", async () => {
+      const { container } = await montar();
+      const [a, b] = videos(container);
+      comecar(a);
+      Object.defineProperty(a, "currentTime", { configurable: true, value: 4, writable: true });
+      Object.defineProperty(a, "readyState", { configurable: true, value: 2 });
+      play.mockClear();
+      act(() => void a.dispatchEvent(new Event("waiting")));
+      act(() => void vi.advanceTimersByTime(450));
+      expect(play).not.toHaveBeenCalled();
+      expect(b.style.opacity).toBe("0");
+    });
+
+    it("encravado ainda a descarregar, mas com o seguinte pronto: segue (já não espera pela rede)", async () => {
+      const { container } = await montar();
+      const [a, b] = videos(container);
+      comecar(a);
+      Object.defineProperty(a, "paused", { configurable: true, value: false });
+      Object.defineProperty(a, "currentTime", { configurable: true, value: 4, writable: true });
+      Object.defineProperty(a, "readyState", { configurable: true, value: 2 });
+      Object.defineProperty(a, "networkState", { configurable: true, value: 2 }); // a carregar
+      act(() => void b.dispatchEvent(new Event("canplaythrough")));
+      play.mockClear();
+      act(() => void vi.advanceTimersByTime(4100));
       expect(play).toHaveBeenCalled();
       act(() => void b.dispatchEvent(new Event("playing")));
       expect(b.style.opacity).toBe("1");

@@ -6,10 +6,14 @@ import {
   CHAVE_DO_ULTIMO,
   CORTINA_ESPERA_MAX_MS,
   ENCRAVADO_MS,
+  MEDIR_REDE_MS,
   NUMERO_DE_VIDEOS,
   PASSAGEM_MS,
+  SALTAR_SEM_DADOS_MS,
+  duracaoDaSubida,
   eHoraDePassar,
   enderecoDoVideo,
+  enderecoLeve,
   formatoDoEndereco,
   formatoQueToca,
   type Formato,
@@ -151,7 +155,20 @@ export function fontesDeEntrada(i: number): string {
   return de("retrato", `${AO_ALTO} `) + de("paisagem", "");
 }
 
+/**
+ * As `<source>` da versão leve do take `i` (só ao alto): HEVC e H.264, sem
+ * `media` — só se põem quando o ecrã já está ao alto. Ver `enderecoLeve`.
+ */
+export function fontesLeves(i: number): string {
+  return (["hevc", "mp4"] as const)
+    .map((f) => `<source src="${enderecoLeve(i, f)}" type='${tipoDoFormato(f, "retrato")}'>`)
+    .join("");
+}
+
 type ComPrerender = Document & { prerendering?: boolean };
+type ComLigacao = Navigator & {
+  connection?: { effectiveType?: string; downlink?: number; saveData?: boolean };
+};
 
 /**
  * O GUIÃO DE ARRANQUE. Corre ESCRITO NO HTML, enquanto o browser lê a página
@@ -164,7 +181,13 @@ type ComPrerender = Document & { prerendering?: boolean };
  *   2. põe-lhe as `<source>` e manda-o tocar;
  *   3. se a cortina estiver no ecrã, sincroniza-se com ela (ver o cabeçalho).
  */
-export function arrancarEntrada(fontes: string[], chave: string, esperaMax: number): void {
+export function arrancarEntrada(
+  fontes: string[],
+  chave: string,
+  esperaMax: number,
+  leves: string[] = [],
+  medirMs = 1200,
+): void {
   const doc = document as ComPrerender;
   const guiao = doc.currentScript;
   const raiz = (guiao && guiao.parentElement) || doc.querySelector("[data-entrada]");
@@ -191,7 +214,32 @@ export function arrancarEntrada(fontes: string[], chave: string, esperaMax: numb
   v.muted = true;
   v.autoplay = true;
   v.preload = "auto";
-  v.insertAdjacentHTML("beforeend", fontes[n]);
+  // ── REDE FRACA, AO ALTO: ARRANCA NA VERSÃO LEVE ────────────────────────
+  // (ver `enderecoLeve`). A mesma conta de `ligacaoLenta`, escrita aqui
+  // porque este guião não importa nada.
+  const aoAlto = typeof matchMedia === "function" && matchMedia("(orientation: portrait)").matches;
+  const lig = (navigator as ComLigacao).connection;
+  const lenta =
+    !!lig &&
+    (!!lig.saveData ||
+      /(^|-)(2g|3g)$/.test(lig.effectiveType || "") ||
+      (typeof lig.downlink === "number" && lig.downlink > 0 && lig.downlink < 5));
+  // Só se o browser a souber tocar: a leve é HEVC e H.264, e há browsers que
+  // só tocam o WebM — esses ficam sempre na normal (sem isto ficavam sem vídeo).
+  const tiposLeves = (leves[n] || "").match(/type='[^']+'/g) || [];
+  let levePode = false;
+  for (let i = 0; i < tiposLeves.length; i++) {
+    if (v.canPlayType(tiposLeves[i].slice(6, -1))) levePode = true;
+  }
+  let leve = false;
+  const porLeve = () => {
+    leve = true;
+    while (v.firstChild) v.removeChild(v.firstChild);
+    v.insertAdjacentHTML("beforeend", leves[n]);
+    v.setAttribute("data-leve", "");
+  };
+  if (aoAlto && levePode && lenta) porLeve();
+  else v.insertAdjacentHTML("beforeend", fontes[n]);
   // Um browser que não sabe tocar nenhuma das fontes fica com a fotografia.
   const fs = v.querySelectorAll("source");
   let tocavel = false;
@@ -252,23 +300,43 @@ export function arrancarEntrada(fontes: string[], chave: string, esperaMax: numb
       // Sem cortina, ou com o pano já à espera dele: arranca agora.
       if (!pano || segurou) largar();
     };
-    v.addEventListener(
-      "playing",
-      () => {
-        if (largou) return;
-        // O 1.º fotograma está pronto: pára nele e junta reserva.
-        v.pause();
-        try {
-          v.currentTime = 0;
-        } catch {
-          // ainda sem dados para saltar: fica onde está
-        }
-        if (v.readyState >= 4) ficaPronto();
-        else v.addEventListener("canplaythrough", ficaPronto, { once: true });
-        if (!pano) setTimeout(largar, esperaMax);
-      },
-      { once: true },
-    );
+    const segurar = () =>
+      v.addEventListener(
+        "playing",
+        () => {
+          if (largou) return;
+          // O 1.º fotograma está pronto: pára nele e junta reserva.
+          v.pause();
+          try {
+            v.currentTime = 0;
+          } catch {
+            // ainda sem dados para saltar: fica onde está
+          }
+          if (v.readyState >= 4) ficaPronto();
+          else v.addEventListener("canplaythrough", ficaPronto, { once: true });
+          if (!pano) setTimeout(largar, esperaMax);
+        },
+        { once: true },
+      );
+    segurar();
+    // Ao alto e ainda na versão normal: mede-se a rede no arranque (é o que
+    // conta no iPhone, que não diz como está a ligação). Se em `medirMs` chegou
+    // menos de 1,3 s de vídeo por segundo de espera, a normal pararia — e
+    // passa-se à leve, ainda antes de o take ficar à vista (ver `eRedeLenta`).
+    if (aoAlto && !leve && levePode) {
+      const t0 = Date.now();
+      setTimeout(() => {
+        if (largou || pronto || leve) return;
+        const b = v.buffered;
+        const chegou = b && b.length ? b.end(b.length - 1) : 0;
+        if (chegou >= ((Date.now() - t0) / 1000) * 1.3) return;
+        porLeve();
+        v.load();
+        segurar();
+        const q = v.play();
+        if (q) q.catch(() => undefined);
+      }, medirMs);
+    }
     const p = v.play();
     if (p) {
       p.catch(() => {
@@ -317,11 +385,13 @@ export function arrancarEntrada(fontes: string[], chave: string, esperaMax: numb
 
 /** As `<source>` de entrada de cada take, pela ordem dos `<video>`. */
 const FONTES = Array.from({ length: NUMERO_DE_VIDEOS }, (_, i) => fontesDeEntrada(i));
+/** E as da versão leve (ao alto, numa rede fraca). */
+const LEVES = Array.from({ length: NUMERO_DE_VIDEOS }, (_, i) => fontesLeves(i));
 
 /** O guião como texto, para ir no HTML (ver `arrancarEntrada`). */
 export const GUIAO_DA_ENTRADA = `(${arrancarEntrada.toString()})(${JSON.stringify(FONTES)},${JSON.stringify(
   CHAVE_DO_ULTIMO,
-)},${CORTINA_ESPERA_MAX_MS});`;
+)},${CORTINA_ESPERA_MAX_MS},${JSON.stringify(LEVES)},${MEDIR_REDE_MS});`;
 
 /**
  * O HTML dos três vídeos, igual no servidor e no browser: os três vazios, e o
@@ -606,10 +676,58 @@ function criarMotor(raiz: HTMLElement): Motor | null {
       });
   }
 
+  /**
+   * ── O TAKE DE ABERTURA TAMBÉM PASSA PARA A MEMÓRIA ──────────────────────
+   * Era o único que tocava sempre da rede: na primeira volta (não há outro
+   * jeito de começar depressa) e também nas seguintes — e o iPhone deita fora
+   * o que guardou dele, por isso cada volta voltava a depender do 4G. Quando
+   * os outros já estão na memória, pede-se uma cópia inteira (o ficheiro tem
+   * cache de um ano: quase sempre vem da cache do browser), e na volta
+   * seguinte toca essa. Se arrancou na versão leve, a cópia é já a normal.
+   */
+  const abertura = atual;
+  let aberturaPedida = false;
+  let aberturaNaMemoria = false;
+  function guardarAbertura() {
+    if (aberturaPedida || !podeDescarregar) return;
+    aberturaPedida = true;
+    const endereco = enderecoDoVideo(abertura, varianteParaOEcra(ecraDeAgora(), abertura), formato);
+    const corte = new AbortController();
+    limpar.push(() => corte.abort());
+    fetch(endereco, { signal: corte.signal })
+      .then((r) => {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.blob();
+      })
+      .then((b) => {
+        if (!vivo) return;
+        const u = URL.createObjectURL(b);
+        naMemoria.push(u);
+        fonte[abertura] = u;
+        daMemoria[abertura] = true;
+        passarAberturaParaAMemoria();
+      })
+      .catch(() => undefined); // fica a tocar da rede, como antes
+  }
+  /** Troca a fonte do take de abertura pela cópia na memória — fora da vista. */
+  function passarAberturaParaAMemoria() {
+    if (aberturaNaMemoria || !daMemoria[abertura] || !fonte[abertura]) return;
+    const el = videos[abertura];
+    if (el === videos[atual] || aTocar.has(el) || aAquecer.has(el)) return; // espera pela passagem
+    aberturaNaMemoria = true;
+    for (const f of [...el.querySelectorAll("source")]) f.remove();
+    el.removeAttribute("data-leve");
+    // O `aquecer` põe-lhe a fonte nova perto da sua vez, como aos outros.
+    aquecido[abertura] = false;
+    pronto[abertura] = false;
+    aquecerSeForHora();
+  }
+
   /** Prepara o primeiro da fila que ainda não foi pedido (um de cada vez). */
   function prepararOQueVem() {
     if (!decidido || !inicioAssente) return;
     for (const i of fila) {
+      if (i === abertura) continue; // tem o seu caminho (`guardarAbertura`)
       if (!pedido[i]) {
         preparar(i);
         return;
@@ -619,12 +737,20 @@ function criarMotor(raiz: HTMLElement): Motor | null {
       if (!fonte[i]) return;
       if (!daMemoria[i] && !pronto[i] && videos[i].readyState < 4) return;
     }
+    // Os outros já estão (ou estão a chegar da memória): agora a abertura.
+    guardarAbertura();
   }
 
   /** Pôr o vídeo `el` à vista, por cima dos outros. */
   const mostrar = (el: HTMLVideoElement) => {
     el.style.zIndex = "2";
     el.style.opacity = "1";
+  };
+
+  /** O seguinte da fila pode arrancar já (da memória, ou com dados). */
+  const seguintePronto = () => {
+    const i = proximo();
+    return pronto[i] || videos[i].readyState >= 3;
   };
 
   const passar = () => {
@@ -642,29 +768,47 @@ function criarMotor(raiz: HTMLElement): Motor | null {
     }
     aPassar = true;
     velho.loop = false;
-    ouvir(
-      novo,
-      "playing",
-      () => {
+    let subiu = false;
+    const subir = () => {
+      if (!vivo || subiu) return;
+      subiu = true;
+      velho.style.zIndex = "1";
+      // Arrancou tarde (descodificador a acordar, CPU ocupada)? A subida
+      // encolhe para acabar antes de o que sai chegar ao fim — um fotograma
+      // parado por baixo do que entra é o que se vê como «parou».
+      const sobe = duracaoDaSubida(velho.duration - velho.currentTime);
+      novo.style.transitionDuration = `${sobe}ms`;
+      mostrar(novo);
+      const t = setTimeout(() => {
         if (!vivo) return;
-        velho.style.zIndex = "1";
-        mostrar(novo);
-        const t = setTimeout(() => {
-          if (!vivo) return;
-          pausar(velho);
-          aTocar.delete(velho);
-          velho.style.opacity = "0";
-          velho.style.zIndex = "0";
-          velho.currentTime = 0;
-          atual = seguinte;
-          fila.shift();
-          encherFila();
-          aPassar = false;
-          ultimoTempo = -1;
-          prepararOQueVem();
-          aquecerSeForHora();
-        }, PASSAGEM_MS + 50);
-        limpar.push(() => clearTimeout(t));
+        novo.style.transitionDuration = "";
+        pausar(velho);
+        aTocar.delete(velho);
+        velho.style.opacity = "0";
+        velho.style.zIndex = "0";
+        velho.currentTime = 0;
+        atual = seguinte;
+        // O take de abertura tocava da rede; se a cópia na memória já
+        // chegou, as voltas seguintes tocam-na (ver `guardarAbertura`).
+        passarAberturaParaAMemoria();
+        fila.shift();
+        encherFila();
+        aPassar = false;
+        ultimoTempo = -1;
+        prepararOQueVem();
+        aquecerSeForHora();
+      }, sobe + 50);
+      limpar.push(() => clearTimeout(t));
+    };
+    ouvir(novo, "playing", subir, true);
+    // Rede de segurança: o que sai chegou ao fim e o novo ainda não avisou que
+    // anda (o aviso pode chegar atrasado com a CPU ocupada). Se já tem imagem,
+    // sobe já — um fotograma parado à vista é pior do que uma subida curta.
+    ouvir(
+      velho,
+      "ended",
+      () => {
+        if (novo.readyState >= 2) subir();
       },
       true,
     );
@@ -699,6 +843,20 @@ function criarMotor(raiz: HTMLElement): Motor | null {
           }
         });
       }
+    });
+    // ── SEM DADOS: SALTA PARA UM TAKE QUE JÁ ESTÁ NA MEMÓRIA ───────────────
+    // A rede não chegou a tempo (`waiting`). Esperar por ela era ficar parado
+    // o tempo que levasse — à vista. Se o seguinte já está na memória e pronto,
+    // passa-se para ele ao fim de `SALTAR_SEM_DADOS_MS`; o que parou continua a
+    // descarregar e volta na sua vez.
+    ouvir(el, "waiting", () => {
+      if (el !== videos[atual] || !mostrado) return;
+      const t = el.currentTime;
+      depois(SALTAR_SEM_DADOS_MS, () => {
+        if (el !== videos[atual] || aPassar || !podeTocar() || aEsperarGesto) return;
+        if (el.currentTime !== t || el.readyState >= 3) return; // já anda
+        if (seguintePronto()) passar();
+      });
     });
     // Rede de segurança: se o `timeupdate` da recta final se perder.
     ouvir(el, "ended", () => {
@@ -816,24 +974,25 @@ function criarMotor(raiz: HTMLElement): Motor | null {
     }
     if (agora - paradoDesde < ENCRAVADO_MS) return;
     paradoDesde = 0;
-    // Ainda a descarregar numa rede lenta: recarregar deitava fora o que já
-    // chegou. Espera-se.
-    if (el.networkState === el.NETWORK_LOADING && el.readyState < 3) return;
-    const seguinte = proximo();
-    if (mostrado && (pronto[seguinte] || videos[seguinte].readyState >= 3)) {
-      passar(); // o seguinte está pronto: segue-se para ele
-    } else {
-      // Recarrega este no mesmo ponto (o de entrada volta a tentar as suas
-      // fontes; os outros a sua, da memória ou da rede).
-      if (el === primeiro) el.load();
-      else {
-        el.src =
-          fonte[atual] ?? enderecoDoVideo(atual, varianteParaOEcra(ecraDeAgora(), atual), formato);
-        el.load();
-      }
-      ouvir(el, "loadedmetadata", () => void (el.currentTime = t), true);
-      tocar(el);
+    // O seguinte está pronto: segue-se para ele — mesmo que este ainda esteja
+    // a descarregar. Ficar à espera da rede era ficar parado à vista.
+    if (mostrado && seguintePronto()) {
+      passar();
+      return;
     }
+    // Sem para onde ir, e ainda a descarregar numa rede lenta: recarregar
+    // deitava fora o que já chegou. Espera-se.
+    if (el.networkState === el.NETWORK_LOADING && el.readyState < 3) return;
+    // Recarrega este no mesmo ponto (o de entrada volta a tentar as suas
+    // fontes; os outros a sua, da memória ou da rede).
+    if (el === primeiro && !fonte[atual]) el.load();
+    else {
+      el.src =
+        fonte[atual] ?? enderecoDoVideo(atual, varianteParaOEcra(ecraDeAgora(), atual), formato);
+      el.load();
+    }
+    ouvir(el, "loadedmetadata", () => void (el.currentTime = t), true);
+    tocar(el);
   };
   let relogio = 0;
   const io = new IntersectionObserver(
@@ -907,7 +1066,7 @@ export default function EntradaEmVideo() {
     }
     // Numa navegação dentro do sítio o guião do HTML não correu: corre-se aqui.
     if (!raiz.querySelector("[data-primeiro]")) {
-      arrancarEntrada(FONTES, CHAVE_DO_ULTIMO, CORTINA_ESPERA_MAX_MS);
+      arrancarEntrada(FONTES, CHAVE_DO_ULTIMO, CORTINA_ESPERA_MAX_MS, LEVES, MEDIR_REDE_MS);
     }
     const m = criarMotor(raiz);
     if (!m) return;
