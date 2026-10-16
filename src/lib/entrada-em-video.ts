@@ -229,7 +229,7 @@ function baralhar(lista: number[], sorteio: () => number): number[] {
 /**
  * ── A ORDEM VAI MUDANDO ────────────────────────────────────────────────────
  * Ela (16/10): «vai alterando os vídeos para não estarem sempre com a mesma
- * ordem». A primeira volta começa no take de entrada (`TAKE_DE_ENTRADA`, a floresta),
+ * ordem». A primeira volta começa no take de entrada (ver `escolherPrimeiro`),
  * e os outros vêm por uma ordem sorteada. As voltas seguintes são sorteadas
  * inteiras, com uma regra: nunca o mesmo vídeo duas vezes seguidas na passagem
  * de uma volta para a outra.
@@ -240,17 +240,38 @@ export function primeiraVolta(primeiro = 0, sorteio: () => number = Math.random)
 }
 
 /**
- * ── A ENTRADA É SEMPRE NA FLORESTA ─────────────────────────────────────────
- * Decisão dela (16/10, depois de entrar pelo Instagram e cair no castelo):
- * «quero que a primeira vez que a pessoa entra no site seja sempre o vídeo da
- * floresta com o carro» — e, perguntada, «sempre a floresta», em TODAS as
- * entradas. Substitui a alternância de visita para visita (que guardava no
- * browser o take da entrada anterior). A variedade fica na ordem dos outros
- * dois, sorteada a cada volta (`primeiraVolta`/`novaVolta`). A fotografia da
- * capa é o primeiro fotograma deste take: a passagem da foto para o vídeo não
- * se nota.
+ * O take da PRIMEIRA visita de sempre: a floresta com o carro. É também o que
+ * entra como imagem animada quando o aparelho recusa o vídeo (ver
+ * `imagensAnimadas`), e a fotografia da capa é o seu primeiro fotograma.
  */
 export const TAKE_DE_ENTRADA = 0;
+
+/** Onde o browser guarda o take com que a pessoa entrou da última vez. */
+export const CHAVE_DO_ULTIMO = "liquen-entrada-ultimo";
+
+/**
+ * ── O TAKE DE ENTRADA VAI TROCANDO DE VISITA PARA VISITA ───────────────────
+ * Ela (16/10, à noite): «coloca outra vez aquela mudança para não estar sempre
+ * a aparecer o mesmo vídeo da floresta no início, vai trocando». Volta a
+ * alternância que o «sempre a floresta» (#241) tinha tirado — com o pedido dela
+ * de antes («pelo menos a primeira vez que se entra no site seja sempre o
+ * vídeo da floresta»): a primeira visita de sempre abre na floresta; a partir
+ * daí, cada entrada abre num take sorteado que NUNCA é o da entrada anterior.
+ *
+ * `ultimo` é o que ficou guardado no browser (`null` na primeira visita).
+ * O guião que corre no HTML (`EntradaEmVideo.tsx`) faz a mesma conta.
+ */
+export function escolherPrimeiro(
+  ultimo: number | null,
+  sorteio: () => number = Math.random,
+): number {
+  if (ultimo === null || !Number.isInteger(ultimo) || ultimo < 0 || ultimo >= NUMERO_DE_VIDEOS) {
+    return TAKE_DE_ENTRADA;
+  }
+  let n = Math.floor(sorteio() * (NUMERO_DE_VIDEOS - 1));
+  if (n >= ultimo) n++;
+  return Math.min(n, NUMERO_DE_VIDEOS - 1);
+}
 
 /**
  * Quantos segundos antes do fim do take à vista se prepara o seguinte para
@@ -340,6 +361,38 @@ export const SALTAR_SEM_DADOS_MS = 400;
 export function enderecoLeve(i: number, formato: "hevc" | "mp4"): string {
   const n = i % NUMERO_DE_VIDEOS;
   return `${PASTA_DOS_VIDEOS}/entrada-${n + 1}-retrato-leve${formato === "hevc" ? "-hevc" : ""}.mp4`;
+}
+
+/**
+ * ── A FLORESTA COMO IMAGEM ANIMADA (QUANDO O APARELHO RECUSA O VÍDEO) ─────
+ * Ela (16/10), num iPhone com a poupança de energia ligada: «quero que mal
+ * entremos no site o vídeo corra… sem aparecer botões… nem essas fotos no
+ * início». Com a poupança ligada o iPhone recusa QUALQUER vídeo que arranque
+ * sem um toque — é uma regra do sistema, para todos os sítios. Imagens
+ * animadas, não: por isso, recusado, a floresta entra como imagem animada.
+ *
+ * Duas, por ordem: o MP4 dentro de um `<img>` (só o Safari/iPhone o toca, e é
+ * o de melhor qualidade), e, se esse falhar ou o browser não for o Safari, um
+ * WebP animado (todos os browsers de hoje, iPhone incluído desde o iOS 14).
+ */
+export function enderecoAnimada(i: number, variante: "retrato" | "paisagem"): string {
+  const n = i % NUMERO_DE_VIDEOS;
+  return `${PASTA_DOS_VIDEOS}/entrada-${n + 1}-${variante}-animada.webp`;
+}
+
+/** O tecto de peso de cada WebP animado (o teste dos ficheiros prende-o). */
+export const ANIMADA_MAX_BYTES = 6 * 1024 * 1024;
+
+/** As imagens animadas do take `i`, ao alto e deitado (ver `enderecoAnimada`). */
+export interface Animadas {
+  mp4: [alto: string, deitado: string];
+  webp: [alto: string, deitado: string];
+}
+export function imagensAnimadas(i: number): Animadas {
+  return {
+    mp4: [enderecoLeve(i, "mp4"), enderecoDoVideo(i, "paisagem", "mp4")],
+    webp: [enderecoAnimada(i, "retrato"), enderecoAnimada(i, "paisagem")],
+  };
 }
 
 /** O que o `navigator.connection` diz (só existe em alguns browsers). */

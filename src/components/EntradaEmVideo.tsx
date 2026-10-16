@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import {
   AQUECER_ANTES_S,
+  CHAVE_DO_ULTIMO,
   CORTINA_ESPERA_MAX_MS,
   ENCRAVADO_MS,
   MEDIR_REDE_MS,
@@ -14,6 +15,8 @@ import {
   eHoraDePassar,
   enderecoDoVideo,
   enderecoLeve,
+  imagensAnimadas,
+  type Animadas,
   formatoDoEndereco,
   formatoQueToca,
   type Formato,
@@ -39,8 +42,9 @@ import {
  * correr» e, no mesmo dia, «para as pessoas não se fartarem… vai alternando de
  * takes na entrada do site». Os três `<video>` vêm vazios no HTML, e um guião
  * pequeno ESCRITO NO PRÓPRIO HTML (`arrancarEntrada`) corre enquanto o browser
- * lê a página: o take de entrada é SEMPRE a floresta (`TAKE_DE_ENTRADA`, decisão
- * dela de 16/10), põe-lhe as `<source>` e manda-o tocar. Não espera pelo JavaScript da página. (É HTML e não JSX
+ * lê a página: escolhe o take de entrada (a 1.ª visita na floresta; depois,
+ * nunca o da entrada anterior — `escolherPrimeiro`), põe-lhe as `<source>` e
+ * manda-o tocar. Não espera pelo JavaScript da página. (É HTML e não JSX
  * porque o React não põe o atributo `muted` no HTML do servidor — e, sem ele,
  * nenhum browser arranca um vídeo antes do JavaScript.)
  *
@@ -117,9 +121,11 @@ import {
  * vídeos continuem a correr». Por isso `prefers-reduced-motion` e «Poupar
  * dados» NÃO desligam os vídeos (o resto do sítio continua a respeitá-los).
  * Quando o próprio aparelho recusa arrancar sozinho (o iPhone em poupança de
- * bateria recusa o `play()` sem gesto — `NotAllowedError`), fica a fotografia
- * e o vídeo arranca ao PRIMEIRO toque, clique ou tecla da pessoa em qualquer
- * sítio da página. Nenhum código consegue contornar a recusa sem um gesto.
+ * bateria recusa o `play()` sem gesto — `NotAllowedError`), a floresta entra
+ * logo como IMAGEM animada (`porImagemAnimada`, posta pelo próprio guião do
+ * HTML, antes de o React chegar) e o vídeo arranca ao PRIMEIRO toque, clique
+ * ou tecla da pessoa em qualquer sítio da página. Nenhum código consegue pôr
+ * um `<video>` a tocar sem um gesto nesse modo — é uma regra do sistema.
  *
  * `aria-hidden`, sem controlos e fora do Tab: é fundo, mudo, sem nada que o
  * texto à volta não diga.
@@ -165,6 +171,47 @@ export function fontesLeves(i: number): string {
 }
 
 type ComPrerender = Document & { prerendering?: boolean };
+
+/**
+ * Põe a floresta como IMAGEM animada por cima da fotografia (ver
+ * `enderecoAnimada`): o MP4 num `<img>` no Safari/iPhone e, se falhar ou o
+ * browser não for o Safari, o WebP animado. Se a raiz já tiver uma, devolve-a
+ * (o guião do HTML põe-na antes de o React chegar, e o motor reconhece-a).
+ *
+ * Como o `arrancarEntrada`, é fechada em si mesma: vai no HTML como texto.
+ */
+export function porImagemAnimada(
+  raiz: Element,
+  animadas: Animadas,
+  aoAlto: boolean,
+  passagemMs: number,
+): HTMLImageElement | null {
+  const ja = raiz.querySelector("img[data-entrada-imagem]") as HTMLImageElement | null;
+  if (ja) return ja;
+  const k = aoAlto ? 0 : 1;
+  const safari = /Apple/.test(navigator.vendor || "");
+  const fontes = safari ? [animadas.mp4[k], animadas.webp[k]] : [animadas.webp[k]];
+  const img = document.createElement("img");
+  img.alt = "";
+  img.setAttribute("aria-hidden", "true");
+  img.setAttribute("data-entrada-imagem", "");
+  img.decoding = "async";
+  img.className = "absolute inset-0 h-full w-full object-cover";
+  img.style.cssText =
+    "opacity:0;transform:scale(1.06);transition:opacity " + passagemMs + "ms ease;z-index:1";
+  let i = 0;
+  img.addEventListener("load", () => {
+    img.style.opacity = "1";
+  });
+  img.addEventListener("error", () => {
+    i++;
+    if (i < fontes.length) img.src = fontes[i];
+    else img.remove();
+  });
+  img.src = fontes[0];
+  raiz.appendChild(img);
+  return img;
+}
 type ComLigacao = Navigator & {
   connection?: { effectiveType?: string; downlink?: number; saveData?: boolean };
 };
@@ -175,21 +222,41 @@ type ComLigacao = Navigator & {
  * si mesma: tudo o que precisa entra pelos argumentos, e é passada ao HTML
  * como texto (`.toString()`). Sem sintaxe que precise de ajudas do compilador.
  *
- *   1. o take de entrada é o `n` que vem por argumento (a floresta);
+ *   1. escolhe o take de entrada (a mesma conta do `escolherPrimeiro`: a 1.ª
+ *      visita na floresta, depois nunca o da entrada anterior) e guarda-o no
+ *      browser, para a próxima entrada ser outro;
  *   2. põe-lhe as `<source>` e manda-o tocar;
  *   3. se a cortina estiver no ecrã, sincroniza-se com ela (ver o cabeçalho).
  */
 export function arrancarEntrada(
   fontes: string[],
-  n: number,
+  chave: string,
   esperaMax: number,
   leves: string[] = [],
   medirMs = 1200,
+  animadas?: Animadas,
+  porImagem?: typeof porImagemAnimada,
+  passagemMs = 800,
 ): void {
   const doc = document as ComPrerender;
   const guiao = doc.currentScript;
   const raiz = (guiao && guiao.parentElement) || doc.querySelector("[data-entrada]");
   if (!raiz || raiz.querySelector("[data-primeiro]")) return;
+  let n = 0;
+  try {
+    const u = localStorage.getItem(chave);
+    if (u !== null) {
+      const ultimo = Number(u);
+      if (ultimo >= 0 && ultimo < fontes.length && Math.floor(ultimo) === ultimo) {
+        n = Math.floor(Math.random() * (fontes.length - 1));
+        if (n >= ultimo) n++;
+        if (n > fontes.length - 1) n = fontes.length - 1;
+      }
+    }
+    localStorage.setItem(chave, String(n));
+  } catch {
+    // Janela privada ou armazenamento bloqueado: entra na floresta.
+  }
   const vs = raiz.querySelectorAll("video");
   const v = vs[n] as HTMLVideoElement | undefined;
   if (!v) return;
@@ -322,9 +389,14 @@ export function arrancarEntrada(
     }
     const p = v.play();
     if (p) {
-      p.catch(() => {
+      p.catch((e: unknown) => {
         // O aparelho recusou (poupança de bateria): não se segura nada, e o
-        // componente arranca-o ao primeiro toque.
+        // componente arranca-o ao primeiro toque. Entretanto, JÁ, a floresta
+        // entra como imagem animada — antes de o React chegar, para não se
+        // ver a fotografia parada (ver `enderecoAnimada`).
+        if (e && (e as { name?: string }).name === "NotAllowedError" && animadas && porImagem) {
+          porImagem(raiz, animadas, innerHeight > innerWidth, passagemMs);
+        }
         pronto = true;
         largar();
       });
@@ -371,8 +443,11 @@ const FONTES = Array.from({ length: NUMERO_DE_VIDEOS }, (_, i) => fontesDeEntrad
 /** E as da versão leve (ao alto, numa rede fraca). */
 const LEVES = Array.from({ length: NUMERO_DE_VIDEOS }, (_, i) => fontesLeves(i));
 
+/** As imagens animadas do take de entrada, para quando o aparelho recusa o vídeo. */
+const ANIMADAS = imagensAnimadas(TAKE_DE_ENTRADA);
+
 /** O guião como texto, para ir no HTML (ver `arrancarEntrada`). */
-export const GUIAO_DA_ENTRADA = `(${arrancarEntrada.toString()})(${JSON.stringify(FONTES)},${TAKE_DE_ENTRADA},${CORTINA_ESPERA_MAX_MS},${JSON.stringify(LEVES)},${MEDIR_REDE_MS});`;
+export const GUIAO_DA_ENTRADA = `(${arrancarEntrada.toString()})(${JSON.stringify(FONTES)},${JSON.stringify(CHAVE_DO_ULTIMO)},${CORTINA_ESPERA_MAX_MS},${JSON.stringify(LEVES)},${MEDIR_REDE_MS},${JSON.stringify(ANIMADAS)},${porImagemAnimada.toString()},${PASSAGEM_MS});`;
 
 /**
  * O HTML dos três vídeos, igual no servidor e no browser: os três vazios, e o
@@ -412,11 +487,6 @@ let motorDaSessao: Motor | null = null;
 export function esquecerMotorDaSessao() {
   motorDaSessao?.destruir();
   motorDaSessao = null;
-}
-
-/** O Safari e tudo no iPhone (WebKit): os que tocam um MP4 dentro de um `<img>`. */
-function eWebKit(): boolean {
-  return typeof navigator !== "undefined" && /Apple/.test(navigator.vendor || "");
 }
 
 function criarMotor(raiz: HTMLElement): Motor | null {
@@ -543,30 +613,16 @@ function criarMotor(raiz: HTMLElement): Motor | null {
   };
   let imagem: HTMLImageElement | null = null;
   const imagemAnimada = () => {
-    if (!eWebKit()) return;
     if (imagem) {
       if (!imagem.isConnected) raizAtual.append(imagem);
       return;
     }
-    const img = document.createElement("img");
-    img.alt = "";
-    img.setAttribute("aria-hidden", "true");
-    img.decoding = "async";
-    img.className = "absolute inset-0 h-full w-full object-cover";
-    img.style.cssText = `opacity:0;transform:scale(1.06);transition:opacity ${PASSAGEM_MS}ms ease;z-index:1`;
-    img.setAttribute("data-entrada-imagem", "");
-    img.addEventListener("load", () => void (img.style.opacity = "1"), { once: true });
-    img.addEventListener("error", () => img.remove(), { once: true });
-    const i = TAKE_DE_ENTRADA;
-    img.src =
-      ecraDeAgora().altura > ecraDeAgora().largura
-        ? enderecoLeve(i, "mp4")
-        : enderecoDoVideo(i, "paisagem", "mp4");
-    imagem = img;
-    raizAtual.append(img);
+    const { largura, altura } = ecraDeAgora();
+    imagem = porImagemAnimada(raizAtual, ANIMADAS, altura > largura, PASSAGEM_MS);
   };
   const tirarImagem = () => {
-    const img = imagem;
+    // A que o guião do HTML pôs antes de o motor existir também conta.
+    const img = imagem ?? raizAtual.querySelector<HTMLImageElement>("img[data-entrada-imagem]");
     if (!img) return;
     imagem = null;
     img.style.opacity = "0";
@@ -1131,7 +1187,16 @@ export default function EntradaEmVideo() {
     }
     // Numa navegação dentro do sítio o guião do HTML não correu: corre-se aqui.
     if (!raiz.querySelector("[data-primeiro]")) {
-      arrancarEntrada(FONTES, TAKE_DE_ENTRADA, CORTINA_ESPERA_MAX_MS, LEVES, MEDIR_REDE_MS);
+      arrancarEntrada(
+        FONTES,
+        CHAVE_DO_ULTIMO,
+        CORTINA_ESPERA_MAX_MS,
+        LEVES,
+        MEDIR_REDE_MS,
+        ANIMADAS,
+        porImagemAnimada,
+        PASSAGEM_MS,
+      );
     }
     const m = criarMotor(raiz);
     if (!m) return;
