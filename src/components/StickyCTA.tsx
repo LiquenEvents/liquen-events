@@ -109,7 +109,7 @@ export default function StickyCTA() {
       // barra esconde-se ao descer), aparece depois do primeiro ecrã, e
       // esconde-se enquanto o aviso de cookies estiver no ecrã — a regra está
       // em globals.css, junto de `.piso-flutuante`.
-      className={`cta-flutuante lg:hidden piso-flutuante piso-flutuante-lg fixed left-[calc(1.25rem+env(safe-area-inset-left))] lg:left-[calc(1.75rem+env(safe-area-inset-left))] z-40 transition-all duration-500 motion-reduce:transition-none motion-reduce:translate-y-0 ${
+      className={`cta-flutuante lg:hidden piso-flutuante piso-flutuante-lg fixed left-[calc(1.25rem+env(safe-area-inset-left))] lg:left-[calc(1.75rem+env(safe-area-inset-left))] z-40 transition-[opacity,translate] duration-500 motion-reduce:transition-none motion-reduce:translate-y-0 ${
         show ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
       }`}
     >

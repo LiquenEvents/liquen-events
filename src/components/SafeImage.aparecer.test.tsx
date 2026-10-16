@@ -15,7 +15,7 @@ const BLUR = "data:image/webp;base64,AAAA";
 
 afterEach(cleanup);
 
-function montar(aparecer: boolean) {
+function montar(aparecer?: boolean) {
   return render(
     <div style={{ position: "relative", width: 200, height: 200 }}>
       <SafeImage
@@ -34,9 +34,16 @@ const veu = (c: HTMLElement) => c.querySelector<HTMLImageElement>('img[aria-hidd
 const foto = (c: HTMLElement) => c.querySelector<HTMLImageElement>('img[alt="Foto"]')!;
 
 describe("SafeImage — o desfoque esbate-se quando a foto chega (A6)", () => {
-  it("sem `aparecer` não há véu", () => {
+  it("com `aparecer={false}` não há véu", () => {
     const { container } = montar(false);
     expect(veu(container)).toBeNull();
+  });
+
+  it("é o comportamento por omissão de uma imagem `fill` com desfoque (16/10)", () => {
+    // Ela: «ainda dá para ver a foto desfocada… a entrada nas páginas não está
+    // muito boa». A fotografia passava do desfoque à nitidez num salto.
+    const { container } = montar();
+    expect(veu(container)).not.toBeNull();
   });
 
   it("com a foto por chegar: véu por cima, a 100%, com o tempo da casa", () => {
@@ -44,7 +51,7 @@ describe("SafeImage — o desfoque esbate-se quando a foto chega (A6)", () => {
     const v = veu(container)!;
     expect(v).not.toBeNull();
     expect(v.getAttribute("src")).toBe(BLUR);
-    expect(v.className).toContain("opacity-100");
+    expect(v.style.opacity).toBe("1");
     expect(v.className).toContain("duration-foto-chega");
     expect(v.className).toContain("pointer-events-none");
   });
@@ -56,7 +63,7 @@ describe("SafeImage — o desfoque esbate-se quando a foto chega (A6)", () => {
       fireEvent.load(foto(container));
     });
     const v = veu(container)!;
-    expect(v.className).toContain("opacity-0");
+    expect(v.style.opacity).toBe("0");
     act(() => {
       fireEvent.transitionEnd(v);
     });

@@ -271,10 +271,12 @@ const MobileMenu = memo(function MobileMenu({
                 </span>
                 <span
                   aria-hidden
-                  className={`h-px bg-current ${reduce ? "" : "transition-all duration-500"} ${
+                  // O traço cresce por `scale` e não por `width`: a largura
+                  // obriga a recalcular a linha do menu a cada fotograma.
+                  className={`h-px w-7 origin-left bg-current ${reduce ? "" : "transition-[scale,opacity] duration-500"} ${
                     active
-                      ? "w-7 opacity-100"
-                      : "w-0 opacity-0 group-hover:w-4 group-hover:opacity-50"
+                      ? "scale-x-100 opacity-100"
+                      : "scale-x-0 opacity-0 group-hover:scale-x-[0.57] group-hover:opacity-50"
                   }`}
                   style={{ transitionTimingFunction: MENU_EASE }}
                 />
@@ -688,7 +690,7 @@ export default function Navbar() {
             <Link
               href={localizeHref("/contacto", locale)}
               transitionTypes={navTypes("/contacto")}
-              className={`${BOTAO_DA_BARRA} transition-all duration-300 ${
+              className={`${BOTAO_DA_BARRA} transition-[color,background-color,border-color] duration-300 ${
                 light
                   ? "border-white/50 text-white/90 hover:border-white/80 hover:bg-white/10"
                   : "border-moss/60 text-moss hover:border-moss/80 hover:bg-moss/10"
@@ -740,13 +742,13 @@ export default function Navbar() {
             >
               <span className="block">
                 <span
-                  className={`block w-[18px] h-px transition-all duration-300 mb-1.5 ${light ? "bg-white/90" : "bg-foreground/70"} ${isOpen ? "rotate-45 translate-y-2" : ""}`}
+                  className={`block w-[18px] h-px transition-[rotate,translate,opacity] duration-300 mb-1.5 ${light ? "bg-white/90" : "bg-foreground/70"} ${isOpen ? "rotate-45 translate-y-2" : ""}`}
                 />
                 <span
-                  className={`block w-[18px] h-px transition-all duration-300 mb-1.5 ${light ? "bg-white/90" : "bg-foreground/70"} ${isOpen ? "opacity-0" : ""}`}
+                  className={`block w-[18px] h-px transition-[rotate,translate,opacity] duration-300 mb-1.5 ${light ? "bg-white/90" : "bg-foreground/70"} ${isOpen ? "opacity-0" : ""}`}
                 />
                 <span
-                  className={`block w-[18px] h-px transition-all duration-300 ${light ? "bg-white/90" : "bg-foreground/70"} ${isOpen ? "-rotate-45 -translate-y-2" : ""}`}
+                  className={`block w-[18px] h-px transition-[rotate,translate,opacity] duration-300 ${light ? "bg-white/90" : "bg-foreground/70"} ${isOpen ? "-rotate-45 -translate-y-2" : ""}`}
                 />
               </span>
             </button>

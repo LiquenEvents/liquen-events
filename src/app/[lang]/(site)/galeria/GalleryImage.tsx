@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { galleryLoadQueue } from "./load-queue";
-import { esquecer, promoverQuandoAVista } from "./prioridade-a-vista";
+import { anteciparQuandoPerto, esquecer, promoverQuandoAVista } from "./prioridade-a-vista";
 import {
   CORTE_TELEMOVEL,
   ESCADA_ECRA_GRANDE,
@@ -311,6 +311,8 @@ export default function GalleryImage({
        * `low` para sempre — a que está debaixo do polegar incluída.
        */
       if (longe && !priority) promoverQuandoAVista(anchorRef.current, el);
+      // E começa a descarregar um ecrã e meio antes (ver `prioridade-a-vista`).
+      if (!priority) anteciparQuandoPerto(anchorRef.current, el);
       const revelar = () => {
         el.classList.add("g-foto-pronta");
         handleLoad();

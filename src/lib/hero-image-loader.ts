@@ -115,6 +115,17 @@ export function heroImageUrl(src: string, width: number): string {
 }
 
 /**
+ * O ficheiro AVIF que o `<picture>` de um herói escolhe para esta largura — o
+ * mesmo `snapHeroWidth` — ou `null` se a origem não for um herói conhecido.
+ * É o que o `HeroWarm` deve aquecer num browser com AVIF: aquecer o WebP era
+ * descarregar um ficheiro que a página seguinte nunca ia usar.
+ */
+export function heroAvifUrl(src: string, width: number): string | null {
+  if (!HERO_SOURCES.has(src)) return null;
+  return `/_img/${heroKey(src)}-${snapHeroWidth(width)}.avif`;
+}
+
+/**
  * O `srcset` AVIF completo de um herói, para a `<source>` do `<picture>`.
  *
  * Devolve `null` quando a origem não é um herói conhecido — e essa é a

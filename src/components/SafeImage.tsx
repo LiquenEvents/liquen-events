@@ -196,6 +196,11 @@ export type SafeImageProps = Omit<ImageProps, "src" | "loader" | "onError" | "on
    * ela chega, essa cópia esbate-se. O HTML do servidor fica igual ao de
    * sempre, e uma fotografia que já tinha chegado não ganha camada nenhuma.
    * É opacidade, não movimento: fica também com movimento reduzido.
+   *
+   * Desde 16/10 é o comportamento POR OMISSÃO de qualquer imagem `fill` com
+   * desfoque. Ela: «ainda dá para ver a foto desfocada… a entrada nas páginas
+   * não está muito boa». Só uma página o tinha; nas outras a fotografia
+   * substituía o desfoque num salto. `aparecer={false}` desliga-o.
    */
   aparecer?: boolean;
 };
@@ -207,12 +212,13 @@ export default function SafeImage({
   blurDataURL,
   unavailableLabel,
   initialLoader,
-  aparecer = false,
+  aparecer: aparecerPedido,
   fill,
   width,
   height,
   ...rest
 }: SafeImageProps) {
+  const aparecer = aparecerPedido ?? Boolean(fill && blurDataURL);
   /** Já se desistiu da versão optimizada e está-se a pedir o ficheiro original. */
   const [original, setOriginal] = useState(false);
   /** Nº do anti-cache: 0 = URL normal, N = `?r=N` na tentativa N. */
@@ -434,9 +440,11 @@ export default function SafeImage({
           src={blurDataURL}
           alt=""
           aria-hidden
-          className={`pointer-events-none absolute inset-0 h-full w-full object-cover transition-opacity duration-foto-chega ${
-            veu === "saida" ? "opacity-0" : "opacity-100"
-          }`}
+          // A mesma `className` da fotografia (enquadramento, escala de
+          // repouso…) para o desfoque ficar exactamente por cima dela; a
+          // opacidade vai no `style`, para nenhuma classe a contrariar.
+          className={`pointer-events-none absolute inset-0 h-full w-full object-cover transition-opacity duration-foto-chega ${className ?? ""}`}
+          style={{ opacity: veu === "saida" ? 0 : 1 }}
           onTransitionEnd={() => setVeu("nenhum")}
         />
       )}
