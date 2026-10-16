@@ -290,14 +290,98 @@ export function novaVolta(ultimo: number, sorteio: () => number = Math.random): 
 }
 
 /**
+ * Quanto tempo ANTES da passagem o seguinte recebe ordem de tocar.
+ *
+ * Ela (16/10): «às vezes pára e não tem que parar» — no telemóvel com dados,
+ * com Wi-Fi, e no computador. MEDIDO com um medidor de fotogramas (90 s, CPU
+ * ÷4, redes de 4 a 20 Mbit/s, ao alto e no computador): TODAS as paragens
+ * eram na passagem. O seguinte recebia `play()` a 0,8 s do fim e só começava
+ * a subir quando o descodificador lhe dava o 1.º fotograma — 0,1 a 0,3 s
+ * depois (mais, no iPhone, a acordar o descodificador de HEVC). O que saía
+ * chegava ao fim antes de a subida acabar, e ficava 200 a 300 ms parado no
+ * último fotograma, à vista por baixo do que entrava.
+ *
+ * Com esta folga, o seguinte arranca 1,5 s antes do fim: quando começa a
+ * subir já está a andar, e acaba de subir antes de o outro acabar.
+ */
+export const ARRANQUE_S = 0.7;
+
+/**
  * Se já é altura de começar a passagem para o vídeo seguinte: quando faltar
- * o tempo da passagem para o fim. Assim o seguinte já está inteiro à vista no
- * instante em que este acaba, e nunca se vê o último fotograma parado nem preto.
+ * o tempo da passagem, mais a folga do arranque (`ARRANQUE_S`), para o fim.
+ * Assim o seguinte já está inteiro à vista no instante em que este acaba, e
+ * nunca se vê o último fotograma parado nem preto.
  */
 export function eHoraDePassar(tempo: number, duracao: number): boolean {
   if (!Number.isFinite(duracao) || duracao <= 0) return false;
-  return tempo >= duracao - PASSAGEM_MS / 1000;
+  return tempo >= duracao - PASSAGEM_MS / 1000 - ARRANQUE_S;
 }
 
-/** Quanto tempo o vídeo à vista pode ficar sem avançar antes de o vigia agir. */
-export const ENCRAVADO_MS = 2500;
+/**
+ * Quanto dura a subida do seguinte quando ele arrancou tarde: o que falta ao
+ * que sai, com um pouco de margem, e nunca menos de 200 ms. Uma subida mais
+ * curta não se nota; um fotograma parado por baixo, nota-se.
+ */
+export function duracaoDaSubida(faltaAoQueSaiS: number): number {
+  if (!Number.isFinite(faltaAoQueSaiS)) return PASSAGEM_MS;
+  return Math.round(Math.min(PASSAGEM_MS, Math.max(200, faltaAoQueSaiS * 1000 * 0.9)));
+}
+
+/**
+ * Quanto tempo o vídeo à vista pode ficar sem avançar antes de o vigia agir.
+ * Eram 2,5 s: uma paragem inteira à vista antes de alguém fazer alguma coisa.
+ */
+export const ENCRAVADO_MS = 1200;
+
+/**
+ * Quanto tempo o vídeo à vista pode ficar SEM DADOS (o evento `waiting`, a
+ * rede não chegou) antes de se passar a um take que já está na memória do
+ * aparelho. Esperar pela rede era ficar parado o tempo que ela levasse.
+ */
+export const SALTAR_SEM_DADOS_MS = 400;
+
+/**
+ * ── A VERSÃO LEVE, SÓ PARA ARRANCAR NUMA REDE FRACA ───────────────────────
+ * O take de entrada é o único que toca da rede (os seguintes tocam da memória
+ * do aparelho). Ao alto, a versão normal pede 4 a 6 Mbit/s; um 4G a perder
+ * sinal desce abaixo disso e o vídeo esgota o que tem. A versão leve
+ * (`retrato-leve`, ~2 Mbit/s, ~40 % do peso) foi MEDIDA contra o 4K de origem:
+ * SSIM 0,983 (HEVC) e 0,981 (H.264), contra 0,989 da normal — num ecrã de
+ * telemóvel não se distingue. Só se usa para ARRANCAR quando a rede é fraca;
+ * a volta seguinte toca a normal, da memória.
+ */
+export function enderecoLeve(i: number, formato: "hevc" | "mp4"): string {
+  const n = i % NUMERO_DE_VIDEOS;
+  return `${PASTA_DOS_VIDEOS}/entrada-${n + 1}-retrato-leve${formato === "hevc" ? "-hevc" : ""}.mp4`;
+}
+
+/** O que o `navigator.connection` diz (só existe em alguns browsers). */
+export interface Ligacao {
+  effectiveType?: string;
+  downlink?: number;
+  saveData?: boolean;
+}
+
+/**
+ * A ligação diz-se lenta para a versão normal? (Android/Chrome; o iPhone não
+ * tem `navigator.connection` — aí conta a medição do `eRedeLenta`.)
+ */
+export function ligacaoLenta(l: Ligacao | null | undefined): boolean {
+  if (!l) return false;
+  if (l.saveData) return true;
+  if (l.effectiveType && /(^|-)(2g|3g)$/.test(l.effectiveType)) return true;
+  return typeof l.downlink === "number" && l.downlink > 0 && l.downlink < 5;
+}
+
+/**
+ * Medido no arranque: a rede está a trazer o vídeo mais devagar do que ele se
+ * vê? `segundosChegados` é o fim do que já chegou (`buffered`), `ms` o tempo
+ * desde que se pediu. Só se decide depois de 1,2 s (antes disso a latência
+ * engana), e com menos de 1,3 s de vídeo por cada segundo de espera a versão
+ * normal não aguentaria sem parar.
+ */
+export const MEDIR_REDE_MS = 1200;
+export function eRedeLenta(segundosChegados: number, ms: number): boolean {
+  if (!(ms >= MEDIR_REDE_MS)) return false;
+  return segundosChegados < (ms / 1000) * 1.3;
+}
