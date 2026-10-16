@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
 import {
+  ANIMADA_MAX_BYTES,
   ARRANQUE_S,
   TAKE_DE_ENTRADA,
   MEDIR_REDE_MS,
@@ -12,7 +13,10 @@ import {
   eHoraDePassar,
   eRedeLenta,
   enderecoDoVideo,
+  enderecoAnimada,
+  escolherPrimeiro,
   enderecoLeve,
+  imagensAnimadas,
   ligacaoLenta,
   formatoDoEndereco,
   formatoQueToca,
@@ -161,6 +165,26 @@ describe("os vídeos da entrada — as regras", () => {
     expect(duracaoDaSubida(Number.NaN)).toBe(PASSAGEM_MS);
   });
 
+  it("a floresta como imagem animada: o MP4 no <img> e o WebP, ao alto e deitado", () => {
+    expect(enderecoAnimada(0, "retrato")).toBe("/videos/entrada/v4/entrada-1-retrato-animada.webp");
+    expect(imagensAnimadas(TAKE_DE_ENTRADA)).toEqual({
+      mp4: [
+        "/videos/entrada/v4/entrada-1-retrato-leve.mp4",
+        "/videos/entrada/v4/entrada-1-paisagem.mp4",
+      ],
+      webp: [
+        "/videos/entrada/v4/entrada-1-retrato-animada.webp",
+        "/videos/entrada/v4/entrada-1-paisagem-animada.webp",
+      ],
+    });
+    // Os WebP existem e não passam do tecto (é o que se descarrega quando o
+    // aparelho recusa o vídeo, muitas vezes num telemóvel em 4G).
+    for (const p of imagensAnimadas(TAKE_DE_ENTRADA).webp) {
+      expect(existsSync(`public${p}`), p).toBe(true);
+      expect(statSync(`public${p}`).size, p).toBeLessThan(ANIMADA_MAX_BYTES);
+    }
+  });
+
   it("a versão leve: só ao alto, em HEVC ou H.264", () => {
     expect(enderecoLeve(0, "hevc")).toBe("/videos/entrada/v4/entrada-1-retrato-leve-hevc.mp4");
     expect(enderecoLeve(2, "mp4")).toBe("/videos/entrada/v4/entrada-3-retrato-leve.mp4");
@@ -215,9 +239,26 @@ describe("os vídeos da entrada — as regras", () => {
     }
   });
 
-  it("a entrada é sempre na floresta (decisão dela, 16/10)", () => {
+  it("a 1.ª visita de sempre abre na floresta; um valor estranho também", () => {
     expect(TAKE_DE_ENTRADA).toBe(0);
-    expect(primeiraVolta(TAKE_DE_ENTRADA)[0]).toBe(0);
+    expect(escolherPrimeiro(null)).toBe(0);
+    expect(escolherPrimeiro(Number.NaN)).toBe(0);
+    expect(escolherPrimeiro(7)).toBe(0);
+    expect(primeiraVolta(escolherPrimeiro(null))[0]).toBe(0);
+  });
+
+  it("depois, cada entrada abre num take diferente do da anterior (e todos aparecem)", () => {
+    for (let ultimo = 0; ultimo < NUMERO_DE_VIDEOS; ultimo++) {
+      const vistos = new Set<number>();
+      for (let k = 0; k < 40; k++) {
+        const n = escolherPrimeiro(ultimo);
+        expect(n).not.toBe(ultimo);
+        vistos.add(n);
+      }
+      expect(vistos.size).toBe(NUMERO_DE_VIDEOS - 1);
+    }
+    expect(escolherPrimeiro(0, () => 0.9999)).toBe(2);
+    expect(escolherPrimeiro(2, () => 0)).toBe(0);
   });
 
   it("uma volta nova nunca repete o último vídeo logo a seguir", () => {

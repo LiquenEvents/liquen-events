@@ -8,7 +8,9 @@ import EntradaEmVideo, {
   HTML_DOS_VIDEOS,
   arrancarEntrada,
   esquecerMotorDaSessao,
+  porImagemAnimada,
 } from "./EntradaEmVideo";
+import { imagensAnimadas } from "@/lib/entrada-em-video";
 
 let play: ReturnType<typeof vi.fn>;
 let pausa: ReturnType<typeof vi.fn>;
@@ -133,7 +135,7 @@ describe("EntradaEmVideo", () => {
     expect(GUIAO_DA_ENTRADA).not.toContain("av1");
   });
 
-  describe("a entrada é sempre na floresta (decisão dela, 16/10)", () => {
+  describe("o take de entrada vai trocando (1.ª visita na floresta)", () => {
     /** Uma entrada no sítio: o HTML do servidor e o guião a correr nele. */
     function entrar() {
       document.body.innerHTML = `<div data-entrada="">${HTML_DOS_VIDEOS}</div>`;
@@ -160,12 +162,28 @@ describe("EntradaEmVideo", () => {
       expect(play).toHaveBeenCalled();
     });
 
-    it("todas as entradas abrem na floresta — também quem já cá esteve", () => {
+    it("a 1.ª visita guarda o take, e cada entrada seguinte abre num diferente do anterior", () => {
       vi.spyOn(Math, "random").mockRestore();
-      // O que a alternância antiga deixava guardado não conta.
-      localStorage.setItem("liquen-entrada-ultimo", "0");
-      for (let k = 0; k < 20; k++) expect(entrar().n).toBe(0);
-      expect(localStorage.getItem("liquen-entrada-ultimo")).toBe("0"); // nada escrito de novo
+      expect(entrar().n).toBe(0);
+      expect(localStorage.getItem("liquen-entrada-ultimo")).toBe("0");
+      const vistos = new Set<number>();
+      let antes = 0;
+      for (let k = 0; k < 30; k++) {
+        const { n } = entrar();
+        expect(n).not.toBe(antes);
+        expect(localStorage.getItem("liquen-entrada-ultimo")).toBe(String(n));
+        vistos.add(n);
+        antes = n;
+      }
+      // Os três takes aparecem à entrada.
+      expect(vistos.size).toBe(3);
+    });
+
+    it("sem armazenamento (janela privada), entra na floresta", () => {
+      vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+        throw new Error("bloqueado");
+      });
+      expect(entrar().n).toBe(0);
     });
   });
 
@@ -188,7 +206,7 @@ describe("EntradaEmVideo", () => {
       });
       arrancarEntrada(
         [...Array(3)].map(() => "<source src='x.mp4' type='video/mp4'>"),
-        0,
+        "liquen-entrada-ultimo",
         2500,
       );
       const v = document.querySelector<HTMLVideoElement>("[data-primeiro]")!;
@@ -248,7 +266,7 @@ describe("EntradaEmVideo", () => {
       document.body.innerHTML = `<div class="cortina cortina--fora"></div><div data-entrada="">${HTML_DOS_VIDEOS}</div>`;
       arrancarEntrada(
         [...Array(3)].map(() => "<source src='x.mp4' type='video/mp4'>"),
-        0,
+        "liquen-entrada-ultimo",
         2500,
       );
       const v = document.querySelector<HTMLVideoElement>("[data-primeiro]")!;
@@ -269,7 +287,7 @@ describe("EntradaEmVideo", () => {
       document.body.innerHTML = `<div class="cortina cortina--fora"></div><div data-entrada="">${HTML_DOS_VIDEOS}</div>`;
       arrancarEntrada(
         [...Array(3)].map(() => "<source src='x.mp4' type='video/mp4'>"),
-        0,
+        "liquen-entrada-ultimo",
         2500,
       );
       const v = document.querySelector<HTMLVideoElement>("[data-primeiro]")!;
@@ -588,12 +606,64 @@ describe("EntradaEmVideo", () => {
       );
     });
 
-    it("fora do Safari não há imagem animada (só ele toca um MP4 num <img>)", async () => {
+    it("fora do Safari (que não toca um MP4 num <img>) entra logo o WebP animado", async () => {
       Object.defineProperty(navigator, "vendor", { configurable: true, value: "Google Inc." });
       recusar();
       const { container } = await montar();
-      expect(container.querySelector("img[data-entrada-imagem]")).toBeNull();
+      expect(container.querySelector("img[data-entrada-imagem]")?.getAttribute("src")).toBe(
+        "/videos/entrada/v4/entrada-1-paisagem-animada.webp",
+      );
       expect(videos(container).every((v) => v.style.opacity === "0")).toBe(true);
+    });
+
+    it("no iPhone, se o MP4 no <img> falhar, entra o WebP; se também falhar, fica a fotografia", async () => {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+      Object.defineProperty(window, "innerHeight", { configurable: true, value: 844 });
+      comoNoIphone();
+      recusar();
+      const { container } = await montar();
+      const img = container.querySelector<HTMLImageElement>("img[data-entrada-imagem]")!;
+      act(() => void img.dispatchEvent(new Event("error")));
+      expect(img.getAttribute("src")).toBe("/videos/entrada/v4/entrada-1-retrato-animada.webp");
+      expect(img.isConnected).toBe(true);
+      act(() => void img.dispatchEvent(new Event("error")));
+      expect(img.isConnected).toBe(false);
+    });
+
+    it("o guião do HTML põe a imagem LOGO na recusa, antes do React, e não a repete", async () => {
+      comoNoIphone();
+      recusar();
+      document.body.innerHTML = `<div data-entrada="">${HTML_DOS_VIDEOS}</div>`;
+      try {
+        // Corre o texto que vai mesmo no HTML (com o `porImagemAnimada` dentro).
+        new Function(GUIAO_DA_ENTRADA)();
+        await act(async () => {
+          for (let k = 0; k < 4; k++) await Promise.resolve();
+        });
+        const imgs = document.querySelectorAll<HTMLImageElement>("img[data-entrada-imagem]");
+        expect(imgs).toHaveLength(1);
+        expect(imgs[0].getAttribute("src")).toBe("/videos/entrada/v4/entrada-1-paisagem.mp4");
+        // Quem vier depois (o motor) reconhece-a em vez de pôr outra.
+        const raiz = document.querySelector("[data-entrada]")!;
+        expect(porImagemAnimada(raiz, imagensAnimadas(0), false, 800)).toBe(imgs[0]);
+        expect(document.querySelectorAll("img[data-entrada-imagem]")).toHaveLength(1);
+      } finally {
+        document.body.innerHTML = "";
+      }
+    });
+
+    it("sem recusa, o guião não põe imagem nenhuma (o vídeo é que entra)", async () => {
+      comoNoIphone();
+      document.body.innerHTML = `<div data-entrada="">${HTML_DOS_VIDEOS}</div>`;
+      try {
+        new Function(GUIAO_DA_ENTRADA)();
+        await act(async () => {
+          for (let k = 0; k < 4; k++) await Promise.resolve();
+        });
+        expect(document.querySelector("img[data-entrada-imagem]")).toBeNull();
+      } finally {
+        document.body.innerHTML = "";
+      }
     });
 
     it("ao primeiro toque o vídeo volta, sobe quando anda, e a imagem sai", async () => {
