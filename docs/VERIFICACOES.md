@@ -101,7 +101,7 @@ escolheu **«inteligente + completa depois»**:
   email.
 - **Mais depressa mesmo quando corre tudo:**
   - o ficheiro do estúdio (339 testes, ~6 min) e o do `montar` (~2 min) correm
-    em partes (`test/em-partes.ts`): os casos ficam num `*.casos.tsx`, e cada
+    em partes (`test/em-partes.ts`): os casos ficam num `*.casos.test.tsx` (que o vitest não corre sozinho), e cada
     `*.parte-N.test.tsx` corre uma fatia dos `describe`;
   - testes de unidade em 5 partes, imagens em 3, `dados` em 3, informativo
     em 4;
@@ -109,7 +109,34 @@ escolheu **«inteligente + completa depois»**:
     `tsc --incremental`);
   - o Chromium guardado entre corridas.
 - **Os totais à vista:** cada parte de unidade, de imagens e de dados escreve
-  uma anotação com o que correu, para se conferir que a soma é tudo (879
-  ficheiros de unidade).
+  uma anotação com o que correu, para se conferir que a soma é tudo (887
+  ficheiros de unidade desde esta volta).
 
-Os tempos medidos desta volta ficam aqui quando o CI dela acabar.
+## Os tempos da 2.ª volta (#232, medidos no próprio PR, que corre tudo)
+
+O PR muda o `.github/`, por isso o `decidir` mandou correr **tudo** — é o pior
+caso, o mesmo que corre depois de juntar e à noite.
+
+| Job | Tempo |
+|---|---|
+| O que verificar (`decidir`) | 0:19 |
+| Lint · Typecheck · Build | 2:18 |
+| Testes unitários 1/5 · 2/5 · 3/5 · 4/5 · 5/5 | 1:58 · **4:12** · 3:38 · 2:54 · 2:04 |
+| E2E · imagens 1/3 · 2/3 · 3/3 | 3:33 · 3:40 · 3:07 |
+| E2E · dados 1/3 · 2/3 · 3/3 | 2:46 · 2:53 · 2:36 |
+| E2E · peso, galeria, molas, vidro, sem rede | 4:24 |
+| E2E · telemóvel, propostas, passkeys | 3:41 |
+
+**Espera para juntar: 6 minutos** (do empurrão ao último job que bloqueia),
+contra 8 na 1.ª volta e 28 antes. Os totais conferem: as cinco partes de
+unidade somam **887 ficheiros**, 11 861 testes passados, 3 saltados, 0 falhas;
+as três de imagens somam 128 passeios, 0 falhas.
+
+**O que ainda segura o tempo, e porquê:** o GitHub só corre **20 jobs ao mesmo
+tempo** num repositório público, e uma corrida completa pede 25. As partes 1/5
+e 3/5 dos testes esperaram 1 a 2 minutos por um runner livre antes de
+começarem. Num PR típico (só o sítio, ou só o back office) correm menos jobs, e
+essa fila não existe.
+
+**O caminho rápido (só documentos),** medido no commit que acrescentou esta
+tabela: ver a linha abaixo.
