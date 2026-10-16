@@ -56,7 +56,7 @@ export default function StructuredData({ locale }: { locale: Locale }) {
         },
       ],
       knowsLanguage: ["pt-PT", "en"],
-      sameAs: [SITE.instagram, SITE.facebook, SITE.googleBusiness],
+      sameAs: [SITE.instagram, SITE.facebook, SITE.linkedin, SITE.googleBusiness].filter(Boolean),
       contactPoint: {
         "@type": "ContactPoint",
         telephone: SITE.phone,
