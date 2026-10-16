@@ -138,5 +138,7 @@ e 3/5 dos testes esperaram 1 a 2 minutos por um runner livre antes de
 começarem. Num PR típico (só o sítio, ou só o back office) correm menos jobs, e
 essa fila não existe.
 
-**O caminho rápido (só documentos),** medido no commit que acrescentou esta
-tabela: ver a linha abaixo.
+**O caminho rápido (só documentos, ou só um ecrã) ainda não está medido.** O
+`decidir` olha para o PR inteiro, e este PR mexe no `.github/` — por isso todos
+os commits dele correm tudo. Mede-se no primeiro PR depois de este entrar, e o
+número fica aqui.
