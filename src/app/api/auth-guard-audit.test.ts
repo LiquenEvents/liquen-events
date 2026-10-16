@@ -783,6 +783,11 @@ describe("a auditoria cobre TODAS as rotas de src/app/api", () => {
       "./health/route",
       "./security/csp-report/route",
       "./vitals/route",
+      // O registo anónimo do vídeo da entrada (ela autorizou, 16/10). PÚBLICO
+      // pela mesma razão que os Web Vitals: quem manda é o browser de quem
+      // visita, sem sessão. O que o protege: esquema fechado, 8 KB, 20 por
+      // minuto por IP, e desliga-se sozinho no fim do prazo.
+      "./diagnostico-video/route",
       "./orcamento/route", // POST público + GET admin (ambos acima)
       // A medição da Meta. É PÚBLICA de propósito: recebe os eventos que o
       // browser acabou de mandar ao pixel, e o browser não tem sessão nenhuma.
@@ -889,6 +894,13 @@ describe("PUBLIC routes stay reachable without a session", () => {
     );
     // Public RUM sink (browsers beacon here): 204 accepted (or 429 if rate-limited).
     expect([204, 429]).toContain(res.status);
+  });
+
+  it("POST /api/diagnostico-video accepts the anonymous video report unauthenticated", async () => {
+    const fn = await handler("./diagnostico-video/route", "POST");
+    const res = await fn(req("POST", "/api/diagnostico-video", { v: 1 }), ctx());
+    // Público (o browser manda): 204 sempre, mesmo quando recusa o corpo.
+    expect(res.status).toBe(204);
   });
 
   it("POST /api/orcamento (public quote form) is processed, not auth-gated", async () => {

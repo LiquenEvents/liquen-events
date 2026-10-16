@@ -1121,6 +1121,31 @@ describe("EntradaEmVideo", () => {
         act(() => void a.dispatchEvent(new Event("ended")));
       }
 
+      it("depois do #243 («pára um bocadinho»): durante a passagem o que sai REPETE-SE, nunca congela no fim", async () => {
+        const { a, b } = await ateAPassagem();
+        expect(a.loop).toBe(true);
+        expect(b.style.opacity).toBe("0");
+      });
+
+      it("o prazo desiste sem precisar do «ended» (que com a repetição não chega)", async () => {
+        const { a, b } = await ateAPassagem();
+        act(() => void vi.advanceTimersByTime(2000));
+        expect(a.loop).toBe(true);
+        expect(a.style.opacity).toBe("1");
+        Object.defineProperty(b, "paused", { configurable: true, value: true });
+        act(() => void b.dispatchEvent(new Event("playing")));
+        expect(b.style.opacity).toBe("0"); // a passagem desistida não volta
+      });
+
+      it("no prazo, se o seguinte já anda (o «playing» atrasou-se), sobe", async () => {
+        const { a, b } = await ateAPassagem();
+        Object.defineProperty(b, "readyState", { configurable: true, value: 3 });
+        Object.defineProperty(b, "currentTime", { configurable: true, value: 0.3, writable: true });
+        act(() => void vi.advanceTimersByTime(2000));
+        expect(b.style.opacity).toBe("1");
+        expect(a.loop).toBe(false);
+      });
+
       it("o seguinte nunca arranca: a passagem desiste e o que está à vista volta a tocar", async () => {
         const { a, b } = await ateAPassagem();
         expect(b.style.opacity).toBe("0");
@@ -1211,6 +1236,53 @@ describe("EntradaEmVideo", () => {
         Object.defineProperty(a, "paused", { configurable: true, value: false });
         act(() => void a.dispatchEvent(new Event("playing")));
         expect(a.style.opacity).toBe("1");
+      });
+    });
+
+    describe("o registo anónimo (ela autorizou, 16/10)", () => {
+      let beacons: Blob[];
+      beforeEach(() => {
+        beacons = [];
+        Object.defineProperty(navigator, "sendBeacon", {
+          configurable: true,
+          value: vi.fn((_url: string, corpo: Blob) => {
+            beacons.push(corpo);
+            return true;
+          }),
+        });
+      });
+      afterEach(() => {
+        Reflect.deleteProperty(navigator, "sendBeacon");
+      });
+
+      it("uma paragem do vídeo à vista vai para o registo, com o estado e o que veio antes", async () => {
+        const { container } = await montar();
+        const [a] = videos(container);
+        comecar(a);
+        Object.defineProperty(a, "currentTime", { configurable: true, value: 4, writable: true });
+        act(() => void a.dispatchEvent(new Event("timeupdate"))); // um fotograma
+        act(() => void a.dispatchEvent(new Event("waiting")));
+        act(() => void vi.advanceTimersByTime(1000)); // nada anda: paragem
+        a.currentTime = 4.5;
+        act(() => void a.dispatchEvent(new Event("timeupdate"))); // voltou
+        act(() => void vi.advanceTimersByTime(3100));
+        expect(beacons.length).toBeGreaterThan(0);
+        const corpo = JSON.parse(await beacons[beacons.length - 1].text());
+        expect(corpo.motivo).toBe("paragem");
+        // (A espera dos 3 s até ao envio, sem fotogramas, também conta: é outra.)
+        expect(corpo.paragens[0].ms).toBeGreaterThanOrEqual(700);
+        expect(corpo.paragens[0].estado).toMatchObject({ take: 0, paused: false });
+        expect(corpo.paragens[0].antes.map((x: { k: string }) => x.k)).toContain("waiting");
+        // Nada que identifique alguém.
+        expect(JSON.stringify(corpo)).not.toMatch(/Mozilla|jsdom|userAgent/);
+      });
+
+      it("ao sair da página vai sempre um resumo", async () => {
+        await montar();
+        act(() => void window.dispatchEvent(new Event("pagehide")));
+        const corpo = JSON.parse(await beacons[beacons.length - 1].text());
+        expect(corpo.motivo).toBe("saida");
+        expect(corpo.paragens).toEqual([]);
       });
     });
 
