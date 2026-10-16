@@ -14,7 +14,7 @@
  *   · que versão se pede para este ecrã;
  *   · que formato este browser toca (H.264, ou VP9 como rede).
  *
- * ── OS FICHEIROS (`public/videos/entrada/v3/`) ──────────────────────────────
+ * ── OS FICHEIROS (`public/videos/entrada/v4/`) ──────────────────────────────
  *   · SEM AS TIRAS PRETAS. Os vídeos vêm gravados em formato de cinema (2:1),
  *     com 60 px pretos em cima e em baixo (120 px no 4K). Cortam-se, e o
  *     `object-cover` faz o resto: o vídeo enche a entrada sem nada à volta;
@@ -34,17 +34,17 @@
  *     perto do original, e um débito que o 4G aguenta sem parar a carregar;
  *   · WebM/VP9 em `paisagem` e `retrato` para os poucos browsers sem H.264.
  *
- * A pasta tem versão (`v3`) porque os vídeos são servidos com cache de um ano:
- * um vídeo novo vai para `v4`, nunca por cima.
+ * A pasta tem versão (`v4`) porque os vídeos são servidos com cache de um ano:
+ * um vídeo novo vai para `v5`, nunca por cima.
  */
 
-export const PASTA_DOS_VIDEOS = "/videos/entrada/v3";
+export const PASTA_DOS_VIDEOS = "/videos/entrada/v4";
 
 /** Quantos vídeos há. */
 export const NUMERO_DE_VIDEOS = 3;
 
-/** Que vídeos têm versão `grande` (as fontes em 4K). Hoje: só o 2. */
-export const TEM_GRANDE: readonly boolean[] = [false, true, false];
+/** Que vídeos têm versão `grande` (as fontes em 4K). Desde 16/10: os três. */
+export const TEM_GRANDE: readonly boolean[] = [true, true, true];
 
 export type Variante = "paisagem" | "retrato" | "grande";
 export type Formato = "mp4" | "webm";
@@ -93,9 +93,45 @@ export function enderecoDoVideo(i: number, variante: Variante, formato: Formato 
   return `${PASTA_DOS_VIDEOS}/entrada-${n + 1}-${v}.${formato}`;
 }
 
-/** O vídeo que vem a seguir: 1 → 2 → 3 → 1. */
+/** O vídeo que vem a seguir pela ordem dos ficheiros: 1 → 2 → 3 → 1. */
 export function proximoVideo(i: number): number {
   return (i + 1) % NUMERO_DE_VIDEOS;
+}
+
+/** Baralha `lista` (Fisher–Yates) com o `sorteio` dado (0 ≤ x < 1). */
+function baralhar(lista: number[], sorteio: () => number): number[] {
+  const l = [...lista];
+  for (let k = l.length - 1; k > 0; k--) {
+    const j = Math.floor(sorteio() * (k + 1));
+    [l[k], l[j]] = [l[j], l[k]];
+  }
+  return l;
+}
+
+/**
+ * ── A ORDEM VAI MUDANDO ────────────────────────────────────────────────────
+ * Ela (16/10): «vai alterando os vídeos para não estarem sempre com a mesma
+ * ordem». A primeira volta começa SEMPRE na floresta (o vídeo 1: «quero que
+ * comece na floresta com a vista de cima»), e os outros dois vêm por uma ordem
+ * sorteada. As voltas seguintes são sorteadas inteiras, com uma regra: nunca o
+ * mesmo vídeo duas vezes seguidas na passagem de uma volta para a outra.
+ */
+export function primeiraVolta(sorteio: () => number = Math.random): number[] {
+  const resto = Array.from({ length: NUMERO_DE_VIDEOS - 1 }, (_, k) => k + 1);
+  return [0, ...baralhar(resto, sorteio)];
+}
+
+/** Uma volta nova, que não começa pelo `ultimo` que tocou. */
+export function novaVolta(ultimo: number, sorteio: () => number = Math.random): number[] {
+  const ordem = baralhar(
+    Array.from({ length: NUMERO_DE_VIDEOS }, (_, k) => k),
+    sorteio,
+  );
+  if (ordem[0] === ultimo && ordem.length > 1) {
+    const j = 1 + Math.floor(sorteio() * (ordem.length - 1));
+    [ordem[0], ordem[j]] = [ordem[j], ordem[0]];
+  }
+  return ordem;
 }
 
 /**

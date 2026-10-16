@@ -13,16 +13,16 @@
     }
   },
   "entrada-floresta": {
-    "carimbo": "l:640,1080,1536,2048|webp:q75e6|avif:q46e4|22021dd456c53c41",
+    "carimbo": "l:640,1080,1536,2048|webp:q75e6|avif:q46e4|1fadfb27afe6351f",
     "ficheiros": {
-      "entrada-floresta-640.webp": 16456,
-      "entrada-floresta-640.avif": 10984,
-      "entrada-floresta-1080.webp": 39242,
-      "entrada-floresta-1080.avif": 26354,
-      "entrada-floresta-1536.webp": 63406,
-      "entrada-floresta-1536.avif": 45120,
-      "entrada-floresta-2048.webp": 88002,
-      "entrada-floresta-2048.avif": 63078
+      "entrada-floresta-640.webp": 16372,
+      "entrada-floresta-640.avif": 10987,
+      "entrada-floresta-1080.webp": 39744,
+      "entrada-floresta-1080.avif": 26261,
+      "entrada-floresta-1536.webp": 64810,
+      "entrada-floresta-1536.avif": 45566,
+      "entrada-floresta-2048.webp": 90876,
+      "entrada-floresta-2048.avif": 64488
     }
   },
   "hd-edited": {

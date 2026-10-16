@@ -11,6 +11,9 @@ let tiposQueToca: string[];
 let vista: ((e: Array<{ isIntersecting: boolean }>) => void) | null;
 
 beforeEach(() => {
+  // A ordem dos vídeos é sorteada; aqui fixa-se em 1 → 2 → 3 (0,99 não troca
+  // nada no baralhar), e o teste da ordem variada muda-o.
+  vi.spyOn(Math, "random").mockReturnValue(0.99);
   tiposQueToca = ["mp4"];
   vista = null;
   play = vi.fn(() => Promise.resolve());
@@ -38,6 +41,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
 });
 
 async function montar() {
@@ -67,13 +71,14 @@ describe("EntradaEmVideo", () => {
     expect(primeiro).not.toMatch(/\bcontrols\b/);
     // Ao alto, a versão vertical; deitado, a larga. H.264 primeiro, VP9 como rede.
     expect(html).toContain(
-      '<source media="(orientation: portrait)" src="/videos/entrada/v3/entrada-1-retrato.mp4"',
+      '<source media="(orientation: portrait)" src="/videos/entrada/v4/entrada-1-retrato.mp4"',
     );
-    expect(html).toContain('<source src="/videos/entrada/v3/entrada-1-paisagem.mp4"');
+    expect(html).toContain('<source src="/videos/entrada/v4/entrada-1-paisagem.mp4"');
     expect(html.indexOf("retrato.mp4")).toBeLessThan(html.indexOf("paisagem.mp4"));
     expect(html.indexOf("paisagem.mp4")).toBeLessThan(html.indexOf("paisagem.webm"));
-    // O 2.º não descarrega nada até ser preciso.
+    // Os outros não descarregam nada até o JavaScript os preparar.
     expect(html).toMatch(/<video data-entrada-video="1" preload="none"/);
+    expect(html).toMatch(/<video data-entrada-video="2" preload="none"/);
   });
 
   it("aparece por cima da fotografia quando JÁ está a tocar, e o 2 começa logo a carregar", async () => {
@@ -85,7 +90,7 @@ describe("EntradaEmVideo", () => {
 
     act(() => void a.dispatchEvent(new Event("playing")));
     expect(a.style.opacity).toBe("1");
-    expect(b.getAttribute("src")).toBe("/videos/entrada/v3/entrada-2-paisagem.mp4");
+    expect(b.getAttribute("src")).toBe("/videos/entrada/v4/entrada-2-paisagem.mp4");
   });
 
   it("no telemóvel ao alto, os seguintes vêm na versão vertical", async () => {
@@ -103,6 +108,16 @@ describe("EntradaEmVideo", () => {
     const [a, b] = videos(container);
     act(() => void a.dispatchEvent(new Event("playing")));
     expect(b.getAttribute("src")).toMatch(/entrada-2-grande\.mp4$/);
+  });
+
+  it("a ordem vai mudando: com outro sorteio, depois da floresta vem o 3", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const { container } = await montar();
+    const [a, b, c] = videos(container);
+    act(() => void a.dispatchEvent(new Event("playing")));
+    // É o 3 que se prepara primeiro, porque é o que vem a seguir.
+    expect(c.getAttribute("src")).toMatch(/entrada-3-paisagem\.mp4$/);
+    expect(b.getAttribute("src")).toBeNull();
   });
 
   it("sem H.264 (o Chromium dos testes), os seguintes vêm em WebM", async () => {
@@ -124,6 +139,9 @@ describe("EntradaEmVideo", () => {
     const [a, b] = videos(container);
     act(() => void a.dispatchEvent(new Event("playing")));
 
+    // O 2 fica pronto (e o 3 começa a preparar-se a seguir, em cadeia).
+    act(() => void b.dispatchEvent(new Event("canplaythrough")));
+    expect(videos(container)[2].getAttribute("src")).toMatch(/entrada-3-paisagem\.mp4$/);
     Object.defineProperty(a, "duration", { configurable: true, value: 18 });
     Object.defineProperty(a, "currentTime", { configurable: true, value: 17.5, writable: true });
     play.mockClear();
@@ -136,17 +154,48 @@ describe("EntradaEmVideo", () => {
     expect(Number(b.style.zIndex)).toBeGreaterThan(Number(a.style.zIndex));
   });
 
-  it("se o fim passar sem a passagem ter começado, o «ended» faz seguir", async () => {
+  it("se o seguinte ainda não chegou, o actual REPETE-SE em vez de parar", async () => {
     const { container } = await montar();
     const [a, b] = videos(container);
     act(() => void a.dispatchEvent(new Event("playing")));
+    Object.defineProperty(a, "duration", { configurable: true, value: 18 });
+    Object.defineProperty(a, "currentTime", { configurable: true, value: 17.5, writable: true });
+    act(() => void a.dispatchEvent(new Event("timeupdate")));
+    expect(a.loop).toBe(true);
+    expect(b.style.opacity).toBe("0");
+
+    // Quando o 2 chega, a passagem faz-se na volta seguinte.
+    act(() => void b.dispatchEvent(new Event("canplaythrough")));
     play.mockClear();
-    act(() => void a.dispatchEvent(new Event("ended")));
-    // O seguinte arranca logo, mesmo sem estar carregado: é o play() que obriga
-    // o telemóvel a ir buscá-lo.
+    act(() => void a.dispatchEvent(new Event("timeupdate")));
     expect(play).toHaveBeenCalledTimes(1);
     act(() => void b.dispatchEvent(new Event("playing")));
     expect(b.style.opacity).toBe("1");
+    expect(a.loop).toBe(false);
+  });
+
+  it("o «ended» é rede de segurança: segue para o seguinte se estiver pronto", async () => {
+    const { container } = await montar();
+    const [a, b] = videos(container);
+    act(() => void a.dispatchEvent(new Event("playing")));
+    act(() => void b.dispatchEvent(new Event("canplaythrough")));
+    play.mockClear();
+    act(() => void a.dispatchEvent(new Event("ended")));
+    expect(play).toHaveBeenCalledTimes(1);
+    act(() => void b.dispatchEvent(new Event("playing")));
+    expect(b.style.opacity).toBe("1");
+  });
+
+  it("preparar um vídeo é tocá-lo escondido até estar pronto (o iPhone só descarrega assim)", async () => {
+    const { container } = await montar();
+    const [a, b] = videos(container);
+    play.mockClear();
+    act(() => void a.dispatchEvent(new Event("playing")));
+    expect(play).toHaveBeenCalledTimes(1); // o 2, escondido
+    expect(b.style.opacity).toBe("0");
+    pausa.mockClear();
+    act(() => void b.dispatchEvent(new Event("canplaythrough")));
+    expect(pausa).toHaveBeenCalled(); // pronto: pára e espera pela sua vez
   });
 
   it("pára quando a entrada sai do ecrã e retoma quando volta", async () => {
@@ -197,7 +246,7 @@ describe("EntradaEmVideo", () => {
       act(() => void a.dispatchEvent(new Event("playing")));
       Object.defineProperty(a, "paused", { configurable: true, value: false });
       Object.defineProperty(a, "currentTime", { configurable: true, value: 4, writable: true });
-      Object.defineProperty(b, "readyState", { configurable: true, value: 4 });
+      act(() => void b.dispatchEvent(new Event("canplaythrough")));
       play.mockClear();
       act(() => void vi.advanceTimersByTime(5000));
       expect(play).toHaveBeenCalled();

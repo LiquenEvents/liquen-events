@@ -25,7 +25,7 @@ test.describe("@movimento a entrada em vídeo", () => {
     // Arranca sozinho, do HTML, sem esperar por nada (pedido dela, 16/10).
     await expect(primeiro).toHaveCSS("opacity", "1", { timeout: 25_000 });
     expect(await primeiro.evaluate((v: HTMLVideoElement) => v.currentSrc)).toMatch(
-      /\/videos\/entrada\/v3\/entrada-1-(paisagem|retrato)\./,
+      /\/videos\/entrada\/v4\/entrada-1-(paisagem|retrato)\./,
     );
 
     const t1 = await primeiro.evaluate((v: HTMLVideoElement) => v.currentTime);
@@ -33,8 +33,16 @@ test.describe("@movimento a entrada em vídeo", () => {
     const t2 = await primeiro.evaluate((v: HTMLVideoElement) => v.currentTime);
     expect(t2, "o tempo do vídeo não avançou: está parado").toBeGreaterThan(t1);
 
-    // O vídeo 2 já está a ser preparado enquanto o 1 toca.
-    await expect(page.locator('[data-entrada-video="1"]')).toHaveAttribute("src", /entrada-2-/);
+    // O seguinte (o 2 ou o 3 — a ordem é sorteada) já se prepara enquanto o 1 toca.
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          [...document.querySelectorAll<HTMLVideoElement>("video[data-entrada-video]")]
+            .slice(1)
+            .some((v) => /entrada-[23]-/.test(v.getAttribute("src") ?? "")),
+        ),
+      )
+      .toBe(true);
 
     // E a fotografia continua lá por baixo.
     await expect(page.locator("section img.hero-settle")).toHaveCount(1);

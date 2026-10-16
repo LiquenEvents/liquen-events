@@ -8,6 +8,8 @@ import {
   eHoraDePassar,
   enderecoDoVideo,
   formatoQueToca,
+  novaVolta,
+  primeiraVolta,
   proximoVideo,
   varianteParaOEcra,
 } from "./entrada-em-video";
@@ -79,6 +81,32 @@ describe("os vídeos da entrada — as regras", () => {
       return; // sem node no ambiente: não se mede
     }
     expect(saida.trim()).toBe("1920x960");
+  });
+
+  it("a primeira volta começa sempre na floresta, e as outras vão mudando de ordem", () => {
+    const vistas = new Set<string>();
+    for (let k = 0; k < 200; k++) {
+      const v = primeiraVolta();
+      expect(v[0]).toBe(0);
+      expect([...v].sort()).toEqual([0, 1, 2]);
+      vistas.add(v.join());
+    }
+    // As duas ordens possíveis dos outros dois aparecem.
+    expect(vistas.size).toBe(2);
+  });
+
+  it("uma volta nova nunca repete o último vídeo logo a seguir", () => {
+    const ordens = new Set<string>();
+    for (let ultimo = 0; ultimo < NUMERO_DE_VIDEOS; ultimo++) {
+      for (let k = 0; k < 300; k++) {
+        const v = novaVolta(ultimo);
+        expect(v[0]).not.toBe(ultimo);
+        expect([...v].sort()).toEqual([0, 1, 2]);
+        ordens.add(v.join());
+      }
+    }
+    // E não é sempre a mesma: aparecem as seis ordens possíveis.
+    expect(ordens.size).toBe(6);
   });
 });
 
