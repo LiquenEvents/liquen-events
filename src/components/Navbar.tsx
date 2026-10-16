@@ -79,6 +79,29 @@ const MobileMenu = memo(function MobileMenu({
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
 
+  /**
+   * ── O TOQUE TEM RESPOSTA NO MESMO INSTANTE ─────────────────────────────
+   * Ela (16/10): «a entrada nas páginas não está muito boa, parece que está
+   * assim meia coisa». FILMADO a 390 px (telemóvel ×4 mais lento): depois de
+   * tocar em «Sobre» o menu ficava 0,54 s PARADO, sem sinal nenhum de que o
+   * toque tinha sido recebido — o processador estava a montar a página nova
+   * (já pré-carregada) — e só depois desaparecia de uma vez.
+   *
+   * Agora, no instante do toque, o destino acende (fica branco e o traço
+   * cresce) e os outros esmorecem. São só `opacity` e `scale`, que a placa
+   * gráfica anima sozinha enquanto o processador monta a página. O menu fica
+   * por cima até a página nova chegar e esvai-se sobre ela, como antes —
+   * fechá-lo logo destapava, a meio, a página de onde se saiu.
+   */
+  const [destino, setDestino] = useState<string | null>(null);
+  // Fechado o menu, esquece-se o destino (ajuste no próprio render, sem efeito).
+  const [abertoAntes, setAbertoAntes] = useState(isOpen);
+  if (abertoAntes !== isOpen) {
+    setAbertoAntes(isOpen);
+    if (!isOpen) setDestino(null);
+  }
+  const aoTocar = (href: string) => () => setDestino(href);
+
   // Staggered reveal for the overlay's blocks — a single source of truth so the
   // eyebrow, each link and the footer share the same cascade + easing. Under
   // prefers-reduced-motion everything simply cross-fades in place (no travel).
@@ -243,14 +266,17 @@ const MobileMenu = memo(function MobileMenu({
       <div className="relative flex-1 min-h-0 overflow-y-auto overscroll-contain px-8 pt-40 pb-6">
         <nav aria-label={t.nav.menuLabel} className="w-full">
           {[...links, { href: "/contacto", label: t.nav.contacto }].map((link, i) => {
-            const active = isActive(link.href);
+            const escolhido = destino === link.href;
+            const active = destino ? escolhido : isActive(link.href);
+            const esmorece = destino !== null && !escolhido;
             return (
               <Link
                 key={link.href}
                 href={localizeHref(link.href, locale)}
                 prefetch
                 transitionTypes={navTypes(link.href)}
-                aria-current={active ? "page" : undefined}
+                onClick={aoTocar(link.href)}
+                aria-current={isActive(link.href) ? "page" : undefined}
                 // MEDIDO com o menu ABERTO a 375 px e toque emulado: 311×43 px.
                 // Falha por um pixel — e é o menu inteiro, cinco itens, a única
                 // navegação que existe no telemóvel. Um varrimento que não abre
@@ -259,7 +285,11 @@ const MobileMenu = memo(function MobileMenu({
                 className={`alvo-toque group flex items-center justify-between py-2.5 sm:py-3 transition-colors duration-300 ${
                   active ? "text-white" : "text-white/55 hover:text-white"
                 }`}
-                style={reveal(80 + i * 60)}
+                style={
+                  esmorece
+                    ? { ...reveal(0), opacity: 0.3, transition: `opacity 0.15s ${MENU_EASE}` }
+                    : reveal(80 + i * 60)
+                }
               >
                 <span
                   className={`text-[15px] sm:text-base tracking-[0.26em] uppercase font-light ${
@@ -299,7 +329,10 @@ const MobileMenu = memo(function MobileMenu({
                 href={localizeHref(s.href, locale)}
                 prefetch
                 transitionTypes={navTypes(s.href)}
-                className="group flex items-center gap-4 border-b border-white/12 py-3"
+                onClick={aoTocar(s.href)}
+                className={`group flex items-center gap-4 border-b border-white/12 py-3 transition-opacity duration-150 ${
+                  destino !== null && destino !== s.href ? "opacity-30" : ""
+                }`}
               >
                 <span className="relative h-14 w-14 flex-shrink-0 overflow-hidden bg-white/5">
                   {isOpen && (
