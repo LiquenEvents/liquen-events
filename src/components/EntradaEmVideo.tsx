@@ -3,13 +3,16 @@
 import { useEffect, useRef } from "react";
 import {
   AQUECER_ANTES_S,
+  ARRANQUE_S,
   CHAVE_DO_ULTIMO,
   CORTINA_ESPERA_MAX_MS,
   ENCRAVADO_MS,
   MEDIR_REDE_MS,
   NUMERO_DE_VIDEOS,
   PASSAGEM_MS,
+  PASSAGEM_PRESA_MS,
   SALTAR_SEM_DADOS_MS,
+  TENTAR_DE_NOVO_MS,
   TAKE_DE_ENTRADA,
   duracaoDaSubida,
   eHoraDePassar,
@@ -523,6 +526,8 @@ function criarMotor(raiz: HTMLElement): Motor | null {
   encherFila();
   const proximo = () => fila[0];
   let aPassar = false;
+  /** A passagem em curso: até quando pode esperar pelo seguinte, e se ele já subiu. */
+  let passagem: { limite: number; subiu: boolean } | null = null;
   /** Há um vídeo à vista (escondem-se todos quando o aparelho os recusa). */
   let mostrado = false;
   let ultimoTempo = -1; // para o vigia: o último tempo visto do vídeo à vista
@@ -629,12 +634,12 @@ function criarMotor(raiz: HTMLElement): Motor | null {
     window.setTimeout(() => img.remove(), PASSAGEM_MS + 50);
   };
   const esperarPorGesto = () => {
-    // Só se esconde o que está mesmo parado: um vídeo que anda (o browser
-    // arrancou-o pelo `autoplay` e recusou só um `play()` a mais) fica à vista.
-    if (videos[atual].paused) {
-      esconderVideos();
-      imagemAnimada();
-    }
+    // Só conta se o take à vista está mesmo parado: um vídeo que anda (o
+    // browser arrancou-o pelo `autoplay` e recusou só um `play()` a mais) não
+    // espera por nada — e esperar desligava o vigia.
+    if (!videos[atual].paused) return;
+    esconderVideos();
+    imagemAnimada();
     if (aEsperarGesto) return;
     aEsperarGesto = true;
     for (const g of GESTOS) window.addEventListener(g, aoGesto, { capture: true, passive: true });
@@ -655,7 +660,12 @@ function criarMotor(raiz: HTMLElement): Motor | null {
     const p = el.play();
     p?.catch((e: unknown) => {
       const nome = (e as { name?: string })?.name;
-      if (nome === "NotAllowedError") esperarPorGesto();
+      if (nome === "NotAllowedError") {
+        // Recusado o take à vista: espera-se pelo toque. Recusado o SEGUINTE a
+        // meio de uma passagem: desiste-se dela, e o que está à vista continua.
+        if (el === videos[atual] && !aPassar) esperarPorGesto();
+        else if (aPassar && el === videos[proximo()]) cancelarPassagem();
+      }
       // AbortError (um `pause()` a meio do arranque) e erros de rede: o vigia
       // volta a tentar no segundo seguinte.
     });
@@ -854,6 +864,57 @@ function criarMotor(raiz: HTMLElement): Motor | null {
     return pronto[i] || videos[i].readyState >= 3;
   };
 
+  /** O máximo que uma passagem espera pelo fim do que sai (o início dela, em condições normais). */
+  const ESPERA_MAX_S = PASSAGEM_MS / 1000 + ARRANQUE_S;
+
+  /** A fonte da rede do take `i` (quando a da memória não serve). */
+  const daRedeDe = (i: number) => enderecoDoVideo(i, varianteParaOEcra(ecraDeAgora(), i), formato);
+
+  /**
+   * Refaz o take `i` do zero: larga o que tinha carregado e volta a ser
+   * aquecido (da memória, ou da rede) quando for a sua vez.
+   */
+  function refazer(i: number) {
+    const el = videos[i];
+    pausar(el);
+    aTocar.delete(el);
+    aAquecer.delete(el);
+    el.style.opacity = "0";
+    el.style.zIndex = "0";
+    pronto[i] = false;
+    aquecido[i] = false;
+    if (!fonte[i]) {
+      // Ainda com as `<source>` do HTML: passa a ter uma fonte sua (a da rede).
+      for (const f of [...el.querySelectorAll("source")]) f.remove();
+      fonte[i] = daRedeDe(i);
+      daMemoria[i] = false;
+    }
+    el.removeAttribute("src");
+    el.load();
+  }
+
+  /**
+   * O seguinte não arrancou (ver `PASSAGEM_PRESA_MS`): desiste-se da
+   * passagem. O que está à vista continua a tocar, em repetição, e o seguinte
+   * é refeito para a volta seguinte.
+   */
+  function cancelarPassagem() {
+    if (!aPassar || !passagem || passagem.subiu) return;
+    const velho = videos[atual];
+    aPassar = false;
+    passagem = null;
+    refazer(proximo());
+    velho.loop = true;
+    velho.style.opacity = "1";
+    if (velho.ended || velho.paused) {
+      if (velho.ended) velho.currentTime = 0;
+      tocar(velho);
+    }
+    ultimoTempo = -1;
+    paradoDesde = 0;
+    aquecerSeForHora();
+  }
+
   const passar = () => {
     if (aPassar) return;
     const velho = videos[atual];
@@ -869,10 +930,19 @@ function criarMotor(raiz: HTMLElement): Motor | null {
     }
     aPassar = true;
     velho.loop = false;
-    let subiu = false;
+    // O prazo: o que falta ao que sai (normalmente ~1,5 s), mas nunca mais do
+    // que isso — numa passagem forçada a meio (o vigia, sem dados) o que sai
+    // está parado, e o resto dele não passa.
+    const resto = velho.duration - velho.currentTime;
+    const espera = Number.isFinite(resto) ? Math.min(Math.max(0, resto), ESPERA_MAX_S) : 0;
+    const esta = {
+      limite: performance.now() + espera * 1000 + PASSAGEM_PRESA_MS,
+      subiu: false,
+    };
+    passagem = esta;
     const subir = () => {
-      if (!vivo || subiu) return;
-      subiu = true;
+      if (!vivo || esta.subiu || passagem !== esta) return;
+      esta.subiu = true;
       velho.style.zIndex = "1";
       // Arrancou tarde (descodificador a acordar, CPU ocupada)? A subida
       // encolhe para acabar antes de o que sai chegar ao fim — um fotograma
@@ -888,10 +958,24 @@ function criarMotor(raiz: HTMLElement): Motor | null {
         velho.style.opacity = "0";
         velho.style.zIndex = "0";
         velho.currentTime = 0;
+        const saiu = atual;
         atual = seguinte;
+        passagem = null;
         // O take de abertura tocava da rede; se a cópia na memória já
         // chegou, as voltas seguintes tocam-na (ver `guardarAbertura`).
         passarAberturaParaAMemoria();
+        // ── NO MÁXIMO DOIS VÍDEOS CARREGADOS ─────────────────────────────
+        // O que saiu larga o ficheiro (está na memória: volta a ser aquecido
+        // dela perto da sua vez). O iPhone tem poucos descodificadores e
+        // pouca memória para vídeo; três takes carregados ao mesmo tempo é a
+        // causa provável de o seguinte não arrancar (não verificado num
+        // iPhone — ver `PASSAGEM_PRESA_MS`).
+        if (daMemoria[saiu] && velho.getAttribute("src")) {
+          velho.removeAttribute("src");
+          velho.load();
+          aquecido[saiu] = false;
+          pronto[saiu] = false;
+        }
         fila.shift();
         encherFila();
         aPassar = false;
@@ -909,7 +993,20 @@ function criarMotor(raiz: HTMLElement): Motor | null {
       velho,
       "ended",
       () => {
-        if (novo.readyState >= 2) subir();
+        if (passagem !== esta) return;
+        // Só se ANDA (o tempo saiu do 0 onde a passagem o pôs): ter imagem não
+        // chega — um seguinte com imagem mas parado, posto à vista, era o
+        // vídeo parado de vez (MEDIDO: 12 s seguidos, com o seguinte a nunca
+        // arrancar).
+        if (novo.readyState >= 2 && novo.currentTime > 0) {
+          subir();
+          return;
+        }
+        // Sem imagem do seguinte: mais `PASSAGEM_PRESA_MS` e desiste-se.
+        esta.limite = Math.min(esta.limite, performance.now() + PASSAGEM_PRESA_MS);
+        depois(PASSAGEM_PRESA_MS, () => {
+          if (passagem === esta && !esta.subiu) cancelarPassagem();
+        });
       },
       true,
     );
@@ -959,8 +1056,42 @@ function criarMotor(raiz: HTMLElement): Motor | null {
         if (seguintePronto()) passar();
       });
     });
+    // Um erro (descodificação, ou o iPhone a recuperar memória): nunca fica
+    // ninguém preso. O que vinha da memória passa a tocar da rede.
+    ouvir(el, "error", () => {
+      if (!vivo) return;
+      const i = videos.indexOf(el);
+      if (!fonte[i]) return; // as `<source>` do HTML: o browser tenta as outras
+      if (daMemoria[i]) {
+        const u = fonte[i];
+        fonte[i] = daRedeDe(i);
+        daMemoria[i] = false;
+        if (u) URL.revokeObjectURL(u);
+      }
+      if (aPassar && i === proximo()) {
+        cancelarPassagem();
+        return;
+      }
+      if (i === atual && !aPassar) {
+        const t = el.currentTime;
+        el.src = fonte[i] ?? daRedeDe(i);
+        el.load();
+        ouvir(el, "loadedmetadata", () => void (el.currentTime = t), true);
+        tocar(el);
+        return;
+      }
+      if (i !== atual) {
+        refazer(i);
+        aquecerSeForHora();
+      }
+    });
     // Depois de uma recusa (escondidos), o take à vista volta quando anda.
     ouvir(el, "playing", () => {
+      if (el === videos[atual] && aEsperarGesto && !el.paused) {
+        // Voltou a andar sem toque (a poupança foi desligada): já não se espera.
+        aEsperarGesto = false;
+        largarGestos();
+      }
       if (el !== videos[atual] || aPassar || mostrado || el.style.opacity !== "0") return;
       if (aEsperaDaCortina(el)) return;
       mostrado = true;
@@ -1055,9 +1186,22 @@ function criarMotor(raiz: HTMLElement): Motor | null {
   depois(1000, () => decidir(null));
 
   // ── O vigia ─────────────────────────────────────────────────────────────
+  let ultimaTentativa = 0;
   const vigiar = () => {
-    if (!vivo || !podeTocar() || aEsperarGesto) {
+    if (!vivo || !podeTocar()) {
       paradoDesde = 0;
+      return;
+    }
+    // À espera de um toque (o aparelho recusa): o vigia não se desliga — de
+    // `TENTAR_DE_NOVO_MS` em `TENTAR_DE_NOVO_MS` tenta outra vez, em silêncio.
+    // Se a poupança for desligada, o vídeo volta sozinho.
+    if (aEsperarGesto) {
+      paradoDesde = 0;
+      const agora = performance.now();
+      if (agora - ultimaTentativa >= TENTAR_DE_NOVO_MS) {
+        ultimaTentativa = agora;
+        tocar(videos[atual]);
+      }
       return;
     }
     const el = videos[atual];
@@ -1074,8 +1218,13 @@ function criarMotor(raiz: HTMLElement): Motor | null {
       mostrar(el);
       verSeChegou();
     }
-    // A meio de uma passagem, quem tem de andar é o seguinte.
+    // A meio de uma passagem, quem tem de andar é o seguinte — e se passou o
+    // prazo sem ele arrancar, desiste-se (ver `cancelarPassagem`).
     if (aPassar) {
+      if (passagem && !passagem.subiu && performance.now() > passagem.limite) {
+        cancelarPassagem();
+        return;
+      }
       const novo = videos[proximo()];
       if (novo.paused) tocar(novo);
       return;

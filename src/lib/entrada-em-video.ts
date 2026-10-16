@@ -349,6 +349,24 @@ export const ENCRAVADO_MS = 1200;
 export const SALTAR_SEM_DADOS_MS = 400;
 
 /**
+ * ── UMA PASSAGEM NUNCA FICA PRESA ─────────────────────────────────────────
+ * Ela (16/10, iPhone, sem poupança de energia): «o vídeo pára» — ao mudar de
+ * vídeo e depois de algum tempo, e fica parado de vez. A passagem esperava
+ * pelo seguinte sem prazo: se ele nunca arrancasse (o iPhone largou o
+ * descodificador ou os dados dele, um `play()` pendurado, um erro no
+ * ficheiro), o que sai chegava ao fim e ficava no último fotograma para
+ * sempre. Agora, se o seguinte não andar até este tempo depois de o que sai
+ * chegar ao fim, a passagem desiste: o que está à vista volta a tocar (em
+ * repetição) e o seguinte é refeito do zero para a volta seguinte. Curto de
+ * propósito: o seguinte já teve o último 1,5 s do que sai para arrancar, e
+ * cada milissegundo daqui é um fotograma parado à vista.
+ */
+export const PASSAGEM_PRESA_MS = 400;
+
+/** Com o aparelho a recusar (poupança de energia), de quanto em quanto se volta a tentar, em silêncio. */
+export const TENTAR_DE_NOVO_MS = 3000;
+
+/**
  * ── A VERSÃO LEVE, SÓ PARA ARRANCAR NUMA REDE FRACA ───────────────────────
  * O take de entrada é o único que toca da rede (os seguintes tocam da memória
  * do aparelho). Ao alto, a versão normal pede 4 a 6 Mbit/s; um 4G a perder

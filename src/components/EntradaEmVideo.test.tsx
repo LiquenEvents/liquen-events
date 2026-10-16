@@ -484,8 +484,9 @@ describe("EntradaEmVideo", () => {
     Object.defineProperty(a, "currentTime", { configurable: true, value: 16.5, writable: true });
     act(() => void a.dispatchEvent(new Event("timeupdate")));
     expect(b.style.opacity).toBe("0");
-    // O novo já tem imagem, mas o «playing» ainda não chegou; o velho acabou.
+    // O novo já anda, mas o «playing» ainda não chegou; o velho acabou.
     Object.defineProperty(b, "readyState", { configurable: true, value: 3 });
+    Object.defineProperty(b, "currentTime", { configurable: true, value: 0.2, writable: true });
     a.currentTime = 18;
     act(() => void a.dispatchEvent(new Event("ended")));
     expect(b.style.opacity).toBe("1");
@@ -807,6 +808,65 @@ describe("EntradaEmVideo", () => {
       expect(a.querySelectorAll("source")).toHaveLength(0);
     });
 
+    it("um erro num take da memória: larga a cópia e passa a tocar da rede", async () => {
+      const { container } = await montar();
+      const [a, b] = videos(container);
+      Object.defineProperty(a, "duration", { configurable: true, value: 18 });
+      Object.defineProperty(a, "currentTime", { configurable: true, value: 2, writable: true });
+      comecar(a);
+      responder(true);
+      await esperar();
+      a.currentTime = 15.5;
+      act(() => void a.dispatchEvent(new Event("timeupdate")));
+      expect(b.getAttribute("src")).toBe("blob:take-1");
+      act(() => void b.dispatchEvent(new Event("error")));
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:take-1");
+      expect(b.getAttribute("src")).toBe("/videos/entrada/v4/entrada-2-paisagem.mp4");
+    });
+
+    it("depois de cada passagem, o que saiu larga o ficheiro (no máximo dois carregados)", async () => {
+      const { container } = await montar();
+      const [a, b, c] = videos(container);
+      Object.defineProperty(a, "duration", { configurable: true, value: 18 });
+      Object.defineProperty(a, "currentTime", { configurable: true, value: 2, writable: true });
+      comecar(a);
+      responder(true); // o 2
+      await esperar();
+      responder(true); // o 3
+      await esperar();
+      responder(true); // a cópia do de abertura
+      await esperar();
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      try {
+        // 1 → 2
+        a.currentTime = 16.5;
+        act(() => void a.dispatchEvent(new Event("timeupdate")));
+        act(() => void b.dispatchEvent(new Event("canplaythrough")));
+        act(() => void a.dispatchEvent(new Event("timeupdate")));
+        act(() => void b.dispatchEvent(new Event("playing")));
+        act(() => void vi.advanceTimersByTime(1000));
+        expect(b.style.opacity).toBe("1");
+        // 2 → 3: o 3 é aquecido da memória perto do fim do 2…
+        Object.defineProperty(b, "duration", { configurable: true, value: 18 });
+        Object.defineProperty(b, "currentTime", {
+          configurable: true,
+          value: 16.5,
+          writable: true,
+        });
+        act(() => void b.dispatchEvent(new Event("timeupdate")));
+        expect(c.getAttribute("src")).toBe("blob:take-2");
+        act(() => void c.dispatchEvent(new Event("canplaythrough")));
+        act(() => void b.dispatchEvent(new Event("timeupdate")));
+        act(() => void c.dispatchEvent(new Event("playing")));
+        act(() => void vi.advanceTimersByTime(1000));
+      } finally {
+        vi.useRealTimers();
+      }
+      expect(c.style.opacity).toBe("1");
+      // …e o 2, que saiu, larga o ficheiro (volta a ser aquecido na sua vez).
+      expect(b.getAttribute("src")).toBeNull();
+    });
+
     it("se o download falhar, toca da rede como antes", async () => {
       const { container } = await montar();
       const [a, b] = videos(container);
@@ -1035,6 +1095,123 @@ describe("EntradaEmVideo", () => {
       expect(play).toHaveBeenCalled();
       act(() => void b.dispatchEvent(new Event("playing")));
       expect(b.style.opacity).toBe("1");
+    });
+
+    describe("ela (16/10, iPhone): «o vídeo pára» — ao mudar de vídeo, e fica parado de vez", () => {
+      /** Leva o take à vista (a) até à passagem para o seguinte (b), pronto a tocar. */
+      async function ateAPassagem() {
+        const r = await montar();
+        const [a, b] = videos(r.container);
+        comecar(a);
+        act(() => void b.dispatchEvent(new Event("canplaythrough")));
+        Object.defineProperty(a, "duration", { configurable: true, value: 18 });
+        Object.defineProperty(a, "currentTime", {
+          configurable: true,
+          value: 16.5,
+          writable: true,
+        });
+        act(() => void a.dispatchEvent(new Event("timeupdate")));
+        return { ...r, a, b };
+      }
+      /** O que sai chega ao fim e pára no último fotograma. */
+      function chegaAoFim(a: HTMLVideoElement) {
+        a.currentTime = 18;
+        Object.defineProperty(a, "ended", { configurable: true, value: true });
+        Object.defineProperty(a, "paused", { configurable: true, value: true });
+        act(() => void a.dispatchEvent(new Event("ended")));
+      }
+
+      it("o seguinte nunca arranca: a passagem desiste e o que está à vista volta a tocar", async () => {
+        const { a, b } = await ateAPassagem();
+        expect(b.style.opacity).toBe("0");
+        chegaAoFim(a);
+        play.mockClear();
+        act(() => void vi.advanceTimersByTime(2600));
+        // Antes: parado no último fotograma, para sempre.
+        expect(a.loop).toBe(true);
+        expect(a.style.opacity).toBe("1");
+        expect(play).toHaveBeenCalled();
+        // O seguinte foi refeito do zero (volta a ser aquecido)…
+        expect(b.style.opacity).toBe("0");
+        // …e um «playing» atrasado da passagem desistida já não o põe à vista.
+        Object.defineProperty(b, "paused", { configurable: true, value: true });
+        act(() => void b.dispatchEvent(new Event("playing")));
+        expect(b.style.opacity).toBe("0");
+      });
+
+      it("o seguinte com imagem mas PARADO nunca sobe à vista: desiste-se em 0,4 s", async () => {
+        const { a, b } = await ateAPassagem();
+        // Tem imagem (aquecido), mas não anda: o tempo ficou no 0.
+        Object.defineProperty(b, "readyState", { configurable: true, value: 4 });
+        chegaAoFim(a);
+        expect(b.style.opacity).toBe("0");
+        play.mockClear();
+        act(() => void vi.advanceTimersByTime(450));
+        expect(b.style.opacity).toBe("0");
+        expect(a.style.opacity).toBe("1");
+        expect(a.loop).toBe(true);
+        expect(play).toHaveBeenCalled(); // o que está à vista recomeça
+      });
+
+      it("depois de desistir, a passagem faz-se na volta seguinte", async () => {
+        const { a, b } = await ateAPassagem();
+        chegaAoFim(a);
+        act(() => void vi.advanceTimersByTime(2600));
+        // O que está à vista recomeçou e anda; o seguinte ficou pronto.
+        Object.defineProperty(a, "ended", { configurable: true, value: false });
+        Object.defineProperty(a, "paused", { configurable: true, value: false });
+        act(() => void b.dispatchEvent(new Event("canplaythrough")));
+        a.currentTime = 16.5;
+        act(() => void a.dispatchEvent(new Event("timeupdate")));
+        act(() => void b.dispatchEvent(new Event("playing")));
+        expect(b.style.opacity).toBe("1");
+      });
+
+      it("o seguinte recusado (NotAllowedError) não esconde nada nem fica à espera de um toque", async () => {
+        const r = await montar();
+        const [a, b] = videos(r.container);
+        comecar(a);
+        act(() => void b.dispatchEvent(new Event("canplaythrough")));
+        play.mockImplementation(function (this: HTMLVideoElement) {
+          return this === b
+            ? Promise.reject(Object.assign(new Error("no"), { name: "NotAllowedError" }))
+            : Promise.resolve();
+        });
+        Object.defineProperty(a, "duration", { configurable: true, value: 18 });
+        Object.defineProperty(a, "currentTime", {
+          configurable: true,
+          value: 16.5,
+          writable: true,
+        });
+        await act(async () => {
+          a.dispatchEvent(new Event("timeupdate"));
+          for (let k = 0; k < 4; k++) await Promise.resolve();
+        });
+        expect(a.style.opacity).toBe("1");
+        expect(a.loop).toBe(true); // desistiu: o que está à vista repete
+        expect(r.container.querySelector("img[data-entrada-imagem]")).toBeNull();
+        // O vigia continua vivo: se o browser parar o que está à vista, volta.
+        Object.defineProperty(a, "paused", { configurable: true, value: true });
+        play.mockClear();
+        act(() => void vi.advanceTimersByTime(1100));
+        expect(play).toHaveBeenCalled();
+      });
+
+      it("à espera de um toque, o vigia tenta outra vez sozinho — e o vídeo volta sem toque", async () => {
+        play.mockImplementation(() =>
+          Promise.reject(Object.assign(new Error("no"), { name: "NotAllowedError" })),
+        );
+        const { container } = await montar();
+        const [a] = videos(container);
+        expect(a.style.opacity).toBe("0");
+        play.mockImplementation(() => Promise.resolve());
+        play.mockClear();
+        act(() => void vi.advanceTimersByTime(3100));
+        expect(play).toHaveBeenCalled();
+        Object.defineProperty(a, "paused", { configurable: true, value: false });
+        act(() => void a.dispatchEvent(new Event("playing")));
+        expect(a.style.opacity).toBe("1");
+      });
     });
 
     it("fora do ecrã não insiste: o vídeo fica parado de propósito", async () => {
