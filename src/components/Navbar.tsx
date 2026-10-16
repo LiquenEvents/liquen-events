@@ -623,8 +623,18 @@ export default function Navbar() {
           </Link>
 
           {/* Mobile: language toggle on the LEFT, balancing the centred logo
-              (hidden while the menu is open — the overlay carries its own). */}
-          <div className="lg:hidden flex items-center">
+              (hidden while the menu is open — the overlay carries its own).
+
+              `relative z-10`: o logótipo é `absolute` e por isso pinta POR
+              CIMA de tudo o que está no fluxo — incluindo este selector. E o
+              PNG do logótipo tem margens transparentes largas (a marca ocupa
+              só de 23% a 77% da largura), portanto a caixa do link estende-se
+              por cima do «EN» onde não se vê nada. Ela (16/10): «quando
+              carrego no inglês… vai carregar para o logótipo». MEDIDO a 360,
+              375 e 390 px no topo da página: o «EN» recebia 0 de 25 toques —
+              iam todos para o início. Por cima do logótipo, o selector recebe
+              os seus. */}
+          <div className="lg:hidden relative z-10 flex items-center">
             {!isOpen && <LanguageToggle light={light} />}
           </div>
 
@@ -708,8 +718,9 @@ export default function Navbar() {
           </div>
 
           {/* Mobile: hamburger on the RIGHT (balances the left PT/EN toggle
-              around the centred logo). */}
-          <div className="lg:hidden flex items-center">
+              around the centred logo). Por cima do logótipo pela mesma razão
+              do selector de idioma, à esquerda. */}
+          <div className="lg:hidden relative z-10 flex items-center">
             {/* `alvo-toque` porque este botão media 46×43 px com toque emulado
                 — falha o mínimo por UM pixel de altura, e é a única forma de
                 abrir a navegação num telemóvel em todas as páginas do sítio.
