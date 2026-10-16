@@ -208,24 +208,31 @@ export function arrancarEntrada(fontes: string[], chave: string, esperaMax: numb
     typeof c.getAnimations === "function" &&
     getComputedStyle(c).display !== "none";
 
-  const sincronizar = () => {
-    if (!c || !cortinaNoEcra()) return;
-    const pano = c.getAnimations()[0];
-    if (!pano) return;
-    // O browser devolve o tempo como o normalizou («1.98s», não «1980ms»).
-    const tempo = getComputedStyle(doc.documentElement).getPropertyValue("--cortina-sobe").trim();
-    const sobe =
-      (parseFloat(tempo) || 0) * (/ms$/.test(tempo) ? 1 : /s$/.test(tempo) ? 1000 : 0) || 1980;
-    const decorrido = typeof pano.currentTime === "number" ? pano.currentTime : 0;
+  /**
+   * O take arranca escondido só até o descodificador ter o 1.º fotograma, e
+   * fica PARADO nele enquanto junta reserva («pode tocar até ao fim sem
+   * parar» — `canplaythrough`). MEDIDO num 4G fraco: deixado a tocar enquanto
+   * carregava, gastava o pouco que chegava e, ao ficar à vista, parava e
+   * arrancava várias vezes. Parado no 1.º fotograma, a reserva junta-se e o
+   * take, quando arranca, já não pára.
+   *
+   * Com a cortina no ecrã, arranca com a subida do pano (ou o pano espera por
+   * ele, no máximo `esperaMax`). Sem cortina, arranca quando tiver reserva, no
+   * máximo `esperaMax` depois do 1.º fotograma.
+   */
+  const preparar = () => {
+    const comCortina = !!c && cortinaNoEcra();
+    const pano = comCortina && c ? c.getAnimations()[0] : undefined;
+    let pronto = false;
+    let largou = false;
+    let segurou = false;
     const animacoes = () => {
+      if (!c) return [];
       let a = c.getAnimations({ subtree: true });
       const fotos = doc.querySelectorAll(".hero-settle");
       for (let i = 0; i < fotos.length; i++) a = a.concat(fotos[i].getAnimations());
       return a;
     };
-    let pronto = false;
-    let largou = false;
-    let segurou = false;
     // Enquanto este atributo existir, o componente não toca neste vídeo.
     v.setAttribute("data-a-espera", "");
     const largar = () => {
@@ -242,24 +249,23 @@ export function arrancarEntrada(fontes: string[], chave: string, esperaMax: numb
     const ficaPronto = () => {
       if (pronto || largou) return;
       pronto = true;
-      // O pano já está à espera dele: sobem juntos, sem voltar ao início (um
-      // salto agora era uma espera a mais à vista).
-      if (segurou) {
-        largar();
-        return;
-      }
-      v.pause();
-      try {
-        v.currentTime = 0;
-      } catch {
-        // ainda sem dados para saltar: fica onde está
-      }
+      // Sem cortina, ou com o pano já à espera dele: arranca agora.
+      if (!pano || segurou) largar();
     };
     v.addEventListener(
       "playing",
       () => {
+        if (largou) return;
+        // O 1.º fotograma está pronto: pára nele e junta reserva.
+        v.pause();
+        try {
+          v.currentTime = 0;
+        } catch {
+          // ainda sem dados para saltar: fica onde está
+        }
         if (v.readyState >= 4) ficaPronto();
         else v.addEventListener("canplaythrough", ficaPronto, { once: true });
+        if (!pano) setTimeout(largar, esperaMax);
       },
       { once: true },
     );
@@ -272,6 +278,12 @@ export function arrancarEntrada(fontes: string[], chave: string, esperaMax: numb
         largar();
       });
     }
+    if (!pano) return;
+    // O browser devolve o tempo como o normalizou («1.98s», não «1980ms»).
+    const tempo = getComputedStyle(doc.documentElement).getPropertyValue("--cortina-sobe").trim();
+    const sobe =
+      (parseFloat(tempo) || 0) * (/ms$/.test(tempo) ? 1 : /s$/.test(tempo) ? 1000 : 0) || 1980;
+    const decorrido = typeof pano.currentTime === "number" ? pano.currentTime : 0;
     setTimeout(
       () => {
         if (largou) return;
@@ -287,25 +299,19 @@ export function arrancarEntrada(fontes: string[], chave: string, esperaMax: numb
       // Um pouco ANTES da subida: o pano anda na placa gráfica, sozinho, mas
       // este relógio corre no processador, que nesse segundo está ocupado a
       // montar a página — MEDIDO, chegava 0,1 a 0,4 s atrasado ao pano.
-      // Arrancado 0,35 s antes, o vídeo já anda quando o pano o destapa.
-      Math.max(0, sobe - decorrido - 350),
+      // Arrancado 0,2 s antes, o vídeo já anda quando o pano o destapa
+      // (medido: entre 0,2 e 0,45 s antes do pano, em sete formas de entrar).
+      Math.max(0, sobe - decorrido - 200),
     );
   };
 
-  // Sem cortina, arranca já (o `autoplay` também o faz; isto é para não
-  // depender só dele).
-  if (!cortinaNoEcra() && !doc.prerendering) {
-    const p = v.play();
-    if (p) p.catch(() => undefined);
-  }
-
   // Uma página pré-desenhada (o sítio prepara a seguinte quando o dedo se
   // aproxima de uma ligação) ainda não é página: a cortina está parada à
-  // espera, e a sincronização também.
+  // espera, e a preparação também.
   if (doc.prerendering) {
-    doc.addEventListener("prerenderingchange", sincronizar, { once: true });
+    doc.addEventListener("prerenderingchange", preparar, { once: true });
   } else {
-    sincronizar();
+    preparar();
   }
 }
 
@@ -328,492 +334,586 @@ export const HTML_DOS_VIDEOS =
       `<video data-entrada-video="${k}" preload="none" ${COMUNS} style="${ESTILO}"></video>`,
   ).join("") + `<script>${GUIAO_DA_ENTRADA}</script>`;
 
+/**
+ * O que toca os vídeos, e que SOBREVIVE a sair da página inicial.
+ *
+ * Ela (16/10): «quando vou a outra página do site e depois volto à página
+ * inicial, ele fica ali um bocadinho parado numa foto… eu quero que continue a
+ * correr o vídeo lindamente». Antes, sair da página deitava os vídeos fora, e
+ * voltar começava do zero: escolher, descarregar, descodificar — e entretanto
+ * via-se a fotografia. Agora os três `<video>` (com o que já descarregaram e
+ * descodificaram) ficam guardados enquanto a pessoa anda pelo sítio; ao voltar,
+ * os MESMOS elementos entram na página nova e o take continua de onde estava —
+ * o fotograma já está pintado, e a fotografia nem chega a ver-se.
+ *
+ * `ligar` e `desligar` só tratam do que depende da página (o observador do
+ * ecrã, o vigia, os ouvintes da janela); o resto vive enquanto o separador.
+ */
+interface Motor {
+  videos: HTMLVideoElement[];
+  ligar(raiz: HTMLElement): void;
+  desligar(): void;
+  destruir(): void;
+}
+let motorDaSessao: Motor | null = null;
+
+/** Para os testes: esquece o motor guardado (como um separador novo). */
+export function esquecerMotorDaSessao() {
+  motorDaSessao?.destruir();
+  motorDaSessao = null;
+}
+
+function criarMotor(raiz: HTMLElement): Motor | null {
+  const videos = [...raiz.querySelectorAll<HTMLVideoElement>("video")];
+  if (videos.length < NUMERO_DE_VIDEOS) return null;
+  let atual = Math.max(
+    0,
+    videos.findIndex((v) => v.hasAttribute("data-primeiro")),
+  ); // o clip (= o <video>) que está à vista
+  const primeiro = videos[atual];
+  // Um browser que não toca nenhum dos formatos fica com a fotografia.
+  const podeTocarTipo = (tipo: string) => primeiro.canPlayType(tipo);
+  const talvez = formatoDoEndereco(primeiro.currentSrc) ?? formatoQueToca(podeTocarTipo);
+  if (!talvez) return null;
+  // O formato dos vídeos seguintes: para já o que o browser escolheu para o
+  // de entrada; o aparelho é perguntado a seguir (ver `melhorFormato`), e a
+  // preparação dos seguintes espera pela resposta (no máximo 1 s).
+  let formato: Formato = talvez;
+  let decidido = false;
+
+  let vivo = true;
+  // Com a página inicial à vista (ver `Motor`). Fora dela nada toca, mas os
+  // downloads continuam — para estarem prontos quando ela voltar.
+  let ligado = false;
+  // A fila do que vem a seguir: a 1.ª volta começa no take de entrada e os
+  // outros vêm sorteados; as voltas seguintes são sorteadas inteiras (ver
+  // `primeiraVolta`/`novaVolta`). Mantém-se sempre com pelo menos dois à
+  // frente, para a preparação em cadeia saber o que vem depois do próximo.
+  const fila: number[] = primeiraVolta(atual).slice(1);
+  const encherFila = () => {
+    while (fila.length < 2) fila.push(...novaVolta(fila[fila.length - 1] ?? atual));
+  };
+  encherFila();
+  const proximo = () => fila[0];
+  let aPassar = false;
+  let ultimoTempo = -1; // para o vigia: o último tempo visto do vídeo à vista
+  let paradoDesde = 0;
+  let naTela = true;
+  let separadorVisivel = document.visibilityState !== "hidden";
+  const aTocar = new Set<HTMLVideoElement>();
+  /** Pronto a arrancar: com o 1.º fotograma descodificado. */
+  const pronto = videos.map(() => false);
+  /** Já se pediu a fonte (o download, ou o endereço da rede). */
+  const pedido = videos.map((_, i) => i === atual);
+  /** De onde toca: o ficheiro já na memória (`blob:`), ou o endereço da rede. */
+  const fonte: Array<string | null> = videos.map(() => null);
+  const daMemoria = videos.map(() => false);
+  const aquecido = videos.map((_, i) => i === atual);
+  const aAquecer = new Set<HTMLVideoElement>();
+  const naMemoria: string[] = [];
+  // Os `pause()` feitos por nós. Uma paragem que não esteja aqui foi o
+  // sistema (uma notificação, o aviso da bateria) — e o vídeo volta logo.
+  const pausadoPorNos = new WeakSet<HTMLVideoElement>();
+  const limpar: Array<() => void> = [];
+  const depois = (ms: number, fn: () => void) => {
+    const t = window.setTimeout(() => {
+      if (vivo) fn();
+    }, ms);
+    limpar.push(() => window.clearTimeout(t));
+  };
+  const podeDescarregar =
+    typeof fetch === "function" &&
+    typeof URL !== "undefined" &&
+    typeof URL.createObjectURL === "function";
+
+  const ouvir = <K extends keyof HTMLVideoElementEventMap>(
+    el: HTMLVideoElement,
+    ev: K,
+    fn: (e: HTMLVideoElementEventMap[K]) => void,
+    once = false,
+  ) => {
+    el.addEventListener(ev, fn, { once });
+    limpar.push(() => el.removeEventListener(ev, fn));
+  };
+
+  for (const el of videos) {
+    // Propriedade e atributo: o iPhone olha para os dois.
+    el.muted = true;
+    el.defaultMuted = true;
+  }
+
+  const ecraDeAgora = () => ({
+    largura: window.innerWidth,
+    altura: window.innerHeight,
+    densidade: window.devicePixelRatio || 1,
+  });
+
+  const podeTocar = () => ligado && naTela && separadorVisivel;
+  /** O take de entrada à espera da cortina: é o guião do HTML que o larga. */
+  const aEsperaDaCortina = (el: HTMLVideoElement) => el.hasAttribute("data-a-espera");
+
+  // O aparelho recusou arrancar sozinho (poupança de bateria): espera-se pelo
+  // primeiro gesto da pessoa, em qualquer sítio, e tenta-se outra vez.
+  const GESTOS = ["pointerdown", "touchstart", "keydown", "click"] as const;
+  let aEsperarGesto = false;
+  const largarGestos = () => {
+    for (const g of GESTOS) window.removeEventListener(g, aoGesto, true);
+  };
+  function aoGesto() {
+    if (!vivo) return;
+    aEsperarGesto = false;
+    largarGestos();
+    retomar();
+  }
+  const esperarPorGesto = () => {
+    if (aEsperarGesto) return;
+    aEsperarGesto = true;
+    for (const g of GESTOS) window.addEventListener(g, aoGesto, { capture: true, passive: true });
+  };
+  limpar.push(largarGestos);
+
+  function pausar(el: HTMLVideoElement) {
+    if (!el.paused) pausadoPorNos.add(el);
+    el.pause();
+  }
+
+  function tocar(el: HTMLVideoElement) {
+    pausadoPorNos.delete(el);
+    aAquecer.delete(el);
+    aTocar.add(el);
+    if (!podeTocar() || aEsperaDaCortina(el)) return;
+    const p = el.play();
+    p?.catch((e: unknown) => {
+      const nome = (e as { name?: string })?.name;
+      if (nome === "NotAllowedError") esperarPorGesto();
+      // AbortError (um `pause()` a meio do arranque) e erros de rede: o vigia
+      // volta a tentar no segundo seguinte.
+    });
+  }
+
+  function pararTudo() {
+    for (const el of aTocar) pausar(el);
+  }
+  function retomar() {
+    if (!vivo || !podeTocar()) return;
+    for (const el of aTocar) tocar(el);
+  }
+
+  /**
+   * Ao regressar (de outra aplicação, de um aviso do sistema): retoma, e
+   * meio segundo depois confirma que a imagem anda. Se não anda e o vídeo
+   * tem dados, o descodificador ficou preso — um salto para o mesmo
+   * instante solta-o.
+   */
+  function retomarEConfirmar() {
+    retomar();
+    const el = videos[atual];
+    const antes = el.currentTime;
+    depois(500, () => {
+      if (!podeTocar() || aEsperarGesto || el !== videos[atual] || aPassar) return;
+      if (aEsperaDaCortina(el)) return;
+      if (el.paused) tocar(el);
+      else if (el.currentTime === antes && el.readyState >= 2) {
+        el.currentTime = antes;
+        tocar(el);
+      }
+    });
+  }
+
+  /** Falta pouco para o fim do take à vista: é hora de aquecer o seguinte. */
+  const pertoDoFim = () => {
+    const el = videos[atual];
+    const d = el.duration;
+    return !Number.isFinite(d) || d <= 0 || d - el.currentTime <= AQUECER_ANTES_S;
+  };
+
+  /**
+   * Aquece o clip `i`: põe-lhe a fonte e toca-o escondido até ter o 1.º
+   * fotograma pronto, e pára-o no início. É o único jeito de o iPhone o
+   * preparar — ignora o `preload` de um vídeo que ninguém mandou tocar.
+   */
+  function aquecer(i: number) {
+    const src = fonte[i];
+    if (aquecido[i] || !src) return;
+    aquecido[i] = true;
+    const el = videos[i];
+    el.preload = "auto";
+    el.src = src;
+    el.load();
+    const ficaPronto = () => {
+      if (!vivo || pronto[i]) return;
+      pronto[i] = true;
+      if (aAquecer.has(el)) {
+        aAquecer.delete(el);
+        pausar(el);
+        el.currentTime = 0;
+      }
+      prepararOQueVem();
+    };
+    ouvir(el, "canplaythrough", ficaPronto, true);
+    aAquecer.add(el);
+    el.play()?.catch(() => undefined);
+  }
+
+  /** Aquece o próximo da fila se já tiver fonte e for a altura. */
+  function aquecerSeForHora() {
+    const i = proximo();
+    if (aquecido[i] || !fonte[i]) return;
+    // Da rede: aquece-se logo (precisa de tempo para descarregar o início).
+    // Da memória: só perto do fim do take à vista (ver o cabeçalho).
+    if (!daMemoria[i] || pertoDoFim()) aquecer(i);
+  }
+
+  /**
+   * Prepara o clip `i`: descarrega-o INTEIRO para a memória e, quando chega,
+   * passa ao seguinte da fila. Se o browser não deixar descarregar assim,
+   * fica com o endereço da rede e aquece-se logo (o caminho antigo).
+   */
+  function preparar(i: number) {
+    if (i >= NUMERO_DE_VIDEOS || pedido[i]) return;
+    pedido[i] = true;
+    const endereco = enderecoDoVideo(i, varianteParaOEcra(ecraDeAgora(), i), formato);
+    const daRede = () => {
+      if (!vivo) return;
+      fonte[i] = endereco;
+      daMemoria[i] = false;
+      aquecer(i);
+    };
+    if (!podeDescarregar) {
+      daRede();
+      return;
+    }
+    const corte = new AbortController();
+    limpar.push(() => corte.abort());
+    fetch(endereco, { signal: corte.signal })
+      .then((r) => {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.blob();
+      })
+      .then((b) => {
+        if (!vivo) return;
+        const u = URL.createObjectURL(b);
+        naMemoria.push(u);
+        fonte[i] = u;
+        daMemoria[i] = true;
+        aquecerSeForHora();
+        prepararOQueVem();
+      })
+      .catch(() => {
+        if (!vivo) return;
+        daRede();
+        prepararOQueVem();
+      });
+  }
+
+  /** Prepara o primeiro da fila que ainda não foi pedido (um de cada vez). */
+  function prepararOQueVem() {
+    if (!decidido || !inicioAssente) return;
+    for (const i of fila) {
+      if (!pedido[i]) {
+        preparar(i);
+        return;
+      }
+      // Ainda a chegar: o seguinte espera (um de cada vez, para não dividir
+      // a rede). Da rede, espera-se que esteja pronto a tocar.
+      if (!fonte[i]) return;
+      if (!daMemoria[i] && !pronto[i] && videos[i].readyState < 4) return;
+    }
+  }
+
+  /** Pôr o vídeo `el` à vista, por cima dos outros. */
+  const mostrar = (el: HTMLVideoElement) => {
+    el.style.zIndex = "2";
+    el.style.opacity = "1";
+  };
+
+  const passar = () => {
+    if (aPassar) return;
+    const velho = videos[atual];
+    const seguinte = proximo();
+    const novo = videos[seguinte];
+    // Ainda não chegou (rede lenta)? Este repete-se em vez de parar, e a
+    // passagem tenta-se outra vez na próxima volta.
+    if (!pronto[seguinte] && novo.readyState < 3) {
+      velho.loop = true;
+      if (fonte[seguinte]) aquecer(seguinte);
+      else preparar(seguinte);
+      return;
+    }
+    aPassar = true;
+    velho.loop = false;
+    ouvir(
+      novo,
+      "playing",
+      () => {
+        if (!vivo) return;
+        velho.style.zIndex = "1";
+        mostrar(novo);
+        const t = setTimeout(() => {
+          if (!vivo) return;
+          pausar(velho);
+          aTocar.delete(velho);
+          velho.style.opacity = "0";
+          velho.style.zIndex = "0";
+          velho.currentTime = 0;
+          atual = seguinte;
+          fila.shift();
+          encherFila();
+          aPassar = false;
+          ultimoTempo = -1;
+          prepararOQueVem();
+          aquecerSeForHora();
+        }, PASSAGEM_MS + 50);
+        limpar.push(() => clearTimeout(t));
+      },
+      true,
+    );
+    novo.currentTime = 0;
+    tocar(novo);
+  };
+
+  for (const el of videos) {
+    ouvir(el, "timeupdate", () => {
+      if (el !== videos[atual] || aPassar) return;
+      if (eHoraDePassar(el.currentTime, el.duration)) passar();
+      else aquecerSeForHora();
+    });
+    // Parado sem ter sido por nós: foi o sistema (uma notificação, o aviso
+    // da bateria, uma chamada). Volta logo, e insiste aos 0,3 s e a 1 s.
+    ouvir(el, "pause", () => {
+      if (pausadoPorNos.has(el)) {
+        pausadoPorNos.delete(el);
+        return;
+      }
+      if (!vivo || el.ended || !podeTocar() || aEsperarGesto || aEsperaDaCortina(el)) return;
+      if (aAquecer.has(el)) {
+        el.play()?.catch(() => undefined);
+        return;
+      }
+      if (!aTocar.has(el)) return;
+      tocar(el);
+      for (const ms of [300, 1000]) {
+        depois(ms, () => {
+          if (el.paused && !el.ended && aTocar.has(el) && podeTocar() && !aEsperarGesto) {
+            tocar(el);
+          }
+        });
+      }
+    });
+    // Rede de segurança: se o `timeupdate` da recta final se perder.
+    ouvir(el, "ended", () => {
+      if (el !== videos[atual]) return;
+      passar();
+      if (!aPassar) {
+        el.currentTime = 0;
+        tocar(el);
+      }
+    });
+  }
+
+  // O take de entrada sobe por cima da fotografia quando JÁ está a tocar —
+  // pode já estar, se começou antes de o JavaScript chegar.
+  let mostrado = false;
+  // A preparação dos seguintes só começa quando o de entrada já chegou
+  // INTEIRO. MEDIDO num 4G fraco (5 Mbit/s): começar logo que ele tinha
+  // «dados para seguir» punha os dois a dividir a rede, e o take à vista
+  // parava três vezes no primeiro segundo e meio. Numa rede tão lenta que ele
+  // nunca chega inteiro antes do fim, o take repete-se (sem parar) e o
+  // seguinte prepara-se nessa volta — porque, tocado até ao fim, chegou todo.
+  let inicioAssente = false;
+  const assentar = () => {
+    if (!vivo || inicioAssente) return;
+    inicioAssente = true;
+    prepararOQueVem();
+  };
+  const chegouInteiro = () => {
+    const d = primeiro.duration;
+    const b = primeiro.buffered;
+    if (!Number.isFinite(d) || d <= 0 || !b) return false;
+    for (let k = 0; k < b.length; k++) {
+      if (b.start(k) <= primeiro.currentTime + 0.5 && b.end(k) >= d - 0.3) return true;
+    }
+    return false;
+  };
+  const verSeChegou = () => {
+    if (mostrado && chegouInteiro()) assentar();
+  };
+  const mostrarPrimeiro = () => {
+    if (!vivo || mostrado) return;
+    mostrado = true;
+    mostrar(primeiro);
+    verSeChegou();
+  };
+  ouvir(primeiro, "canplaythrough", () => {
+    pronto[atual] = true;
+    verSeChegou();
+  });
+  // O guião do HTML larga o take de entrada quando ele tem reserva (ou com o
+  // pano); daí em diante é este motor que o toca — e que trata de uma recusa
+  // do aparelho (poupança de bateria) esperando pelo primeiro toque.
+  if (aEsperaDaCortina(primeiro)) {
+    const mo = new MutationObserver(() => {
+      if (aEsperaDaCortina(primeiro)) return;
+      mo.disconnect();
+      tocar(primeiro);
+    });
+    mo.observe(primeiro, { attributes: true, attributeFilter: ["data-a-espera"] });
+    limpar.push(() => mo.disconnect());
+  }
+  ouvir(primeiro, "progress", verSeChegou);
+  ouvir(primeiro, "timeupdate", verSeChegou);
+  if (primeiro.readyState >= 2) mostrarPrimeiro();
+  else {
+    ouvir(primeiro, "playing", mostrarPrimeiro, true);
+    // Parado no 1.º fotograma à espera de reserva: mostra-o já, em vez da
+    // fotografia (que só é esse fotograma na floresta).
+    ouvir(primeiro, "loadeddata", mostrarPrimeiro, true);
+  }
+  tocar(primeiro);
+
+  // O aparelho é perguntado que formato descodifica no chip, para os vídeos
+  // seguintes (o de entrada já vai no que o browser escolheu das `<source>`).
+  const decidir = (f: Formato | null) => {
+    if (!vivo || decidido) return;
+    if (f) formato = f;
+    decidido = true;
+    prepararOQueVem();
+  };
+  melhorFormato(podeTocarTipo, perguntaDoNavegador(), varianteParaOEcra(ecraDeAgora(), 1))
+    .then(decidir)
+    .catch(() => decidir(null));
+  depois(1000, () => decidir(null));
+
+  // ── O vigia ─────────────────────────────────────────────────────────────
+  const vigiar = () => {
+    if (!vivo || !podeTocar() || aEsperarGesto) {
+      paradoDesde = 0;
+      return;
+    }
+    const el = videos[atual];
+    if (aEsperaDaCortina(el)) {
+      paradoDesde = 0;
+      return;
+    }
+    // Parado pelo browser (não por nós): volta a tocar.
+    if (el.paused && !el.ended) tocar(el);
+    // A meio de uma passagem, quem tem de andar é o seguinte.
+    if (aPassar) {
+      const novo = videos[proximo()];
+      if (novo.paused) tocar(novo);
+      return;
+    }
+    const t = el.currentTime;
+    if (t !== ultimoTempo) {
+      ultimoTempo = t;
+      paradoDesde = 0;
+      return;
+    }
+    const agora = performance.now();
+    if (!paradoDesde) {
+      paradoDesde = agora;
+      return;
+    }
+    if (agora - paradoDesde < ENCRAVADO_MS) return;
+    paradoDesde = 0;
+    // Ainda a descarregar numa rede lenta: recarregar deitava fora o que já
+    // chegou. Espera-se.
+    if (el.networkState === el.NETWORK_LOADING && el.readyState < 3) return;
+    const seguinte = proximo();
+    if (mostrado && (pronto[seguinte] || videos[seguinte].readyState >= 3)) {
+      passar(); // o seguinte está pronto: segue-se para ele
+    } else {
+      // Recarrega este no mesmo ponto (o de entrada volta a tentar as suas
+      // fontes; os outros a sua, da memória ou da rede).
+      if (el === primeiro) el.load();
+      else {
+        el.src =
+          fonte[atual] ?? enderecoDoVideo(atual, varianteParaOEcra(ecraDeAgora(), atual), formato);
+        el.load();
+      }
+      ouvir(el, "loadedmetadata", () => void (el.currentTime = t), true);
+      tocar(el);
+    }
+  };
+  let relogio = 0;
+  const io = new IntersectionObserver(
+    ([e]) => {
+      naTela = e.isIntersecting;
+      if (naTela) retomar();
+      else pararTudo();
+    },
+    { threshold: 0 },
+  );
+  const aoMudarSeparador = () => {
+    separadorVisivel = document.visibilityState !== "hidden";
+    if (separadorVisivel) retomarEConfirmar();
+    else pararTudo();
+  };
+  const aoRegressar = () => retomarEConfirmar();
+
+  const desligar = () => {
+    if (!ligado) return;
+    ligado = false;
+    window.clearInterval(relogio);
+    io.disconnect();
+    document.removeEventListener("visibilitychange", aoMudarSeparador);
+    document.removeEventListener("resume", aoRegressar);
+    window.removeEventListener("pageshow", aoRegressar);
+    window.removeEventListener("focus", aoRegressar);
+    // Pára sem esquecer quem estava a tocar: ao voltar, retoma esses.
+    for (const el of aTocar) pausar(el);
+  };
+
+  return {
+    videos,
+    ligar(r: HTMLElement) {
+      if (!vivo || ligado) return;
+      ligado = true;
+      naTela = true;
+      separadorVisivel = document.visibilityState !== "hidden";
+      relogio = window.setInterval(vigiar, 1000);
+      io.observe(r);
+      document.addEventListener("visibilitychange", aoMudarSeparador);
+      // `resume`: o Chrome do Android «congela» a página por trás de outra
+      // aplicação e avisa assim quando a descongela.
+      document.addEventListener("resume", aoRegressar);
+      window.addEventListener("pageshow", aoRegressar);
+      window.addEventListener("focus", aoRegressar);
+      retomarEConfirmar();
+    },
+    desligar,
+    destruir() {
+      desligar();
+      vivo = false;
+      for (const f of limpar) f();
+      for (const el of videos) el.pause();
+      for (const u of naMemoria) URL.revokeObjectURL(u);
+    },
+  };
+}
+
 export default function EntradaEmVideo() {
   const caixa = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const raiz = caixa.current;
-    const videos = raiz ? [...raiz.querySelectorAll<HTMLVideoElement>("video")] : [];
-    if (!raiz || videos.length < NUMERO_DE_VIDEOS) return;
+    if (!raiz) return;
+    // Voltou à página inicial sem recarregar: os mesmos vídeos, a continuar.
+    if (motorDaSessao) {
+      const m = motorDaSessao;
+      if (m.videos[0].parentElement !== raiz) raiz.replaceChildren(...m.videos);
+      m.ligar(raiz);
+      return () => m.desligar();
+    }
     // Numa navegação dentro do sítio o guião do HTML não correu: corre-se aqui.
     if (!raiz.querySelector("[data-primeiro]")) {
       arrancarEntrada(FONTES, CHAVE_DO_ULTIMO, CORTINA_ESPERA_MAX_MS);
     }
-    let atual = Math.max(
-      0,
-      videos.findIndex((v) => v.hasAttribute("data-primeiro")),
-    ); // o clip (= o <video>) que está à vista
-    const primeiro = videos[atual];
-    // Um browser que não toca nenhum dos formatos fica com a fotografia.
-    const podeTocarTipo = (tipo: string) => primeiro.canPlayType(tipo);
-    const talvez = formatoDoEndereco(primeiro.currentSrc) ?? formatoQueToca(podeTocarTipo);
-    if (!talvez) return;
-    // O formato dos vídeos seguintes: para já o que o browser escolheu para o
-    // de entrada; o aparelho é perguntado a seguir (ver `melhorFormato`), e a
-    // preparação dos seguintes espera pela resposta (no máximo 1 s).
-    let formato: Formato = talvez;
-    let decidido = false;
-
-    let vivo = true;
-    // A fila do que vem a seguir: a 1.ª volta começa no take de entrada e os
-    // outros vêm sorteados; as voltas seguintes são sorteadas inteiras (ver
-    // `primeiraVolta`/`novaVolta`). Mantém-se sempre com pelo menos dois à
-    // frente, para a preparação em cadeia saber o que vem depois do próximo.
-    const fila: number[] = primeiraVolta(atual).slice(1);
-    const encherFila = () => {
-      while (fila.length < 2) fila.push(...novaVolta(fila[fila.length - 1] ?? atual));
-    };
-    encherFila();
-    const proximo = () => fila[0];
-    let aPassar = false;
-    let ultimoTempo = -1; // para o vigia: o último tempo visto do vídeo à vista
-    let paradoDesde = 0;
-    let naTela = true;
-    let separadorVisivel = document.visibilityState !== "hidden";
-    const aTocar = new Set<HTMLVideoElement>();
-    /** Pronto a arrancar: com o 1.º fotograma descodificado. */
-    const pronto = videos.map(() => false);
-    /** Já se pediu a fonte (o download, ou o endereço da rede). */
-    const pedido = videos.map((_, i) => i === atual);
-    /** De onde toca: o ficheiro já na memória (`blob:`), ou o endereço da rede. */
-    const fonte: Array<string | null> = videos.map(() => null);
-    const daMemoria = videos.map(() => false);
-    const aquecido = videos.map((_, i) => i === atual);
-    const aAquecer = new Set<HTMLVideoElement>();
-    const naMemoria: string[] = [];
-    // Os `pause()` feitos por nós. Uma paragem que não esteja aqui foi o
-    // sistema (uma notificação, o aviso da bateria) — e o vídeo volta logo.
-    const pausadoPorNos = new WeakSet<HTMLVideoElement>();
-    const limpar: Array<() => void> = [];
-    const depois = (ms: number, fn: () => void) => {
-      const t = window.setTimeout(() => {
-        if (vivo) fn();
-      }, ms);
-      limpar.push(() => window.clearTimeout(t));
-    };
-    const podeDescarregar =
-      typeof fetch === "function" &&
-      typeof URL !== "undefined" &&
-      typeof URL.createObjectURL === "function";
-
-    const ouvir = <K extends keyof HTMLVideoElementEventMap>(
-      el: HTMLVideoElement,
-      ev: K,
-      fn: (e: HTMLVideoElementEventMap[K]) => void,
-      once = false,
-    ) => {
-      el.addEventListener(ev, fn, { once });
-      limpar.push(() => el.removeEventListener(ev, fn));
-    };
-
-    for (const el of videos) {
-      // Propriedade e atributo: o iPhone olha para os dois.
-      el.muted = true;
-      el.defaultMuted = true;
-    }
-
-    const ecraDeAgora = () => ({
-      largura: window.innerWidth,
-      altura: window.innerHeight,
-      densidade: window.devicePixelRatio || 1,
-    });
-
-    const podeTocar = () => naTela && separadorVisivel;
-    /** O take de entrada à espera da cortina: é o guião do HTML que o larga. */
-    const aEsperaDaCortina = (el: HTMLVideoElement) => el.hasAttribute("data-a-espera");
-
-    // O aparelho recusou arrancar sozinho (poupança de bateria): espera-se pelo
-    // primeiro gesto da pessoa, em qualquer sítio, e tenta-se outra vez.
-    const GESTOS = ["pointerdown", "touchstart", "keydown", "click"] as const;
-    let aEsperarGesto = false;
-    const largarGestos = () => {
-      for (const g of GESTOS) window.removeEventListener(g, aoGesto, true);
-    };
-    function aoGesto() {
-      if (!vivo) return;
-      aEsperarGesto = false;
-      largarGestos();
-      retomar();
-    }
-    const esperarPorGesto = () => {
-      if (aEsperarGesto) return;
-      aEsperarGesto = true;
-      for (const g of GESTOS) window.addEventListener(g, aoGesto, { capture: true, passive: true });
-    };
-    limpar.push(largarGestos);
-
-    function pausar(el: HTMLVideoElement) {
-      if (!el.paused) pausadoPorNos.add(el);
-      el.pause();
-    }
-
-    function tocar(el: HTMLVideoElement) {
-      pausadoPorNos.delete(el);
-      aAquecer.delete(el);
-      aTocar.add(el);
-      if (!podeTocar() || aEsperaDaCortina(el)) return;
-      const p = el.play();
-      p?.catch((e: unknown) => {
-        const nome = (e as { name?: string })?.name;
-        if (nome === "NotAllowedError") esperarPorGesto();
-        // AbortError (um `pause()` a meio do arranque) e erros de rede: o vigia
-        // volta a tentar no segundo seguinte.
-      });
-    }
-
-    function pararTudo() {
-      for (const el of aTocar) pausar(el);
-    }
-    function retomar() {
-      if (!vivo || !podeTocar()) return;
-      for (const el of aTocar) tocar(el);
-    }
-
-    /**
-     * Ao regressar (de outra aplicação, de um aviso do sistema): retoma, e
-     * meio segundo depois confirma que a imagem anda. Se não anda e o vídeo
-     * tem dados, o descodificador ficou preso — um salto para o mesmo
-     * instante solta-o.
-     */
-    function retomarEConfirmar() {
-      retomar();
-      const el = videos[atual];
-      const antes = el.currentTime;
-      depois(500, () => {
-        if (!podeTocar() || aEsperarGesto || el !== videos[atual] || aPassar) return;
-        if (aEsperaDaCortina(el)) return;
-        if (el.paused) tocar(el);
-        else if (el.currentTime === antes && el.readyState >= 2) {
-          el.currentTime = antes;
-          tocar(el);
-        }
-      });
-    }
-
-    /** Falta pouco para o fim do take à vista: é hora de aquecer o seguinte. */
-    const pertoDoFim = () => {
-      const el = videos[atual];
-      const d = el.duration;
-      return !Number.isFinite(d) || d <= 0 || d - el.currentTime <= AQUECER_ANTES_S;
-    };
-
-    /**
-     * Aquece o clip `i`: põe-lhe a fonte e toca-o escondido até ter o 1.º
-     * fotograma pronto, e pára-o no início. É o único jeito de o iPhone o
-     * preparar — ignora o `preload` de um vídeo que ninguém mandou tocar.
-     */
-    function aquecer(i: number) {
-      const src = fonte[i];
-      if (aquecido[i] || !src) return;
-      aquecido[i] = true;
-      const el = videos[i];
-      el.preload = "auto";
-      el.src = src;
-      el.load();
-      const ficaPronto = () => {
-        if (!vivo || pronto[i]) return;
-        pronto[i] = true;
-        if (aAquecer.has(el)) {
-          aAquecer.delete(el);
-          pausar(el);
-          el.currentTime = 0;
-        }
-        prepararOQueVem();
-      };
-      ouvir(el, "canplaythrough", ficaPronto, true);
-      aAquecer.add(el);
-      el.play()?.catch(() => undefined);
-    }
-
-    /** Aquece o próximo da fila se já tiver fonte e for a altura. */
-    function aquecerSeForHora() {
-      const i = proximo();
-      if (aquecido[i] || !fonte[i]) return;
-      // Da rede: aquece-se logo (precisa de tempo para descarregar o início).
-      // Da memória: só perto do fim do take à vista (ver o cabeçalho).
-      if (!daMemoria[i] || pertoDoFim()) aquecer(i);
-    }
-
-    /**
-     * Prepara o clip `i`: descarrega-o INTEIRO para a memória e, quando chega,
-     * passa ao seguinte da fila. Se o browser não deixar descarregar assim,
-     * fica com o endereço da rede e aquece-se logo (o caminho antigo).
-     */
-    function preparar(i: number) {
-      if (i >= NUMERO_DE_VIDEOS || pedido[i]) return;
-      pedido[i] = true;
-      const endereco = enderecoDoVideo(i, varianteParaOEcra(ecraDeAgora(), i), formato);
-      const daRede = () => {
-        if (!vivo) return;
-        fonte[i] = endereco;
-        daMemoria[i] = false;
-        aquecer(i);
-      };
-      if (!podeDescarregar) {
-        daRede();
-        return;
-      }
-      const corte = new AbortController();
-      limpar.push(() => corte.abort());
-      fetch(endereco, { signal: corte.signal })
-        .then((r) => {
-          if (!r.ok) throw new Error(String(r.status));
-          return r.blob();
-        })
-        .then((b) => {
-          if (!vivo) return;
-          const u = URL.createObjectURL(b);
-          naMemoria.push(u);
-          fonte[i] = u;
-          daMemoria[i] = true;
-          aquecerSeForHora();
-          prepararOQueVem();
-        })
-        .catch(() => {
-          if (!vivo) return;
-          daRede();
-          prepararOQueVem();
-        });
-    }
-
-    /** Prepara o primeiro da fila que ainda não foi pedido (um de cada vez). */
-    function prepararOQueVem() {
-      if (!decidido || !inicioAssente) return;
-      for (const i of fila) {
-        if (!pedido[i]) {
-          preparar(i);
-          return;
-        }
-        // Ainda a chegar: o seguinte espera (um de cada vez, para não dividir
-        // a rede). Da rede, espera-se que esteja pronto a tocar.
-        if (!fonte[i]) return;
-        if (!daMemoria[i] && !pronto[i] && videos[i].readyState < 4) return;
-      }
-    }
-
-    /** Pôr o vídeo `el` à vista, por cima dos outros. */
-    const mostrar = (el: HTMLVideoElement) => {
-      el.style.zIndex = "2";
-      el.style.opacity = "1";
-    };
-
-    const passar = () => {
-      if (aPassar) return;
-      const velho = videos[atual];
-      const seguinte = proximo();
-      const novo = videos[seguinte];
-      // Ainda não chegou (rede lenta)? Este repete-se em vez de parar, e a
-      // passagem tenta-se outra vez na próxima volta.
-      if (!pronto[seguinte] && novo.readyState < 3) {
-        velho.loop = true;
-        if (fonte[seguinte]) aquecer(seguinte);
-        else preparar(seguinte);
-        return;
-      }
-      aPassar = true;
-      velho.loop = false;
-      ouvir(
-        novo,
-        "playing",
-        () => {
-          if (!vivo) return;
-          velho.style.zIndex = "1";
-          mostrar(novo);
-          const t = setTimeout(() => {
-            if (!vivo) return;
-            pausar(velho);
-            aTocar.delete(velho);
-            velho.style.opacity = "0";
-            velho.style.zIndex = "0";
-            velho.currentTime = 0;
-            atual = seguinte;
-            fila.shift();
-            encherFila();
-            aPassar = false;
-            ultimoTempo = -1;
-            prepararOQueVem();
-            aquecerSeForHora();
-          }, PASSAGEM_MS + 50);
-          limpar.push(() => clearTimeout(t));
-        },
-        true,
-      );
-      novo.currentTime = 0;
-      tocar(novo);
-    };
-
-    for (const el of videos) {
-      ouvir(el, "timeupdate", () => {
-        if (el !== videos[atual] || aPassar) return;
-        if (eHoraDePassar(el.currentTime, el.duration)) passar();
-        else aquecerSeForHora();
-      });
-      // Parado sem ter sido por nós: foi o sistema (uma notificação, o aviso
-      // da bateria, uma chamada). Volta logo, e insiste aos 0,3 s e a 1 s.
-      ouvir(el, "pause", () => {
-        if (pausadoPorNos.has(el)) {
-          pausadoPorNos.delete(el);
-          return;
-        }
-        if (!vivo || el.ended || !podeTocar() || aEsperarGesto || aEsperaDaCortina(el)) return;
-        if (aAquecer.has(el)) {
-          el.play()?.catch(() => undefined);
-          return;
-        }
-        if (!aTocar.has(el)) return;
-        tocar(el);
-        for (const ms of [300, 1000]) {
-          depois(ms, () => {
-            if (el.paused && !el.ended && aTocar.has(el) && podeTocar() && !aEsperarGesto) {
-              tocar(el);
-            }
-          });
-        }
-      });
-      // Rede de segurança: se o `timeupdate` da recta final se perder.
-      ouvir(el, "ended", () => {
-        if (el !== videos[atual]) return;
-        passar();
-        if (!aPassar) {
-          el.currentTime = 0;
-          tocar(el);
-        }
-      });
-    }
-
-    // O take de entrada sobe por cima da fotografia quando JÁ está a tocar —
-    // pode já estar, se começou antes de o JavaScript chegar.
-    let mostrado = false;
-    // A preparação dos seguintes só começa quando o de entrada já tem dados
-    // para seguir (ou 4 s depois de aparecer): em 4G, descarregar o seguinte
-    // ao mesmo tempo dividia a rede e fazia parar o que se está a ver.
-    let inicioAssente = false;
-    const assentar = () => {
-      if (!vivo || inicioAssente) return;
-      inicioAssente = true;
-      prepararOQueVem();
-    };
-    const mostrarPrimeiro = () => {
-      if (!vivo || mostrado) return;
-      mostrado = true;
-      mostrar(primeiro);
-      if (pronto[atual] || primeiro.readyState >= 4) assentar();
-      else depois(4000, assentar);
-    };
-    ouvir(primeiro, "canplaythrough", () => {
-      pronto[atual] = true;
-      if (mostrado) assentar();
-    });
-    if (!primeiro.paused && primeiro.readyState >= 3) mostrarPrimeiro();
-    else ouvir(primeiro, "playing", mostrarPrimeiro, true);
-    tocar(primeiro);
-
-    // O aparelho é perguntado que formato descodifica no chip, para os vídeos
-    // seguintes (o de entrada já vai no que o browser escolheu das `<source>`).
-    const decidir = (f: Formato | null) => {
-      if (!vivo || decidido) return;
-      if (f) formato = f;
-      decidido = true;
-      prepararOQueVem();
-    };
-    melhorFormato(podeTocarTipo, perguntaDoNavegador(), varianteParaOEcra(ecraDeAgora(), 1))
-      .then(decidir)
-      .catch(() => decidir(null));
-    depois(1000, () => decidir(null));
-
-    // ── O vigia ─────────────────────────────────────────────────────────────
-    const vigiar = () => {
-      if (!vivo || !podeTocar() || aEsperarGesto) {
-        paradoDesde = 0;
-        return;
-      }
-      const el = videos[atual];
-      if (aEsperaDaCortina(el)) {
-        paradoDesde = 0;
-        return;
-      }
-      // Parado pelo browser (não por nós): volta a tocar.
-      if (el.paused && !el.ended) tocar(el);
-      // A meio de uma passagem, quem tem de andar é o seguinte.
-      if (aPassar) {
-        const novo = videos[proximo()];
-        if (novo.paused) tocar(novo);
-        return;
-      }
-      const t = el.currentTime;
-      if (t !== ultimoTempo) {
-        ultimoTempo = t;
-        paradoDesde = 0;
-        return;
-      }
-      const agora = performance.now();
-      if (!paradoDesde) {
-        paradoDesde = agora;
-        return;
-      }
-      if (agora - paradoDesde < ENCRAVADO_MS) return;
-      paradoDesde = 0;
-      // Ainda a descarregar numa rede lenta: recarregar deitava fora o que já
-      // chegou. Espera-se.
-      if (el.networkState === el.NETWORK_LOADING && el.readyState < 3) return;
-      const seguinte = proximo();
-      if (mostrado && (pronto[seguinte] || videos[seguinte].readyState >= 3)) {
-        passar(); // o seguinte está pronto: segue-se para ele
-      } else {
-        // Recarrega este no mesmo ponto (o de entrada volta a tentar as suas
-        // fontes; os outros a sua, da memória ou da rede).
-        if (el === primeiro) el.load();
-        else {
-          el.src =
-            fonte[atual] ??
-            enderecoDoVideo(atual, varianteParaOEcra(ecraDeAgora(), atual), formato);
-          el.load();
-        }
-        ouvir(el, "loadedmetadata", () => void (el.currentTime = t), true);
-        tocar(el);
-      }
-    };
-    const relogio = window.setInterval(vigiar, 1000);
-
-    const io = new IntersectionObserver(
-      ([e]) => {
-        naTela = e.isIntersecting;
-        if (naTela) retomar();
-        else pararTudo();
-      },
-      { threshold: 0 },
-    );
-    io.observe(raiz);
-    const aoMudarSeparador = () => {
-      separadorVisivel = document.visibilityState !== "hidden";
-      if (separadorVisivel) retomarEConfirmar();
-      else pararTudo();
-    };
-    const aoRegressar = () => retomarEConfirmar();
-    document.addEventListener("visibilitychange", aoMudarSeparador);
-    // `resume`: o Chrome do Android «congela» a página por trás de outra
-    // aplicação e avisa assim quando a descongela.
-    document.addEventListener("resume", aoRegressar);
-    window.addEventListener("pageshow", aoRegressar);
-    window.addEventListener("focus", aoRegressar);
-
-    return () => {
-      vivo = false;
-      window.clearInterval(relogio);
-      io.disconnect();
-      document.removeEventListener("visibilitychange", aoMudarSeparador);
-      document.removeEventListener("resume", aoRegressar);
-      window.removeEventListener("pageshow", aoRegressar);
-      window.removeEventListener("focus", aoRegressar);
-      for (const f of limpar) f();
-      for (const el of videos) el.pause();
-      for (const el of videos) {
-        if (el === primeiro) continue;
-        el.removeAttribute("src");
-        el.load();
-      }
-      for (const u of naMemoria) URL.revokeObjectURL(u);
-    };
+    const m = criarMotor(raiz);
+    if (!m) return;
+    motorDaSessao = m;
+    m.ligar(raiz);
+    return () => m.desligar();
   }, []);
 
   return (

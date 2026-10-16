@@ -7,6 +7,7 @@ import EntradaEmVideo, {
   GUIAO_DA_ENTRADA,
   HTML_DOS_VIDEOS,
   arrancarEntrada,
+  esquecerMotorDaSessao,
 } from "./EntradaEmVideo";
 
 let play: ReturnType<typeof vi.fn>;
@@ -49,6 +50,8 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  // Cada teste é um separador novo: sem os vídeos guardados do anterior.
+  esquecerMotorDaSessao();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -63,8 +66,20 @@ async function montar() {
 
 const videos = (c: HTMLElement) => [...c.querySelectorAll("video")] as HTMLVideoElement[];
 
-/** O take de entrada começa a tocar e já tem dados para seguir. */
+/** O take de entrada fica com `ate` segundos descarregados (de `dur`). */
+function descarregado(el: HTMLVideoElement, ate: number, dur = 18) {
+  if (!Object.getOwnPropertyDescriptor(el, "duration")) {
+    Object.defineProperty(el, "duration", { configurable: true, value: dur });
+  }
+  Object.defineProperty(el, "buffered", {
+    configurable: true,
+    value: { length: 1, start: () => 0, end: () => ate },
+  });
+}
+
+/** O take de entrada começa a tocar e já chegou inteiro. */
 function comecar(el: HTMLVideoElement) {
+  descarregado(el, el.duration || 18);
   act(() => void el.dispatchEvent(new Event("playing")));
   act(() => void el.dispatchEvent(new Event("canplaythrough")));
 }
@@ -193,9 +208,9 @@ describe("EntradaEmVideo", () => {
       v.dispatchEvent(new Event("playing"));
       expect(pausa).toHaveBeenCalled(); // pronto: parado à espera do pano
       play.mockClear();
-      vi.advanceTimersByTime(1550);
+      vi.advanceTimersByTime(1700);
       expect(play).not.toHaveBeenCalled();
-      // O pano sobe aos 1980 ms; o vídeo arranca 0,35 s antes, ainda tapado.
+      // O pano sobe aos 1980 ms; o vídeo arranca 0,2 s antes, ainda tapado.
       vi.advanceTimersByTime(100);
       expect(play).toHaveBeenCalledTimes(1);
       expect(v.hasAttribute("data-a-espera")).toBe(false);
@@ -218,7 +233,7 @@ describe("EntradaEmVideo", () => {
       document.documentElement.style.setProperty("--cortina-sobe", "1.98s");
       try {
         const { pano } = comCortina();
-        vi.advanceTimersByTime(1550);
+        vi.advanceTimersByTime(1700);
         expect(pano.pause).not.toHaveBeenCalled(); // não segura logo no início
         vi.advanceTimersByTime(100);
         expect(pano.pause).toHaveBeenCalled();
@@ -234,7 +249,7 @@ describe("EntradaEmVideo", () => {
       expect(v.hasAttribute("data-a-espera")).toBe(false);
     });
 
-    it("sem cortina no ecrã (movimento reduzido, navegação dentro do sítio), arranca logo", () => {
+    it("sem cortina (movimento reduzido, navegação dentro do sítio): arranca quando tem reserva", () => {
       document.body.innerHTML = `<div class="cortina cortina--fora"></div><div data-entrada="">${HTML_DOS_VIDEOS}</div>`;
       arrancarEntrada(
         [...Array(3)].map(() => "<source src='x.mp4' type='video/mp4'>"),
@@ -242,8 +257,32 @@ describe("EntradaEmVideo", () => {
         2500,
       );
       const v = document.querySelector<HTMLVideoElement>("[data-primeiro]")!;
-      expect(v.hasAttribute("data-a-espera")).toBe(false);
       expect(v.autoplay).toBe(true);
+      // O 1.º fotograma chega: pára nele e junta reserva (4G fraco: não pára à vista).
+      pausa.mockClear();
+      v.dispatchEvent(new Event("playing"));
+      expect(pausa).toHaveBeenCalled();
+      expect(v.hasAttribute("data-a-espera")).toBe(true);
+      play.mockClear();
+      Object.defineProperty(v, "readyState", { configurable: true, value: 4 });
+      v.dispatchEvent(new Event("canplaythrough"));
+      expect(play).toHaveBeenCalledTimes(1);
+      expect(v.hasAttribute("data-a-espera")).toBe(false);
+    });
+
+    it("sem cortina, nunca espera mais do que o tecto pela reserva", () => {
+      document.body.innerHTML = `<div class="cortina cortina--fora"></div><div data-entrada="">${HTML_DOS_VIDEOS}</div>`;
+      arrancarEntrada(
+        [...Array(3)].map(() => "<source src='x.mp4' type='video/mp4'>"),
+        "k",
+        2500,
+      );
+      const v = document.querySelector<HTMLVideoElement>("[data-primeiro]")!;
+      v.dispatchEvent(new Event("playing"));
+      play.mockClear();
+      vi.advanceTimersByTime(2500);
+      expect(play).toHaveBeenCalledTimes(1);
+      expect(v.hasAttribute("data-a-espera")).toBe(false);
     });
   });
 
@@ -357,7 +396,7 @@ describe("EntradaEmVideo", () => {
     const [a, b] = videos(container);
     play.mockClear();
     comecar(a);
-    expect(play).toHaveBeenCalledTimes(1); // o 2, escondido
+    expect(play.mock.contexts).toContain(b); // o 2, escondido
     expect(b.style.opacity).toBe("0");
     pausa.mockClear();
     act(() => void b.dispatchEvent(new Event("canplaythrough")));
@@ -484,18 +523,66 @@ describe("EntradaEmVideo", () => {
       expect(b.getAttribute("src")).toBe("/videos/entrada/v4/entrada-2-paisagem.mp4");
     });
 
-    it("não divide a rede com o take de entrada enquanto ele não tem dados para seguir", async () => {
-      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval"] });
-      try {
-        const { container } = await montar();
-        const [a] = videos(container);
-        act(() => void a.dispatchEvent(new Event("playing")));
-        expect(pedidos).toEqual([]);
-        act(() => void vi.advanceTimersByTime(4100));
-        expect(pedidos).toHaveLength(1);
-      } finally {
-        vi.useRealTimers();
-      }
+    it("não divide a rede com o take de entrada enquanto ele não chegou inteiro", async () => {
+      const { container } = await montar();
+      const [a] = videos(container);
+      descarregado(a, 6);
+      act(() => void a.dispatchEvent(new Event("playing")));
+      act(() => void a.dispatchEvent(new Event("canplaythrough")));
+      act(() => void a.dispatchEvent(new Event("progress")));
+      expect(pedidos).toEqual([]); // tem dados para seguir, mas ainda não todos
+      descarregado(a, 18);
+      act(() => void a.dispatchEvent(new Event("progress")));
+      expect(pedidos).toHaveLength(1);
+    });
+  });
+
+  describe("voltar à página inicial sem recarregar", () => {
+    /**
+     * Ela (16/10): «quando vou a outra página e depois volto à página inicial,
+     * fica ali um bocadinho parado numa foto». Os vídeos ficam guardados
+     * enquanto se anda pelo sítio, e voltam os MESMOS, a continuar.
+     */
+    it("os mesmos vídeos voltam, à vista e a tocar, no mesmo take", async () => {
+      const primeira = await montar();
+      const [a, b] = videos(primeira.container);
+      comecar(a);
+      a.currentTime = 7.3;
+      expect(a.style.opacity).toBe("1");
+      pausa.mockClear();
+      primeira.unmount(); // foi à galeria
+      expect(pausa).toHaveBeenCalled(); // fora da página nada toca
+
+      play.mockClear();
+      const segunda = await montar(); // voltou à página inicial
+      const vs = videos(segunda.container);
+      expect(vs[0]).toBe(a); // o mesmo elemento, com o que já tinha
+      expect(vs[1]).toBe(b);
+      expect(vs[0].style.opacity).toBe("1"); // o fotograma já está à vista
+      expect(vs[0].currentTime).toBe(7.3); // continua de onde estava
+      expect(play).toHaveBeenCalled();
+      // E não escolheu outro take: continua o que estava.
+      expect(vs.filter((v) => v.hasAttribute("data-primeiro"))).toEqual([a]);
+    });
+
+    it("fora da página inicial, os downloads continuam (para estarem prontos à volta)", async () => {
+      const pedidos: string[] = [];
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((url: string) => {
+          pedidos.push(url);
+          return new Promise(() => undefined);
+        }),
+      );
+      Object.defineProperty(URL, "createObjectURL", { configurable: true, value: vi.fn() });
+      const primeira = await montar();
+      comecar(videos(primeira.container)[0]);
+      expect(pedidos).toHaveLength(1);
+      primeira.unmount();
+      // O download não foi cortado: nenhum `abort` no desligar.
+      expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].signal.aborted).toBe(
+        false,
+      );
     });
   });
 
@@ -621,7 +708,8 @@ describe("EntradaEmVideo", () => {
     });
 
     it("ao regressar à página pelo «voltar», retoma", async () => {
-      await montar();
+      const { container } = await montar();
+      comecar(videos(container)[0]);
       play.mockClear();
       act(() => void window.dispatchEvent(new Event("pageshow")));
       expect(play).toHaveBeenCalled();
