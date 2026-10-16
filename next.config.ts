@@ -599,6 +599,11 @@ const nextConfig: NextConfig = {
       "style-src 'self' 'unsafe-inline'",
       `img-src 'self' data: blob:${imgExtra}${gaImg}${metaImg}`,
       "font-src 'self' data:",
+      // Os vídeos da entrada: cada take seguinte é descarregado inteiro e tocado
+      // da memória (`blob:`), para a rede não o fazer parar a meio — pedido dela
+      // a 16/10, num iPhone em 4G. Ver `EntradaEmVideo.tsx`. Sem esta linha, o
+      // `default-src 'self'` recusava o `blob:` e o vídeo voltava a tocar da rede.
+      "media-src 'self' blob:",
       connectSrc,
       "worker-src 'self'",
       "manifest-src 'self'",

@@ -5710,10 +5710,20 @@ body:has(.barra-consentimento) footer {
 
    A entrada encurta de 35% para 30% pela mesma razão: o que se ganha é tempo
    de leitura, e é a leitura que faz disto uma frase e não um efeito. */
+/* ── UM QUADRO POR DEGRAU, COM OS NÚMEROS ESCRITOS ───────────────────────
+   Era um quadro só, com a distância numa variável (`translateY(var(--dy))`).
+   Ela (16/10), a abrir o sítio pelo Instagram no iPhone: «a cortina está toda
+   travada». O Safari NÃO entrega à placa gráfica uma animação cujos quadros
+   dependem de uma variável de CSS — corre-a no processador, fotograma a
+   fotograma, e o processador está precisamente ocupado a montar a página
+   nesse segundo. Era a frase que soluçava; o pano (sem variáveis) não.
+
+   Quatro quadros com os números à letra (a escada dela: 10, 20, 30, 40 px)
+   correm na placa gráfica, sem depender de quanto a página pesa. */
 @keyframes cortina-grupo {
   0% {
     opacity: 0;
-    transform: translateY(var(--dy, 10px));
+    transform: translateY(10px);
   }
   30%,
   88% {
@@ -5722,7 +5732,52 @@ body:has(.barra-consentimento) footer {
   }
   100% {
     opacity: 0;
-    transform: translateY(calc(var(--dy, 10px) * -1));
+    transform: translateY(-10px);
+  }
+}
+@keyframes cortina-grupo-20 {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  30%,
+  88% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+}
+@keyframes cortina-grupo-30 {
+  0% {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  30%,
+  88% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+}
+@keyframes cortina-grupo-40 {
+  0% {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  30%,
+  88% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-40px);
   }
 }
 
@@ -5831,6 +5886,15 @@ body:has(.barra-consentimento) footer {
      mudo — e qualquer afinação de `--cortina-total` voltava a desencontrá-los
      sem dar erro nenhum. */
   animation: cortina-grupo var(--cortina-total) cubic-bezier(0.645, 0.045, 0.355, 1) forwards;
+}
+.cortina__grupo[data-dy="20"] {
+  animation-name: cortina-grupo-20;
+}
+.cortina__grupo[data-dy="30"] {
+  animation-name: cortina-grupo-30;
+}
+.cortina__grupo[data-dy="40"] {
+  animation-name: cortina-grupo-40;
 }
 
 /* ── ESCONDER DE VEZ, SEM SAIR DO DOCUMENTO ──────────────────────────────

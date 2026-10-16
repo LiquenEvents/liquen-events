@@ -132,7 +132,7 @@ describe("o mote", () => {
      */
     const { container } = render(<Cortina locale="pt" />);
     const grupos = [...container.querySelectorAll<HTMLElement>(".cortina__grupo")];
-    const dy = grupos.map((g) => parseInt(g.style.getPropertyValue("--dy"), 10));
+    const dy = grupos.map((g) => Number(g.dataset.dy));
     const atrasos = grupos.map((g) => parseFloat(g.style.animationDelay));
 
     expect(dy[0], "o primeiro grupo deixou de partir de 10px").toBe(10);
@@ -149,13 +149,28 @@ describe("o mote", () => {
     ).toBeLessThanOrEqual(150);
   });
 
+  it("nenhum quadro da frase depende de uma variável (o Safari não a animava na placa gráfica)", () => {
+    // Ela (16/10), pelo Instagram no iPhone: «a cortina está toda travada».
+    const quadros = CSS.match(/@keyframes cortina-[\w-]+ \{[\s\S]*?\n\}/g) ?? [];
+    expect(quadros.length).toBeGreaterThanOrEqual(5);
+    for (const q of quadros) expect(q, q.slice(0, 40)).not.toContain("var(");
+    // E cada degrau da escada tem o seu quadro.
+    for (const d of [20, 30, 40]) {
+      expect(CSS).toMatch(
+        new RegExp(
+          `\\.cortina__grupo\\[data-dy="${d}"\\] \\{\\s*animation-name: cortina-grupo-${d};`,
+        ),
+      );
+    }
+  });
+
   it("a escada pára no quarto degrau — senão a última palavra cai de outro sítio", () => {
     // O exemplo dela tem três grupos; o lema tem quatro em português e SETE em
     // inglês. Uma escada que continuasse a subir dava 70px à última palavra
     // inglesa: deixava de ser profundidade e passava a ser um salto.
     const { container } = render(<Cortina locale="en" />);
     const dy = [...container.querySelectorAll<HTMLElement>(".cortina__grupo")].map((g) =>
-      parseInt(g.style.getPropertyValue("--dy"), 10),
+      Number(g.dataset.dy),
     );
     expect(
       dy.length,
@@ -176,9 +191,10 @@ describe("o mote", () => {
      */
     const marcas = [...quadro.matchAll(/(\d+)%/g)].map((m) => Number(m[1]));
     const paragem = marcas.filter((n) => n > 0 && n < 100).sort((a, b) => a - b);
-    expect(paragem.length, "deixou de haver paragem — voltou a ser um efeito").toBeGreaterThanOrEqual(
-      2,
-    );
+    expect(
+      paragem.length,
+      "deixou de haver paragem — voltou a ser um efeito",
+    ).toBeGreaterThanOrEqual(2);
     expect(
       paragem[paragem.length - 1] - paragem[0],
       "a paragem encolheu a ponto de já não se ler a frase",
@@ -505,10 +521,9 @@ describe("a frase sai COM o pano — e não antes dele", () => {
      * afinação de um desencontrava-o do outro sem dar erro nenhum — e uma
      * animação desencontrada não deixa rasto, só fica feia.
      */
-    expect(
-      BLOCO,
-      "a frase voltou a ter relógio próprio",
-    ).toMatch(/\.cortina__grupo \{[\s\S]*?animation: cortina-grupo var\(--cortina-total\)/);
+    expect(BLOCO, "a frase voltou a ter relógio próprio").toMatch(
+      /\.cortina__grupo \{[\s\S]*?animation: cortina-grupo var\(--cortina-total\)/,
+    );
   });
 
   it("e continua a haver tempo para LER — a paragem é mais de metade da peça", () => {
