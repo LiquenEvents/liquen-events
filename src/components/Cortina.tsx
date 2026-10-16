@@ -357,12 +357,12 @@ export function Cortina({
                     <span
                       key={palavra + n}
                       className="cortina__grupo"
-                      style={
-                        {
-                          "--dy": `${DEGRAUS[degrau]}px`,
-                          animationDelay: `${ATRASOS[degrau]}ms`,
-                        } as React.CSSProperties
-                      }
+                      /* O degrau escolhe o quadro (`cortina-grupo-20`…) no
+                         globals.css. Era uma variável de CSS dentro do quadro,
+                         e o Safari não a anima na placa gráfica: a frase
+                         soluçava enquanto a página se montava. */
+                      data-dy={DEGRAUS[degrau]}
+                      style={{ animationDelay: `${ATRASOS[degrau]}ms` }}
                     >
                       {palavra}
                     </span>
