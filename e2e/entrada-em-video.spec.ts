@@ -49,19 +49,15 @@ test.describe("@movimento a entrada em vídeo", () => {
     await expect(page.locator("section img.hero-settle")).toHaveCount(1);
   });
 
-  // Ela (16/10): «sempre que entram no site veem sempre o mesmo take… vai
-  // alternando». Cada entrada abre num take diferente da anterior.
-  test("cada entrada abre num take diferente do da anterior", async ({ page }) => {
+  // Ela (16/10, depois de entrar pelo Instagram e cair no castelo): «sempre a
+  // floresta». Todas as entradas abrem no take da floresta — também quem já cá
+  // esteve (a alternância de visita para visita saiu).
+  test("todas as entradas abrem na floresta", async ({ page }) => {
     test.setTimeout(60_000);
-    const takes: string[] = [];
     for (let k = 0; k < 3; k++) {
       await page.goto("/");
-      const n = await page.locator("video[data-primeiro]").getAttribute("data-entrada-video");
-      takes.push(n ?? "?");
+      await expect(page.locator("video[data-primeiro]")).toHaveAttribute("data-entrada-video", "0");
     }
-    expect(takes[0]).toBe("0");
-    expect(takes[1]).not.toBe(takes[0]);
-    expect(takes[2]).not.toBe(takes[1]);
   });
 
   // Ela (16/10): a cortina «sincronizada com o vídeo». Quando o pano acaba de

@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
 import {
   ARRANQUE_S,
+  TAKE_DE_ENTRADA,
   MEDIR_REDE_MS,
   NUMERO_DE_VIDEOS,
   PASSAGEM_MS,
@@ -13,7 +14,6 @@ import {
   enderecoDoVideo,
   enderecoLeve,
   ligacaoLenta,
-  escolherPrimeiro,
   formatoDoEndereco,
   formatoQueToca,
   melhorFormato,
@@ -215,23 +215,9 @@ describe("os vídeos da entrada — as regras", () => {
     }
   });
 
-  it("o take de entrada: a 1.ª visita na floresta; depois, nunca o da entrada anterior", () => {
-    expect(escolherPrimeiro(null)).toBe(0);
-    expect(escolherPrimeiro(Number.NaN)).toBe(0);
-    expect(escolherPrimeiro(7)).toBe(0);
-    for (let ultimo = 0; ultimo < NUMERO_DE_VIDEOS; ultimo++) {
-      const vistos = new Set<number>();
-      for (let k = 0; k < 200; k++) {
-        const n = escolherPrimeiro(ultimo);
-        expect(n).not.toBe(ultimo);
-        vistos.add(n);
-      }
-      // Os outros dois aparecem os dois: vai alternando, não troca só entre dois.
-      expect(vistos.size).toBe(NUMERO_DE_VIDEOS - 1);
-    }
-    // Os extremos do sorteio não saem da lista.
-    expect(escolherPrimeiro(0, () => 0.9999)).toBe(2);
-    expect(escolherPrimeiro(2, () => 0)).toBe(0);
+  it("a entrada é sempre na floresta (decisão dela, 16/10)", () => {
+    expect(TAKE_DE_ENTRADA).toBe(0);
+    expect(primeiraVolta(TAKE_DE_ENTRADA)[0]).toBe(0);
   });
 
   it("uma volta nova nunca repete o último vídeo logo a seguir", () => {

@@ -3,13 +3,13 @@
 import { useEffect, useRef } from "react";
 import {
   AQUECER_ANTES_S,
-  CHAVE_DO_ULTIMO,
   CORTINA_ESPERA_MAX_MS,
   ENCRAVADO_MS,
   MEDIR_REDE_MS,
   NUMERO_DE_VIDEOS,
   PASSAGEM_MS,
   SALTAR_SEM_DADOS_MS,
+  TAKE_DE_ENTRADA,
   duracaoDaSubida,
   eHoraDePassar,
   enderecoDoVideo,
@@ -39,9 +39,8 @@ import {
  * correr» e, no mesmo dia, «para as pessoas não se fartarem… vai alternando de
  * takes na entrada do site». Os três `<video>` vêm vazios no HTML, e um guião
  * pequeno ESCRITO NO PRÓPRIO HTML (`arrancarEntrada`) corre enquanto o browser
- * lê a página: escolhe o take de entrada (a 1.ª visita na floresta; depois,
- * nunca o da entrada anterior — `escolherPrimeiro`), põe-lhe as `<source>` e
- * manda-o tocar. Não espera pelo JavaScript da página. (É HTML e não JSX
+ * lê a página: o take de entrada é SEMPRE a floresta (`TAKE_DE_ENTRADA`, decisão
+ * dela de 16/10), põe-lhe as `<source>` e manda-o tocar. Não espera pelo JavaScript da página. (É HTML e não JSX
  * porque o React não põe o atributo `muted` no HTML do servidor — e, sem ele,
  * nenhum browser arranca um vídeo antes do JavaScript.)
  *
@@ -176,14 +175,13 @@ type ComLigacao = Navigator & {
  * si mesma: tudo o que precisa entra pelos argumentos, e é passada ao HTML
  * como texto (`.toString()`). Sem sintaxe que precise de ajudas do compilador.
  *
- *   1. escolhe o take de entrada (a mesma conta do `escolherPrimeiro`) e
- *      guarda-o no browser, para a próxima entrada ser outro;
+ *   1. o take de entrada é o `n` que vem por argumento (a floresta);
  *   2. põe-lhe as `<source>` e manda-o tocar;
  *   3. se a cortina estiver no ecrã, sincroniza-se com ela (ver o cabeçalho).
  */
 export function arrancarEntrada(
   fontes: string[],
-  chave: string,
+  n: number,
   esperaMax: number,
   leves: string[] = [],
   medirMs = 1200,
@@ -193,21 +191,6 @@ export function arrancarEntrada(
   const raiz = (guiao && guiao.parentElement) || doc.querySelector("[data-entrada]");
   if (!raiz || raiz.querySelector("[data-primeiro]")) return;
   const vs = raiz.querySelectorAll("video");
-  let n = 0;
-  try {
-    const u = localStorage.getItem(chave);
-    if (u !== null) {
-      const ultimo = Number(u);
-      if (ultimo >= 0 && ultimo < fontes.length && Math.floor(ultimo) === ultimo) {
-        n = Math.floor(Math.random() * (fontes.length - 1));
-        if (n >= ultimo) n++;
-        if (n > fontes.length - 1) n = fontes.length - 1;
-      }
-    }
-    localStorage.setItem(chave, String(n));
-  } catch {
-    // Janela privada ou armazenamento bloqueado: entra na floresta.
-  }
   const v = vs[n] as HTMLVideoElement | undefined;
   if (!v) return;
   v.setAttribute("data-primeiro", "");
@@ -389,9 +372,7 @@ const FONTES = Array.from({ length: NUMERO_DE_VIDEOS }, (_, i) => fontesDeEntrad
 const LEVES = Array.from({ length: NUMERO_DE_VIDEOS }, (_, i) => fontesLeves(i));
 
 /** O guião como texto, para ir no HTML (ver `arrancarEntrada`). */
-export const GUIAO_DA_ENTRADA = `(${arrancarEntrada.toString()})(${JSON.stringify(FONTES)},${JSON.stringify(
-  CHAVE_DO_ULTIMO,
-)},${CORTINA_ESPERA_MAX_MS},${JSON.stringify(LEVES)},${MEDIR_REDE_MS});`;
+export const GUIAO_DA_ENTRADA = `(${arrancarEntrada.toString()})(${JSON.stringify(FONTES)},${TAKE_DE_ENTRADA},${CORTINA_ESPERA_MAX_MS},${JSON.stringify(LEVES)},${MEDIR_REDE_MS});`;
 
 /**
  * O HTML dos três vídeos, igual no servidor e no browser: os três vazios, e o
@@ -433,7 +414,13 @@ export function esquecerMotorDaSessao() {
   motorDaSessao = null;
 }
 
+/** O Safari e tudo no iPhone (WebKit): os que tocam um MP4 dentro de um `<img>`. */
+function eWebKit(): boolean {
+  return typeof navigator !== "undefined" && /Apple/.test(navigator.vendor || "");
+}
+
 function criarMotor(raiz: HTMLElement): Motor | null {
+  let raizAtual = raiz;
   const videos = [...raiz.querySelectorAll<HTMLVideoElement>("video")];
   if (videos.length < NUMERO_DE_VIDEOS) return null;
   let atual = Math.max(
@@ -466,6 +453,8 @@ function criarMotor(raiz: HTMLElement): Motor | null {
   encherFila();
   const proximo = () => fila[0];
   let aPassar = false;
+  /** Há um vídeo à vista (escondem-se todos quando o aparelho os recusa). */
+  let mostrado = false;
   let ultimoTempo = -1; // para o vigia: o último tempo visto do vídeo à vista
   let paradoDesde = 0;
   let naTela = true;
@@ -535,12 +524,67 @@ function criarMotor(raiz: HTMLElement): Motor | null {
     largarGestos();
     retomar();
   }
+  /**
+   * ── RECUSADO: NUNCA O BOTÃO ▶ DO IPHONE ──────────────────────────────────
+   * Ela (16/10), num iPhone com a poupança de energia ligada, a entrar pelo
+   * Instagram: o vídeo parado, à vista, com o botão ▶ do sistema por cima —
+   * «isto é que não pode acontecer». Com a poupança ligada o iPhone recusa
+   * QUALQUER vídeo que arranque sozinho, e desenha esse botão em cima de um
+   * vídeo parado que esteja à vista. Por isso, recusado: os vídeos saem da
+   * vista (fica a fotografia, que é o primeiro fotograma da floresta) e, no
+   * Safari/iPhone, entra a mesma floresta como IMAGEM animada
+   * (`imagemAnimada`) — o Safari toca um MP4 num `<img>`, e a poupança de
+   * energia não trava imagens. Ao primeiro toque o vídeo tenta outra vez; se
+   * arrancar, a imagem sai.
+   */
+  const esconderVideos = () => {
+    for (const el of videos) el.style.opacity = "0";
+    mostrado = false;
+  };
+  let imagem: HTMLImageElement | null = null;
+  const imagemAnimada = () => {
+    if (!eWebKit()) return;
+    if (imagem) {
+      if (!imagem.isConnected) raizAtual.append(imagem);
+      return;
+    }
+    const img = document.createElement("img");
+    img.alt = "";
+    img.setAttribute("aria-hidden", "true");
+    img.decoding = "async";
+    img.className = "absolute inset-0 h-full w-full object-cover";
+    img.style.cssText = `opacity:0;transform:scale(1.06);transition:opacity ${PASSAGEM_MS}ms ease;z-index:1`;
+    img.setAttribute("data-entrada-imagem", "");
+    img.addEventListener("load", () => void (img.style.opacity = "1"), { once: true });
+    img.addEventListener("error", () => img.remove(), { once: true });
+    const i = TAKE_DE_ENTRADA;
+    img.src =
+      ecraDeAgora().altura > ecraDeAgora().largura
+        ? enderecoLeve(i, "mp4")
+        : enderecoDoVideo(i, "paisagem", "mp4");
+    imagem = img;
+    raizAtual.append(img);
+  };
+  const tirarImagem = () => {
+    const img = imagem;
+    if (!img) return;
+    imagem = null;
+    img.style.opacity = "0";
+    window.setTimeout(() => img.remove(), PASSAGEM_MS + 50);
+  };
   const esperarPorGesto = () => {
+    // Só se esconde o que está mesmo parado: um vídeo que anda (o browser
+    // arrancou-o pelo `autoplay` e recusou só um `play()` a mais) fica à vista.
+    if (videos[atual].paused) {
+      esconderVideos();
+      imagemAnimada();
+    }
     if (aEsperarGesto) return;
     aEsperarGesto = true;
     for (const g of GESTOS) window.addEventListener(g, aoGesto, { capture: true, passive: true });
   };
   limpar.push(largarGestos);
+  limpar.push(() => imagem?.remove());
 
   function pausar(el: HTMLVideoElement) {
     if (!el.paused) pausadoPorNos.add(el);
@@ -745,6 +789,7 @@ function criarMotor(raiz: HTMLElement): Motor | null {
   const mostrar = (el: HTMLVideoElement) => {
     el.style.zIndex = "2";
     el.style.opacity = "1";
+    tirarImagem();
   };
 
   /** O seguinte da fila pode arrancar já (da memória, ou com dados). */
@@ -858,6 +903,14 @@ function criarMotor(raiz: HTMLElement): Motor | null {
         if (seguintePronto()) passar();
       });
     });
+    // Depois de uma recusa (escondidos), o take à vista volta quando anda.
+    ouvir(el, "playing", () => {
+      if (el !== videos[atual] || aPassar || mostrado || el.style.opacity !== "0") return;
+      if (aEsperaDaCortina(el)) return;
+      mostrado = true;
+      mostrar(el);
+      verSeChegou(); // a preparação dos seguintes espera por isto
+    });
     // Rede de segurança: se o `timeupdate` da recta final se perder.
     ouvir(el, "ended", () => {
       if (el !== videos[atual]) return;
@@ -870,8 +923,8 @@ function criarMotor(raiz: HTMLElement): Motor | null {
   }
 
   // O take de entrada sobe por cima da fotografia quando JÁ está a tocar —
-  // pode já estar, se começou antes de o JavaScript chegar.
-  let mostrado = false;
+  // pode já estar, se começou antes de o JavaScript chegar. (`mostrado` é
+  // declarado lá em cima, com o resto do estado.)
   // A preparação dos seguintes só começa quando o de entrada já chegou
   // INTEIRO. MEDIDO num 4G fraco (5 Mbit/s): começar logo que ele tinha
   // «dados para seguir» punha os dois a dividir a rede, e o take à vista
@@ -920,13 +973,16 @@ function criarMotor(raiz: HTMLElement): Motor | null {
   }
   ouvir(primeiro, "progress", verSeChegou);
   ouvir(primeiro, "timeupdate", verSeChegou);
-  if (primeiro.readyState >= 2) mostrarPrimeiro();
-  else {
-    ouvir(primeiro, "playing", mostrarPrimeiro, true);
-    // Parado no 1.º fotograma à espera de reserva: mostra-o já, em vez da
-    // fotografia (que só é esse fotograma na floresta).
-    ouvir(primeiro, "loadeddata", mostrarPrimeiro, true);
-  }
+  // SÓ QUANDO ANDA. Era mostrado parado no 1.º fotograma (à espera de reserva
+  // ou da cortina) — e um vídeo parado à vista é onde o iPhone, com a poupança
+  // de energia, desenha o botão ▶. A fotografia por baixo é esse mesmo
+  // fotograma da floresta: esperar que ande não se vê.
+  const seAnda = () => {
+    if (!primeiro.paused && !aEsperaDaCortina(primeiro)) mostrarPrimeiro();
+  };
+  ouvir(primeiro, "playing", seAnda);
+  ouvir(primeiro, "timeupdate", seAnda);
+  seAnda();
   tocar(primeiro);
 
   // O aparelho é perguntado que formato descodifica no chip, para os vídeos
@@ -955,6 +1011,13 @@ function criarMotor(raiz: HTMLElement): Motor | null {
     }
     // Parado pelo browser (não por nós): volta a tocar.
     if (el.paused && !el.ended) tocar(el);
+    // A andar mas escondido (depois de uma recusa que afinal não parou nada):
+    // volta à vista — nunca um vídeo a tocar por baixo da fotografia.
+    if (!mostrado && !aPassar && !el.paused && el.currentTime !== ultimoTempo) {
+      mostrado = true;
+      mostrar(el);
+      verSeChegou();
+    }
     // A meio de uma passagem, quem tem de andar é o seguinte.
     if (aPassar) {
       const novo = videos[proximo()];
@@ -1027,6 +1090,8 @@ function criarMotor(raiz: HTMLElement): Motor | null {
     videos,
     ligar(r: HTMLElement) {
       if (!vivo || ligado) return;
+      raizAtual = r;
+      if (imagem && !imagem.isConnected) r.append(imagem);
       ligado = true;
       naTela = true;
       separadorVisivel = document.visibilityState !== "hidden";
@@ -1066,7 +1131,7 @@ export default function EntradaEmVideo() {
     }
     // Numa navegação dentro do sítio o guião do HTML não correu: corre-se aqui.
     if (!raiz.querySelector("[data-primeiro]")) {
-      arrancarEntrada(FONTES, CHAVE_DO_ULTIMO, CORTINA_ESPERA_MAX_MS, LEVES, MEDIR_REDE_MS);
+      arrancarEntrada(FONTES, TAKE_DE_ENTRADA, CORTINA_ESPERA_MAX_MS, LEVES, MEDIR_REDE_MS);
     }
     const m = criarMotor(raiz);
     if (!m) return;

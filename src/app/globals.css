@@ -3579,6 +3579,21 @@ body[data-menu-open] .whatsapp-fixed {
 }
 
 /* ── Hero Ken Burns: a slow cinematic settle from a tighter crop. ── */
+/* ── O vídeo da entrada nunca mostra o botão ▶ do iPhone ──
+   Ela (16/10), num iPhone com a poupança de energia ligada: o vídeo parado com
+   o botão ▶ do sistema por cima — «isto é que não pode acontecer». O motor já
+   não deixa um vídeo parado à vista (ver EntradaEmVideo.tsx); isto é a segunda
+   rede: o WebKit não desenha os seus controlos sobre estes vídeos, nunca. São
+   fundo, sem controlos de propósito. */
+[data-entrada] video::-webkit-media-controls,
+[data-entrada] video::-webkit-media-controls-panel,
+[data-entrada] video::-webkit-media-controls-overlay-play-button,
+[data-entrada] video::-webkit-media-controls-start-playback-button {
+  display: none !important;
+  -webkit-appearance: none;
+  opacity: 0 !important;
+}
+
 @keyframes hero-settle {
   from {
     transform: scale(1.14);
