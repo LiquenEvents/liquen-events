@@ -538,8 +538,10 @@ export const pt = {
     hintEmail: "Preferimos o email: é por lá que segue a confirmação do pedido.",
     phTelefone: "+351 9XX XXX XXX",
     phMensagem: "Estilo, cores, ambiente, inspirações que guardou…",
+    // O texto é dela (17/10), palavra por palavra. O `\n\n` separa os dois
+    // parágrafos; o formulário desenha-o com `whitespace-pre-line`.
     hintMensagem:
-      "Quanto mais nos contar sobre o estilo que tem em mente, as cores, o ambiente, referências que guardou, mais à medida sai a proposta. É por aqui que a começamos a desenhar.",
+      "Quanto mais informação nos facultar sobre o estilo pretendido, a paleta de cores, o ambiente desejado e as referências que selecionou, melhor poderemos adaptar a proposta às suas expectativas.\n\nÉ a partir destes elementos que começamos a desenvolver a sua proposta personalizada.",
     errNome: "Indique o seu nome",
     errEmail: "E-mail inválido",
     /**
