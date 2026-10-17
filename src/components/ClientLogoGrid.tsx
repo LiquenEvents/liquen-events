@@ -67,14 +67,6 @@ function ClientLogo({ client, index }: { client: Client; index: number }) {
           </span>
         )}
       </div>
-      {/* O nome por baixo (ela, 17/10: «perceber-se quais são as marcas»).
-          Ao passar o rato aparece; num ecrã de toque, onde não há rato, fica
-          sempre à vista, discreto. aria-hidden: o `alt` da imagem já o diz. */}
-      {!failed && client.logo ? (
-        <span aria-hidden className="cl-nome">
-          {client.name}
-        </span>
-      ) : null}
     </div>
   );
 }

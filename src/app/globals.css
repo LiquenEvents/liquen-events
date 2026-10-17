@@ -5455,8 +5455,9 @@ body:has(.barra-consentimento) footer {
 /* Calmo em repouso, vivo ao toque (ela, 17/10, «dar mais vida»; escolheu
    «calmo, ganha vida ao toque»). Em repouso todos os logótipos estão no mesmo
    cinzento — a parede lê-se como um todo, sem nenhuma marca a gritar mais do
-   que as outras. Ao passar o rato, esse logótipo fica preto, sobe um pouco e o
-   nome aparece por baixo. Só opacidade e transform (trabalho do compositor). */
+   que as outras. Ao passar o rato, esse logótipo fica preto e sobe um pouco.
+   Sem o nome por baixo (ela, 17/10: «retira este texto debaixo do logo»).
+   Só opacidade e transform (trabalho do compositor). */
 .cl-logo {
   position: relative;
   display: inline-flex;
@@ -5466,54 +5467,12 @@ body:has(.barra-consentimento) footer {
   opacity: 0.55;
   transition: opacity 0.5s var(--ease-out);
 }
-.cl-nome {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0.7rem;
-  z-index: 10;
-  text-align: center;
-  font-size: 10px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--color-foreground);
-  opacity: 0;
-  transform: translateY(4px);
-  transition:
-    opacity 0.4s var(--ease-out),
-    transform 0.4s var(--ease-out);
-  pointer-events: none;
-}
 @media (hover: hover) {
   .cl-cell:hover .cl-logo {
     transform: translateY(-6px) scale(1.04);
   }
   .cl-cell:hover .cl-black {
     opacity: 1;
-  }
-  .cl-cell:hover .cl-nome {
-    opacity: 0.6;
-    transform: none;
-  }
-}
-/* O nome entra com o logótipo: enquanto a parede está armada e ainda não
-   chegou ao ecrã (ver ClientLogoGrid), fica escondido como ele. */
-.cl-armed:not(.cl-in) .cl-nome {
-  opacity: 0;
-}
-
-/* Num ecrã de toque não há «passar o rato»: o nome fica sempre, discreto, e o
-   logótipo sobe o suficiente para lhe dar lugar. */
-@media (hover: none) {
-  .cl-nome {
-    opacity: 0.5;
-    transform: none;
-    bottom: 0.5rem;
-    font-size: 9px;
-    letter-spacing: 0.14em;
-  }
-  .cl-logo {
-    transform: translateY(-6px);
   }
 }
 
@@ -5540,8 +5499,8 @@ body:has(.barra-consentimento) footer {
 
 @media (prefers-reduced-motion: reduce) {
   /* Final state, instantly — no rise, blur or crossfade motion. Hover still
-     turns the logo black and shows the name (a state change, not motion),
-     just without a transition. */
+     turns the logo black (a state change, not motion), just without a
+     transition. */
   .cl-armed .cl-reveal,
   .cl-armed.cl-in .cl-reveal {
     opacity: 1;
@@ -5553,12 +5512,10 @@ body:has(.barra-consentimento) footer {
   .cl-cell,
   .cl-cell::before,
   .cl-logo,
-  .cl-black,
-  .cl-nome {
+  .cl-black {
     transition: none;
   }
-  .cl-cell:hover .cl-logo,
-  .cl-cell:hover .cl-nome {
+  .cl-cell:hover .cl-logo {
     transform: none;
   }
 }
