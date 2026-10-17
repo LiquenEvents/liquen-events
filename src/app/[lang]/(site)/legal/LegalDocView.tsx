@@ -5,7 +5,18 @@ import type { LegalDoc } from "./legal-content";
 // Shared, elegant renderer for a legal document (privacy / terms). Editorial
 // column, Playfair headings, AA-contrast body — consistent with the rest of the
 // site, no motion beyond the site's standard scroll reveal.
-export default function LegalDocView({ doc }: { doc: LegalDoc }) {
+//
+// `justificado`: pedido dela («na política de privacidade também justifica o
+// texto»), como nas páginas de serviços — só o texto corrido, e com as palavras
+// partidas por hífen para o telemóvel não esticar os espaços.
+export default function LegalDocView({
+  doc,
+  justificado = false,
+}: {
+  doc: LegalDoc;
+  justificado?: boolean;
+}) {
+  const corrido = justificado ? " text-justify hyphens-auto" : "";
   return (
     <section className="bg-surface">
       <div className="max-w-3xl mx-auto px-6 lg:px-8 pt-40 pb-24 lg:pb-32">
@@ -19,7 +30,9 @@ export default function LegalDocView({ doc }: { doc: LegalDoc }) {
           >
             {doc.title}
           </h1>
-          <p className="text-foreground/72 text-base leading-[1.85] border-t border-foreground/10 pt-8">
+          <p
+            className={`text-foreground/72 text-base leading-[1.85] border-t border-foreground/10 pt-8${corrido}`}
+          >
             {doc.intro}
           </p>
         </AnimateIn>
@@ -36,7 +49,10 @@ export default function LegalDocView({ doc }: { doc: LegalDoc }) {
                 </h2>
                 <div className="flex flex-col gap-3">
                   {s.body.map((p, j) => (
-                    <p key={j} className="text-foreground/72 text-[15px] leading-[1.85]">
+                    <p
+                      key={j}
+                      className={`text-foreground/72 text-[15px] leading-[1.85]${corrido}`}
+                    >
                       {p}
                     </p>
                   ))}
