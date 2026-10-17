@@ -423,7 +423,9 @@ palavras e quiz de estilo.
 - **O que falta:**
   - denominação legal, NIF e morada do responsável na política de privacidade;
   - a ligação ao **Livro de Reclamações Electrónico** no rodapé (obrigatória
-    para quem presta serviços a consumidores);
+    para quem presta serviços a consumidores) — **feita a 17/10**, a pedido
+    dela: o logótipo oficial que ela mandou, num cartão branco ao centro do
+    rodapé de todas as páginas, a abrir `livroreclamacoes.pt` numa janela nova;
   - uma **declaração de acessibilidade**.
 - **Precisa:** os dados são dela, e o texto deve ser revisto por um advogado.
 

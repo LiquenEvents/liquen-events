@@ -52,6 +52,14 @@ export const SITE = {
    * LinkedIn devolve o mesmo perfil.
    */
   linkedin: "https://pt.linkedin.com/company/l%C3%ADquen-events",
+  /**
+   * O Livro de Reclamações Eletrónico (pedido dela, 17/10: «temos que
+   * adicionar o livro de reclamações… quero que isso esteja mesmo bem»).
+   * Quem presta serviços a consumidores tem de mostrar no site, em lugar
+   * visível e destacado, o acesso à plataforma oficial — é para lá que esta
+   * ligação leva. Vive no rodapé, que está em todas as páginas.
+   */
+  livroReclamacoes: "https://www.livroreclamacoes.pt/Inicio/",
   // Google Business Profile (share link) — powers local pack/Maps ranking and
   // lets Google reconcile the site with the profile (sameAs + hasMap).
   googleBusiness: "https://share.google/4Qcuop16TDkYaowsU",

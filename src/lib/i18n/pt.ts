@@ -851,6 +851,7 @@ export const pt = {
     legal: "Legal",
     privacidade: "Privacidade",
     termos: "Termos",
+    livroReclamacoes: "Livro de Reclamações Eletrónico",
   },
 };
 

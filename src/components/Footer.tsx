@@ -245,6 +245,34 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
           </div>
         </div>
 
+        {/* ── Livro de Reclamações Eletrónico ──
+            Obrigatório para quem presta serviços a consumidores: o acesso à
+            plataforma oficial, em lugar visível e destacado, em todas as
+            páginas. O logótipo oficial é vermelho sobre branco, por isso vai
+            num cartão branco — sobre o fundo escuro do rodapé, o «RECLAMAÇÕES»
+            vermelho fora do círculo não se lia. Medido no ficheiro: o PNG tem
+            1012×408 px; desenhado a 48 px de altura (as letras do logótipo
+            ficam com ~10 px), chega para ecrãs 3×. */}
+        <div className="max-w-7xl mx-auto px-6 lg:px-16 pb-10 flex justify-center">
+          <a
+            href={SITE.livroReclamacoes}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`${t.footer.livroReclamacoes} (${t.common.newWindow})`}
+            title={t.footer.livroReclamacoes}
+            className="inline-flex items-center rounded-md bg-white px-3.5 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.25)] ring-1 ring-white/20 transition-transform duration-300 ease-expo hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
+          >
+            <SafeImage
+              src="/logos/livro-de-reclamacoes.png"
+              alt=""
+              width={1012}
+              height={408}
+              sizes="120px"
+              className="h-12 w-auto"
+            />
+          </a>
+        </div>
+
         {/* ── Copyright bar ── */}
         <div className="border-t border-white/12 py-5">
           <div className="max-w-7xl mx-auto px-6 lg:px-16 flex flex-col sm:flex-row justify-between items-center gap-3 text-center">

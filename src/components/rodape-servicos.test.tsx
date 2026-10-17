@@ -57,3 +57,25 @@ describe("o rodapé liga a todos os serviços do catálogo", () => {
     expect(rodape("pt")).toContain('href="/servicos/batizados-e-comunhoes"');
   });
 });
+
+/**
+ * O Livro de Reclamações Eletrónico (pedido dela, 17/10). É obrigatório para
+ * quem presta serviços a consumidores: o acesso à plataforma oficial, visível e
+ * destacado. O rodapé está em todas as páginas, portanto é aqui que se prende.
+ */
+describe("o rodapé leva ao Livro de Reclamações Eletrónico", () => {
+  for (const locale of LOCALES) {
+    it(`${locale}: ligação à plataforma oficial, numa janela nova, com nome`, () => {
+      const html = rodape(locale);
+      const t = getDictionary(locale);
+      const a = html.match(
+        /<a[^>]*href="https:\/\/www\.livroreclamacoes\.pt\/Inicio\/"[^>]*>/,
+      )?.[0];
+      expect(a, "sem ligação ao livroreclamacoes.pt").toBeTruthy();
+      expect(a).toContain('target="_blank"');
+      expect(a).toContain('rel="noopener noreferrer"');
+      expect(a).toContain(`aria-label="${t.footer.livroReclamacoes} (${t.common.newWindow})"`);
+      expect(html).toContain("livro-de-reclamacoes");
+    });
+  }
+});
