@@ -251,7 +251,32 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
             <p className="text-[11px] text-white/55 tracking-wide">
               © {new Date().getFullYear()} Líquen Events. {t.footer.rights}
             </p>
-            <div className="flex items-center gap-5 text-[11px] text-white/55 tracking-wide">
+            <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3 text-[11px] text-white/55 tracking-wide">
+              {/* ── Livro de Reclamações Eletrónico ──
+                  Obrigatório para quem presta serviços a consumidores: o
+                  acesso à plataforma oficial, visível, em todas as páginas.
+                  Ela (17/10): «no canto, ao lado da privacidade, e
+                  transparente como está tudo no cabeçalho» — por isso o
+                  logótipo oficial vai em silhueta branca, com a mesma
+                  transparência dos links ao lado (as letras do círculo ficam
+                  vazadas, e lêem-se no fundo escuro). */}
+              <a
+                href={SITE.livroReclamacoes}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`${t.footer.livroReclamacoes} (${t.common.newWindow})`}
+                title={t.footer.livroReclamacoes}
+                className="alvo-toque inline-flex items-center opacity-70 hover:opacity-100 transition-opacity duration-300"
+              >
+                <SafeImage
+                  src="/logos/livro-de-reclamacoes.png"
+                  alt=""
+                  width={1012}
+                  height={408}
+                  sizes="100px"
+                  className="h-10 w-auto brightness-0 invert"
+                />
+              </a>
               <Link
                 href={localizeHref("/privacidade", locale)}
                 className="alvo-toque link-line pointer-fine:pt-2 pointer-fine:-mt-2 hover:text-white transition-colors"

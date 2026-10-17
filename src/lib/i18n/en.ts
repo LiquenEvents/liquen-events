@@ -759,5 +759,6 @@ export const en: Dict = {
     legal: "Legal",
     privacidade: "Privacy",
     termos: "Terms",
+    livroReclamacoes: "Complaints Book (Livro de Reclamações)",
   },
 };
