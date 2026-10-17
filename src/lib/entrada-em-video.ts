@@ -141,12 +141,13 @@ export async function melhorFormato(
   webkit = false,
 ): Promise<Formato | null> {
   const base = formatoQueToca(podeTocar);
+  // No WebKit (iPhone, Safari, o Instagram) é o HEVC, sem perguntar: é o
+  // formato da casa da Apple, descodificado no chip em todos os iPhones; o
+  // AV1 no WebKit é recente. O registo do iPhone dela (17/10) mostrou que a
+  // pergunta deixava passar o AV1 — e as imagens presas apareceram com ele.
+  if (webkit && podeTocar(tipoDoFormato("hevc", variante))) return "hevc";
   if (!perguntar) return base;
-  // No WebKit (iPhone, Safari, o Instagram) o HEVC vem primeiro: é o formato
-  // da casa da Apple, descodificado no chip em todos os iPhones; o AV1 no
-  // WebKit é recente. As imagens presas do registo (17/10) apareceram com AV1
-  // e também com H.264 — isto tira uma variável, não é a causa.
-  for (const f of webkit ? (["hevc", "av1"] as const) : (["av1", "hevc"] as const)) {
+  for (const f of ["av1", "hevc"] as const) {
     if (!podeTocar(tipoDoFormato(f, variante))) continue;
     try {
       const c = await perguntar(f, variante);
@@ -381,6 +382,16 @@ export const PASSAGEM_PRESA_MS = 400;
  * 15 fotogramas seguidos sem nada — nunca acontece num vídeo que anda.
  */
 export const IMAGEM_PRESA_MS = 600;
+
+/** O salto para a frente do 1.º degrau do destravar (ver `IMAGEM_PRESA_MS`): 2 fotogramas a 25 por segundo. */
+export const SALTO_DE_DESTRAVAR_S = 0.08;
+
+/**
+ * Depois de uma passagem, o que saiu acaba sozinho, escondido, se lhe faltar
+ * até isto — em vez de o pausar e de lhe pôr o tempo a 0 (o registo do iPhone
+ * dela, 17/10: era aí que a imagem do que está à vista prendia).
+ */
+export const DEIXAR_ACABAR_S = 1.5;
 
 /** Com o aparelho a recusar (poupança de energia), de quanto em quanto se volta a tentar, em silêncio. */
 export const TENTAR_DE_NOVO_MS = 3000;

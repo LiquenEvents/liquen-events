@@ -9,7 +9,9 @@ import {
   ENCRAVADO_MS,
   MEDIR_REDE_MS,
   NUMERO_DE_VIDEOS,
+  DEIXAR_ACABAR_S,
   IMAGEM_PRESA_MS,
+  SALTO_DE_DESTRAVAR_S,
   PASSAGEM_MS,
   PASSAGEM_PRESA_MS,
   SALTAR_SEM_DADOS_MS,
@@ -1011,11 +1013,18 @@ function criarMotor(raiz: HTMLElement): Motor | null {
       const t = setTimeout(() => {
         if (!vivo) return;
         novo.style.transitionDuration = "";
-        pausar(velho);
         aTocar.delete(velho);
         velho.style.opacity = "0";
         velho.style.zIndex = "0";
-        velho.currentTime = 0;
+        // ── O QUE SAIU NÃO LEVA PAUSA NEM SALTO PARA O 0 ─────────────────────
+        // O registo do iPhone dela (17/10, já com o destravar): a imagem do que
+        // está à vista prendia ~0,2 s depois de o motor pausar o que saiu e
+        // lhe pôr o tempo a 0 — os dois a pedir ao mesmo descodificador. Agora,
+        // perto do fim (o caso normal), o que saiu acaba sozinho, escondido; o
+        // `passar` põe-no no 0 antes de o voltar a tocar, na vez dele. Só uma
+        // passagem forçada a meio (o vigia) ainda o pausa — mas sem salto.
+        const falta = velho.duration - velho.currentTime;
+        if (!(Number.isFinite(falta) && falta <= DEIXAR_ACABAR_S)) pausar(velho);
         atual = seguinte;
         passagem = null;
         // O take de abertura tocava da rede; se a cópia na memória já
@@ -1420,8 +1429,8 @@ function criarMotor(raiz: HTMLElement): Motor | null {
 
   // ── DESTRAVAR A IMAGEM PRESA (ver `IMAGEM_PRESA_MS`) ────────────────────
   // Sem fotograma pintado há mais de `IMAGEM_PRESA_MS`, com o vídeo à vista a
-  // dever andar: (1) salto para o mesmo instante — obriga o descodificador a
-  // entregar de novo; (2) um segundo depois, ainda presa: passa ao seguinte,
+  // dever andar: (1) um salto ligeiro para a frente — obriga o descodificador
+  // a entregar de novo; (2) ~0,6 s depois, ainda presa: passa ao seguinte,
   // se estiver pronto; (3) senão, recarrega no mesmo ponto.
   let degrau = 0;
   let ultimoDegrau = 0;
@@ -1442,13 +1451,17 @@ function criarMotor(raiz: HTMLElement): Motor | null {
       degrau = 0;
       return;
     }
-    if (degrau && agora - ultimoDegrau < 1000) return; // à espera do efeito do anterior
+    if (degrau && agora - ultimoDegrau < IMAGEM_PRESA_MS) return; // à espera do efeito do anterior
     ultimoDegrau = agora;
     degrau++;
     if (degrau === 1) {
       marcar("destravar", atual);
+      // Um salto ligeiro PARA A FRENTE: saltar para o mesmo instante, no
+      // WebKit, pode não fazer nada (o registo de 17/10: o 1.º degrau não
+      // destravou nenhuma das duas paragens).
       try {
-        el.currentTime = el.currentTime;
+        const fim = Number.isFinite(el.duration) ? el.duration - 0.1 : Infinity;
+        el.currentTime = Math.min(el.currentTime + SALTO_DE_DESTRAVAR_S, fim);
       } catch {
         // sem dados para saltar: o degrau seguinte trata
       }

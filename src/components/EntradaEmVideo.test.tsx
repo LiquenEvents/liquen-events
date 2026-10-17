@@ -26,6 +26,9 @@ beforeEach(() => {
   // testes do download inteiro põem-no de volta.
   vi.stubGlobal("fetch", undefined);
   tiposQueToca = ["mp4"];
+  // Fora do WebKit, salvo nos testes do iPhone: no WebKit o HEVC entra sem
+  // perguntar (`melhorFormato`), e o jsdom diz-se «Apple».
+  Object.defineProperty(navigator, "vendor", { configurable: true, value: "" });
   vista = null;
   play = vi.fn(() => Promise.resolve());
   pausa = vi.fn();
@@ -717,7 +720,7 @@ describe("EntradaEmVideo", () => {
       }
     });
 
-    it("no iPhone/Safari, com os dois no chip, HEVC antes de AV1 (17/10: tira uma variável)", async () => {
+    it("no iPhone/Safari é o HEVC, mesmo com o AV1 no chip (17/10, o registo)", async () => {
       Object.defineProperty(navigator, "vendor", {
         configurable: true,
         value: "Apple Computer, Inc.",
@@ -864,6 +867,9 @@ describe("EntradaEmVideo", () => {
         act(() => void b.dispatchEvent(new Event("playing")));
         act(() => void vi.advanceTimersByTime(1000));
         expect(b.style.opacity).toBe("1");
+        // O que saiu, perto do fim, acaba sozinho: sem salto para o 0 (o
+        // registo do iPhone, 17/10: era aí que a imagem à vista prendia).
+        expect(a.currentTime).toBe(16.5);
         // 2 → 3: o 3 é aquecido da memória perto do fim do 2…
         Object.defineProperty(b, "duration", { configurable: true, value: 18 });
         Object.defineProperty(b, "currentTime", {
@@ -1327,7 +1333,7 @@ describe("EntradaEmVideo", () => {
         pendentes.delete(el);
         act(() => cb?.());
       };
-      /** O take à vista a andar, com o salto para o mesmo instante espiado. */
+      /** O take à vista a andar, com os saltos espiados. */
       async function aAndar() {
         const r = await montar();
         const [a, b] = videos(r.container);
@@ -1346,12 +1352,15 @@ describe("EntradaEmVideo", () => {
         return { a, b, saltos };
       }
 
-      it("sem imagens novas há 0,6 s, com o vídeo à vista a andar: salta para o mesmo instante", async () => {
+      it("sem imagens novas há 0,6 s, com o vídeo à vista a andar: um salto ligeiro para a frente", async () => {
         const { a, saltos } = await aAndar();
         act(() => void vi.advanceTimersByTime(550));
         expect(saltos).toEqual([]); // ainda dentro do normal
         act(() => void vi.advanceTimersByTime(300));
-        expect(saltos).toEqual([4]);
+        // Para a frente, e não para o mesmo instante: no WebKit esse pode não
+        // fazer nada (o registo de 17/10).
+        expect(saltos).toHaveLength(1);
+        expect(saltos[0]).toBeCloseTo(4.08, 5);
         expect(a.style.opacity).toBe("1");
       });
 
@@ -1364,10 +1373,10 @@ describe("EntradaEmVideo", () => {
         expect(saltos).toEqual([]);
       });
 
-      it("continua presa um segundo depois: passa ao seguinte, se estiver pronto", async () => {
+      it("continua presa ~0,6 s depois: passa ao seguinte, se estiver pronto", async () => {
         const { b } = await aAndar();
         act(() => void b.dispatchEvent(new Event("canplaythrough")));
-        act(() => void vi.advanceTimersByTime(2100));
+        act(() => void vi.advanceTimersByTime(1600));
         act(() => void b.dispatchEvent(new Event("playing")));
         expect(b.style.opacity).toBe("1");
       });
