@@ -272,7 +272,6 @@ export const pt = {
     desde: "Desde",
     logosEyebrow: "Empresas & instituições",
     logosTitle: "Marcas que confiam em nós",
-    clientesCount: "clientes",
     featuredEyebrow: "Testemunhos",
     featuredQuote:
       "A dedicação da equipa em criar ambientes mágicos, com decoração impecável e coordenação perfeita, permitiu-nos desfrutar do evento sem qualquer preocupação.",

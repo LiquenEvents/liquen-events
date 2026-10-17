@@ -231,14 +231,6 @@ export default async function ClientesPage({ params }: { params: Promise<{ lang:
                 {t.clientes.logosTitle}
               </h2>
             </AnimateIn>
-            <AnimateIn delay={staggerMs(1)} className="hidden lg:block">
-              <span
-                aria-hidden="true"
-                className="text-foreground/45 text-[9px] tracking-[0.4em] uppercase"
-              >
-                {clientLogos.length} {t.clientes.clientesCount}
-              </span>
-            </AnimateIn>
           </div>
           <AnimateIn delay={staggerMs(2)}>
             <ClientLogoGrid clients={clientLogos} />

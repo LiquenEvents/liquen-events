@@ -270,7 +270,6 @@ export const en: Dict = {
     desde: "Since",
     logosEyebrow: "Companies & institutions",
     logosTitle: "Brands that trust us",
-    clientesCount: "clients",
     featuredEyebrow: "Testimonials",
     featuredQuote:
       "The team's dedication to creating magical settings, with impeccable décor and flawless coordination, let us enjoy the event without a single worry.",
