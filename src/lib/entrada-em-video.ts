@@ -14,7 +14,7 @@
  *   · que versão se pede para este ecrã;
  *   · que formato este aparelho toca melhor sem travar (AV1, HEVC, H.264, VP9).
  *
- * ── OS FICHEIROS (`public/videos/entrada/v4/`) ──────────────────────────────
+ * ── OS FICHEIROS (`public/videos/entrada/v5/`) ──────────────────────────────
  *   · SEM AS TIRAS PRETAS. Os vídeos vêm gravados em formato de cinema (2:1),
  *     com 60 px pretos em cima e em baixo (120 px no 4K). Cortam-se, e o
  *     `object-cover` faz o resto: o vídeo enche a entrada sem nada à volta;
@@ -38,11 +38,25 @@
  *     defeitos pelo mesmo peso. Só os recebe o aparelho que os descodifica no
  *     chip — ver `melhorFormato`.
  *
- * A pasta tem versão (`v4`) porque os vídeos são servidos com cache de um ano:
- * um vídeo novo vai para `v5`, nunca por cima.
+ *   · O VÍDEO 1 MAIS CLARO, desde 17/10 (`v5`). Ela, no telemóvel: «está muito
+ *     escuro… a da parte da floresta». Medido: a parte aérea tinha metade do
+ *     brilho dos outros (luma média ~56 contra ~85 no 3). Levantam-se os tons
+ *     médios com uma curva (`0/0 0.10/0.16 0.30/0.47 0.6/0.78 1/1`, saturação
+ *     ×1,10) — o preto e o branco ficam onde estavam, por isso não lava como
+ *     um `gamma` —, e só até ao corte para a noiva (14,64 s na fonte), que já
+ *     era clara. A fotografia da entrada (`entrada-floresta-clara.jpg`) é o
+ *     1.º fotograma com a mesma curva, para a passagem continuar sem salto.
+ *     Os vídeos 2 e 3 são os mesmos ficheiros de antes, só mudaram de pasta.
+ *     O peso do 1 ficou o de antes (mais claro, o grão das sombras vê-se e
+ *     pedia ~30 % mais): HEVC ao alto CRF 23 e AV1 ao alto CRF 33, a versão
+ *     leve HEVC com tecto de 1,75 Mbit/s e o VP9 a CRF 36. Medido contra a
+ *     versão clara mais fiel (HEVC CRF 20): SSIM 0,9875 no HEVC ao alto.
+ *
+ * A pasta tem versão (`v5`) porque os vídeos são servidos com cache de um ano:
+ * um vídeo novo vai para `v6`, nunca por cima.
  */
 
-export const PASTA_DOS_VIDEOS = "/videos/entrada/v4";
+export const PASTA_DOS_VIDEOS = "/videos/entrada/v5";
 
 /** Quantos vídeos há. */
 export const NUMERO_DE_VIDEOS = 3;
