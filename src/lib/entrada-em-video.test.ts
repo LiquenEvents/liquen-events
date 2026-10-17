@@ -112,6 +112,14 @@ describe("os vídeos da entrada — as regras", () => {
       expect(await melhorFormato(tudo, async () => r(true, true, true), "paisagem")).toBe("av1");
     });
 
+    it("no WebKit (iPhone, Safari, Instagram), com os dois no chip, HEVC primeiro", async () => {
+      const bom = async () => r(true, true, true);
+      expect(await melhorFormato(tudo, bom, "paisagem", true)).toBe("hevc");
+      // O HEVC não serve? Então o AV1, se servir.
+      const soAv1 = async (f: string) => r(true, true, f === "av1");
+      expect(await melhorFormato(tudo, soAv1, "paisagem", true)).toBe("av1");
+    });
+
     it("AV1 no processador (sem chip) ou a perder fotogramas não serve: HEVC", async () => {
       const p = async (f: string) => (f === "av1" ? r(true, true, false) : r(true, true, true));
       expect(await melhorFormato(tudo, p, "paisagem")).toBe("hevc");

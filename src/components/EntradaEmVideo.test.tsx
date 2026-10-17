@@ -707,9 +707,27 @@ describe("EntradaEmVideo", () => {
       return b.getAttribute("src");
     }
 
-    it("AV1 quando o chip o descodifica e corre liso", async () => {
-      aparelho(SIM, SIM);
-      expect(await srcDoSegundo()).toMatch(/entrada-2-paisagem-av1\.mp4$/);
+    it("AV1 quando o chip o descodifica e corre liso (fora do Safari/iPhone)", async () => {
+      Object.defineProperty(navigator, "vendor", { configurable: true, value: "Google Inc." });
+      try {
+        aparelho(SIM, SIM);
+        expect(await srcDoSegundo()).toMatch(/entrada-2-paisagem-av1\.mp4$/);
+      } finally {
+        Reflect.deleteProperty(navigator, "vendor");
+      }
+    });
+
+    it("no iPhone/Safari, com os dois no chip, HEVC antes de AV1 (17/10: tira uma variável)", async () => {
+      Object.defineProperty(navigator, "vendor", {
+        configurable: true,
+        value: "Apple Computer, Inc.",
+      });
+      try {
+        aparelho(SIM, SIM);
+        expect(await srcDoSegundo()).toMatch(/entrada-2-paisagem-hevc\.mp4$/);
+      } finally {
+        Reflect.deleteProperty(navigator, "vendor");
+      }
     });
 
     it("HEVC quando o AV1 seria no processador (travava) e o HEVC é no chip", async () => {
@@ -824,7 +842,7 @@ describe("EntradaEmVideo", () => {
       expect(b.getAttribute("src")).toBe("/videos/entrada/v4/entrada-2-paisagem.mp4");
     });
 
-    it("depois de cada passagem, o que saiu larga o ficheiro (no máximo dois carregados)", async () => {
+    it("depois de cada passagem, o que saiu FICA carregado (largá-lo prendia a imagem no iPhone)", async () => {
       const { container } = await montar();
       const [a, b, c] = videos(container);
       Object.defineProperty(a, "duration", { configurable: true, value: 18 });
@@ -863,8 +881,10 @@ describe("EntradaEmVideo", () => {
         vi.useRealTimers();
       }
       expect(c.style.opacity).toBe("1");
-      // …e o 2, que saiu, larga o ficheiro (volta a ser aquecido na sua vez).
-      expect(b.getAttribute("src")).toBeNull();
+      // …e o 2, que saiu, continua com o seu ficheiro. O #243 largava-o aqui, e
+      // era nesse instante que, no iPhone, a imagem à vista ficava presa
+      // 8 a 10 s (o registo anónimo, 17/10).
+      expect(b.getAttribute("src")).toBe("blob:take-1");
     });
 
     it("se o download falhar, toca da rede como antes", async () => {
@@ -1283,6 +1303,81 @@ describe("EntradaEmVideo", () => {
         const corpo = JSON.parse(await beacons[beacons.length - 1].text());
         expect(corpo.motivo).toBe("saida");
         expect(corpo.paragens).toEqual([]);
+      });
+    });
+
+    describe("a imagem presa (17/10, iPhone): o relógio anda, as imagens não", () => {
+      let pendentes: Map<HTMLVideoElement, () => void>;
+      beforeEach(() => {
+        pendentes = new Map();
+        Object.defineProperty(HTMLVideoElement.prototype, "requestVideoFrameCallback", {
+          configurable: true,
+          value: function (this: HTMLVideoElement, cb: () => void) {
+            pendentes.set(this, cb);
+            return 1;
+          },
+        });
+      });
+      afterEach(() => {
+        Reflect.deleteProperty(HTMLVideoElement.prototype, "requestVideoFrameCallback");
+      });
+      /** O browser pintou um fotograma deste vídeo. */
+      const pintar = (el: HTMLVideoElement) => {
+        const cb = pendentes.get(el);
+        pendentes.delete(el);
+        act(() => cb?.());
+      };
+      /** O take à vista a andar, com o salto para o mesmo instante espiado. */
+      async function aAndar() {
+        const r = await montar();
+        const [a, b] = videos(r.container);
+        comecar(a);
+        let t = 4;
+        const saltos: number[] = [];
+        Object.defineProperty(a, "currentTime", {
+          configurable: true,
+          get: () => t,
+          set: (v: number) => {
+            saltos.push(v);
+            t = v;
+          },
+        });
+        pintar(a);
+        return { a, b, saltos };
+      }
+
+      it("sem imagens novas há 0,6 s, com o vídeo à vista a andar: salta para o mesmo instante", async () => {
+        const { a, saltos } = await aAndar();
+        act(() => void vi.advanceTimersByTime(550));
+        expect(saltos).toEqual([]); // ainda dentro do normal
+        act(() => void vi.advanceTimersByTime(300));
+        expect(saltos).toEqual([4]);
+        expect(a.style.opacity).toBe("1");
+      });
+
+      it("se as imagens voltam, não faz mais nada", async () => {
+        const { a, saltos } = await aAndar();
+        for (let k = 0; k < 10; k++) {
+          act(() => void vi.advanceTimersByTime(300));
+          pintar(a);
+        }
+        expect(saltos).toEqual([]);
+      });
+
+      it("continua presa um segundo depois: passa ao seguinte, se estiver pronto", async () => {
+        const { b } = await aAndar();
+        act(() => void b.dispatchEvent(new Event("canplaythrough")));
+        act(() => void vi.advanceTimersByTime(2100));
+        act(() => void b.dispatchEvent(new Event("playing")));
+        expect(b.style.opacity).toBe("1");
+      });
+
+      it("pausado (de propósito, ou fora do ecrã) não conta como imagem presa", async () => {
+        const { a, saltos } = await aAndar();
+        Object.defineProperty(a, "paused", { configurable: true, value: true });
+        act(() => vista?.([{ isIntersecting: false }]));
+        act(() => void vi.advanceTimersByTime(3000));
+        expect(saltos).toEqual([]);
       });
     });
 

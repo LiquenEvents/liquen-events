@@ -138,10 +138,15 @@ export async function melhorFormato(
   podeTocar: (tipo: string) => string,
   perguntar: PerguntarAoAparelho | null,
   variante: Variante,
+  webkit = false,
 ): Promise<Formato | null> {
   const base = formatoQueToca(podeTocar);
   if (!perguntar) return base;
-  for (const f of ["av1", "hevc"] as const) {
+  // No WebKit (iPhone, Safari, o Instagram) o HEVC vem primeiro: é o formato
+  // da casa da Apple, descodificado no chip em todos os iPhones; o AV1 no
+  // WebKit é recente. As imagens presas do registo (17/10) apareceram com AV1
+  // e também com H.264 — isto tira uma variável, não é a causa.
+  for (const f of webkit ? (["hevc", "av1"] as const) : (["av1", "hevc"] as const)) {
     if (!podeTocar(tipoDoFormato(f, variante))) continue;
     try {
       const c = await perguntar(f, variante);
@@ -362,6 +367,20 @@ export const SALTAR_SEM_DADOS_MS = 400;
  * cada milissegundo daqui é um fotograma parado à vista.
  */
 export const PASSAGEM_PRESA_MS = 400;
+
+/**
+ * ── A IMAGEM PRESA (O RELÓGIO ANDA, AS IMAGENS NÃO) ──────────────────────
+ * Ela (17/10, iPhone): «o vídeo está a andar e depois no meio pára». O registo
+ * anónimo mostrou-o em TODOS os iPhones (Safari, Instagram, Chrome): ~1,1 s
+ * depois de uma passagem, o vídeo à vista deixa de pintar imagens durante 8 a
+ * 10 s — até ao fim do take —, com o relógio a andar, sem pausa e com o
+ * ficheiro inteiro na memória. O vigia só olhava para o relógio, que andava, e
+ * não fazia nada. Agora conta também os fotogramas pintados
+ * (`requestVideoFrameCallback`): sem nenhum durante este tempo, a imagem está
+ * presa e o motor destrava-a (ver `criarMotor`). A 25 imagens por segundo são
+ * 15 fotogramas seguidos sem nada — nunca acontece num vídeo que anda.
+ */
+export const IMAGEM_PRESA_MS = 600;
 
 /** Com o aparelho a recusar (poupança de energia), de quanto em quanto se volta a tentar, em silêncio. */
 export const TENTAR_DE_NOVO_MS = 3000;
