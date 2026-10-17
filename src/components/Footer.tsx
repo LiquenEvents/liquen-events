@@ -245,41 +245,38 @@ export default function Footer({ locale = "pt" }: { locale?: Locale }) {
           </div>
         </div>
 
-        {/* ── Livro de Reclamações Eletrónico ──
-            Obrigatório para quem presta serviços a consumidores: o acesso à
-            plataforma oficial, em lugar visível e destacado, em todas as
-            páginas. O logótipo oficial é vermelho sobre branco, por isso vai
-            num cartão branco — sobre o fundo escuro do rodapé, o «RECLAMAÇÕES»
-            vermelho fora do círculo não se lia. Medido no ficheiro: o PNG tem
-            1012×408 px; desenhado a 48 px de altura (as letras do logótipo
-            ficam com ~10 px), chega para ecrãs 3×. */}
-        <div className="max-w-7xl mx-auto px-6 lg:px-16 pb-10 flex justify-center">
-          <a
-            href={SITE.livroReclamacoes}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label={`${t.footer.livroReclamacoes} (${t.common.newWindow})`}
-            title={t.footer.livroReclamacoes}
-            className="inline-flex items-center rounded-md bg-white px-3.5 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.25)] ring-1 ring-white/20 transition-transform duration-300 ease-expo hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
-          >
-            <SafeImage
-              src="/logos/livro-de-reclamacoes.png"
-              alt=""
-              width={1012}
-              height={408}
-              sizes="120px"
-              className="h-12 w-auto"
-            />
-          </a>
-        </div>
-
         {/* ── Copyright bar ── */}
         <div className="border-t border-white/12 py-5">
           <div className="max-w-7xl mx-auto px-6 lg:px-16 flex flex-col sm:flex-row justify-between items-center gap-3 text-center">
             <p className="text-[11px] text-white/55 tracking-wide">
               © {new Date().getFullYear()} Líquen Events. {t.footer.rights}
             </p>
-            <div className="flex items-center gap-5 text-[11px] text-white/55 tracking-wide">
+            <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3 text-[11px] text-white/55 tracking-wide">
+              {/* ── Livro de Reclamações Eletrónico ──
+                  Obrigatório para quem presta serviços a consumidores: o
+                  acesso à plataforma oficial, visível, em todas as páginas.
+                  Ela (17/10): «no canto, ao lado da privacidade, e
+                  transparente como está tudo no cabeçalho» — por isso o
+                  logótipo oficial vai em silhueta branca, com a mesma
+                  transparência dos links ao lado (as letras do círculo ficam
+                  vazadas, e lêem-se no fundo escuro). */}
+              <a
+                href={SITE.livroReclamacoes}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`${t.footer.livroReclamacoes} (${t.common.newWindow})`}
+                title={t.footer.livroReclamacoes}
+                className="alvo-toque inline-flex items-center opacity-70 hover:opacity-100 transition-opacity duration-300"
+              >
+                <SafeImage
+                  src="/logos/livro-de-reclamacoes.png"
+                  alt=""
+                  width={1012}
+                  height={408}
+                  sizes="100px"
+                  className="h-10 w-auto brightness-0 invert"
+                />
+              </a>
               <Link
                 href={localizeHref("/privacidade", locale)}
                 className="alvo-toque link-line pointer-fine:pt-2 pointer-fine:-mt-2 hover:text-white transition-colors"
