@@ -5,18 +5,36 @@ import logoDims from "./logo-dims.json";
  * vs square marks), so a single height makes some dominate. We size each logo
  * by AREA — every logo occupies a similar visual area — within a clamped
  * height range, which is the balanced "logo wall" approach.
+ *
+ * ── E PELA TINTA, NÃO SÓ PELA CAIXA (ela, 17/10) ──────────────────────────
+ * «Há empresas como a José de Mello que têm o logo muito mais pequeno… quero
+ * tudo ao mesmo tamanho.» A área da CAIXA não chegava: o José de Mello é um
+ * símbolo por cima de letras finas, com muito ar por dentro (tinta 0,11), e a
+ * Deloitte é letra grossa de ponta a ponta (0,55). Com a mesma caixa, um
+ * parece metade do outro. `logo-dims.json` guarda a densidade de cada um
+ * (`scripts/gen-logo-dims.mjs`) e a altura sobe nos leves e desce nos
+ * pesados, por `(DENSIDADE_DE_REFERENCIA / densidade)^0,4` — amortecido de
+ * propósito: compensar por inteiro deixava o Convento (0,07) gigante.
+ * Um cliente novo acerta-se sozinho: basta correr o gerador.
  */
 const DIMS = logoDims as Record<string, number[]>;
 
+/** A tinta de um logótipo «médio» da parede (a mediana, medida a 17/10). */
+const DENSIDADE_DE_REFERENCIA = 0.28;
+/** Quanto a tinta pesa na altura: 0 ignora-a, 0,5 compensa-a por inteiro. */
+const PESO_DA_TINTA = 0.4;
+
 export function logoDimsFor(src: string): number[] {
-  return DIMS[src] ?? [400, 120];
+  const d = DIMS[src];
+  return d ? [d[0], d[1]] : [400, 120];
 }
 
 export function logoHeight(src: string, targetArea = 1600, min = 26, max = 46): number {
   const d = DIMS[src];
   if (!d || !d[1]) return Math.round(Math.sqrt(targetArea));
   const ratio = d[0] / d[1];
-  return Math.round(Math.max(min, Math.min(max, Math.sqrt(targetArea / ratio))));
+  const tinta = d[2] ? Math.pow(DENSIDADE_DE_REFERENCIA / d[2], PESO_DA_TINTA) : 1;
+  return Math.round(Math.max(min, Math.min(max, Math.sqrt(targetArea / ratio) * tinta)));
 }
 
 /**
@@ -80,17 +98,17 @@ const CONTEXTOS = [
     larguraMax: 170,
   },
   {
-    // ClientLogoGrid: altura de `logoHeight(src, 3200, 30, 54)` (célula mais
+    // ClientLogoGrid: altura de `logoHeight(src, 3000, 22, 72)` (célula mais
     // alta, sem `max-h`), largura travada pelo `max-w-[68%]` da célula.
     //
     // 194px = 68% da célula MAIS LARGA que a grelha alguma vez tem: 3 colunas a
-    // 1023px de viewport, dentro de `max-w-7xl px-6`, cada célula com `px-5` e
-    // uma borda — (1023−48)/3 − 40 − 1 ≈ 285px de conteúdo. Nos ecrãs grandes a
+    // 1023px de viewport, dentro de `max-w-7xl px-6`, cada célula com `px-5`
+    // (já sem borda, desde 17/10) — (1023−48)/3 − 40 = 285px de conteúdo. Nos ecrãs grandes a
     // célula é MENOR (5 colunas dentro de 1280px ⇒ ~189px, medido), por isso
     // 194 cobre toda a escala de viewports com um número só.
-    area: 3200,
-    min: 30,
-    max: 54,
+    area: 3000,
+    min: 22,
+    max: 72,
     alturaMax: Infinity,
     larguraMax: 194,
   },

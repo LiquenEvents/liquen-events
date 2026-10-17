@@ -140,7 +140,7 @@ export const en: Dict = {
       "Photo gallery of events decorated by Líquen Events: weddings, corporate events, conferences and celebrations.",
     clientesTitle: "Companies and Institutions That Trust Us",
     clientesDescription:
-      "Companies and institutions that trust Líquen Events: universities, city councils, José de Mello, Aernnova, Mainova and many more.",
+      "Companies and institutions that trust Líquen Events: universities, city councils, José de Mello, Deloitte, Aernnova, Mainova and many more.",
     contactoTitle: "Contact: Request Your Event Quote",
     contactoDescription:
       "Contact Líquen Events to decorate your event, wherever it takes place. Receive a tailored proposal.",
@@ -270,7 +270,6 @@ export const en: Dict = {
     desde: "Since",
     logosEyebrow: "Companies & institutions",
     logosTitle: "Brands that trust us",
-    clientesCount: "clients",
     featuredEyebrow: "Testimonials",
     featuredQuote:
       "The team's dedication to creating magical settings, with impeccable décor and flawless coordination, let us enjoy the event without a single worry.",

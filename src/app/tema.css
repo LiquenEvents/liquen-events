@@ -71,7 +71,7 @@
      Tailwind. As regras escritas à mão neste ficheiro não a vêem — uma
      `transition: opacity 0.5s ease` continua em `ease` até alguém lá ir. Por
      isso as que partilham um gesto com a assinatura foram convergidas à mão
-     (`.lift`, `.field-line`, `.ff-label`, `.cl-black`, `.cl-moss`, `.bo-input`).
+     (`.lift`, `.field-line`, `.ff-label`, `.cl-black`, `.cl-nome`, `.bo-input`).
 
      O valor está escrito por extenso porque o `@theme` é lido antes do :root —
      `var(--ease-out)` aqui não resolveria. `tokens.coerencia.test.ts` guarda a

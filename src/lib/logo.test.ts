@@ -38,6 +38,26 @@ describe("logoHeight", () => {
   it("honours custom min/max bounds", () => {
     expect(logoHeight(WIDE, 1600, 30, 50)).toBe(30);
   });
+
+  // Ela (17/10): «a José de Mello tem o logo muito mais pequeno… tudo ao mesmo
+  // tamanho». Os dois têm quase a mesma forma; o que muda é a tinta.
+  it("um logótipo de traço fino fica maior do que um de letra grossa com a mesma forma", () => {
+    const fino = "/logos/clientes/jose-de-mello.png"; // tinta 0,11
+    const grosso = "/logos/clientes/palacio-cadaval.avif"; // 0,20, forma parecida
+    const [wf, hf] = logoDimsFor(fino);
+    const [wg, hg] = logoDimsFor(grosso);
+    // Mesma área de caixa daria quase a mesma altura; com a tinta, o fino sobe.
+    const semTinta = (w: number, h: number) => Math.sqrt(3000 / (w / h));
+    expect(logoHeight(fino, 3000, 0, 999) / semTinta(wf, hf)).toBeGreaterThan(
+      logoHeight(grosso, 3000, 0, 999) / semTinta(wg, hg),
+    );
+  });
+
+  it("a letra grossa (Deloitte) desce em relação à caixa", () => {
+    const deloitte = "/logos/clientes/deloitte.png";
+    const [w, h] = logoDimsFor(deloitte);
+    expect(logoHeight(deloitte, 3000, 0, 999)).toBeLessThan(Math.sqrt(3000 / (w / h)));
+  });
 });
 
 /**
@@ -75,15 +95,17 @@ describe("logoCssWidth / logoSizes", () => {
       expect(declarada, src).toBeGreaterThanOrEqual(desenhada(src, 1600, 26, 46, 22, 120));
       // Parede: a célula mais larga (3 colunas a 1023px) e a mais estreita
       // (5 colunas dentro de max-w-7xl) — o `max-w-[68%]` de cada uma.
-      expect(declarada, src).toBeGreaterThanOrEqual(desenhada(src, 3200, 30, 54, Infinity, 194));
-      expect(declarada, src).toBeGreaterThanOrEqual(desenhada(src, 3200, 30, 54, Infinity, 129));
+      expect(declarada, src).toBeGreaterThanOrEqual(desenhada(src, 3000, 22, 72, Infinity, 194));
+      expect(declarada, src).toBeGreaterThanOrEqual(desenhada(src, 3000, 22, 72, Infinity, 129));
     }
   });
 
   it("declara a largura real, não a do logótipo mais largo de todos", () => {
     // O ponto todo da mudança: estes dois são desenhados a larguras muito
     // diferentes e têm de declarar valores muito diferentes.
-    expect(logoCssWidth(TALL)).toBeLessThan(60); // desenhado a ~28–31px
+    // O Convento é leve (pouca tinta) e por isso cresce desde 17/10 — mas
+    // continua muito mais estreito do que o wordmark.
+    expect(logoCssWidth(TALL)).toBeLessThan(80);
     expect(logoCssWidth(WIDE)).toBeGreaterThan(150); // wordmark, vai aos 170px
     expect(logoSizes(TALL)).toBe(`${logoCssWidth(TALL)}px`);
     expect(logoSizes(TALL)).toMatch(/^\d+px$/);
@@ -121,6 +143,6 @@ describe("logoCssWidth / logoSizes", () => {
     expect(FITA).toContain("max-w-[120px] sm:max-w-[170px]");
     expect(FITA).toContain("logoHeight(logo)");
     expect(PAREDE).toContain("max-w-[68%]");
-    expect(PAREDE).toContain("logoHeight(client.logo, 3200, 30, 54)");
+    expect(PAREDE).toContain("logoHeight(client.logo, 3000, 22, 72)");
   });
 });

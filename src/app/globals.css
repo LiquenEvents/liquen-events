@@ -5432,9 +5432,9 @@ body:has(.barra-consentimento) footer {
    so without JS — and under reduced motion — the logos stay fully visible
    (they're client proof and must always render legibly). */
 
-/* Cells share borders, so nothing translates the cell itself (that would open
-   seams between neighbours). Instead a soft moss spotlight blooms behind the
-   logo and the cell picks up the faintest moss tint. */
+/* Sem quadrados (ela, 17/10: «tira os quadrados à volta dos logos»): as
+   células já não têm traços nem fundo próprio ao passar o rato — só a luz
+   musgo, redonda e esbatida, que não desenha nenhuma caixa. */
 .cl-cell::before {
   content: "";
   position: absolute;
@@ -5447,53 +5447,73 @@ body:has(.barra-consentimento) footer {
 }
 /* Gated to hover devices so the logo-wall recolor/lift doesn't stick on tap. */
 @media (hover: hover) {
-  .cl-cell:hover {
-    background-color: rgba(99, 122, 95, 0.045);
-  }
   .cl-cell:hover::before {
     opacity: 1;
   }
 }
 
-/* On hover the logo lifts + swells a touch, and the black silhouette crossfades
-   to a true moss recolor: a moss-filled layer masked by the logo's own alpha. */
+/* Calmo em repouso, vivo ao toque (ela, 17/10, «dar mais vida»; escolheu
+   «calmo, ganha vida ao toque»). Em repouso todos os logótipos estão no mesmo
+   cinzento — a parede lê-se como um todo, sem nenhuma marca a gritar mais do
+   que as outras. Ao passar o rato, esse logótipo fica preto, sobe um pouco e o
+   nome aparece por baixo. Só opacidade e transform (trabalho do compositor). */
 .cl-logo {
   position: relative;
   display: inline-flex;
   transition: transform 0.5s var(--ease-out);
 }
 .cl-black {
-  /* O logótipo levanta e cresce na assinatura (`.cl-logo`, acima) enquanto o
-     preto se desvanecia para o musgo em `ease`: um só gesto, duas curvas. */
+  opacity: 0.55;
   transition: opacity 0.5s var(--ease-out);
 }
-@media (hover: hover) {
-  .cl-cell:hover .cl-logo {
-    transform: translateY(-2px) scale(1.045);
-  }
-  .cl-cell:hover .cl-black {
-    opacity: 0;
-  }
-}
-.cl-moss {
+.cl-nome {
   position: absolute;
-  inset: 0;
-  background-color: var(--color-moss);
+  left: 0;
+  right: 0;
+  bottom: 0.7rem;
+  z-index: 10;
+  text-align: center;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-foreground);
   opacity: 0;
-  /* O par do `.cl-black`: as duas metades do mesmo crossfade têm de partilhar a
-     curva, ou uma chega antes da outra e vê-se um piscar a meio. */
-  transition: opacity 0.5s var(--ease-out);
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  mask-position: center;
-  -webkit-mask-size: contain;
-  mask-size: contain;
+  transform: translateY(4px);
+  transition:
+    opacity 0.4s var(--ease-out),
+    transform 0.4s var(--ease-out);
   pointer-events: none;
 }
 @media (hover: hover) {
-  .cl-cell:hover .cl-moss {
+  .cl-cell:hover .cl-logo {
+    transform: translateY(-6px) scale(1.04);
+  }
+  .cl-cell:hover .cl-black {
     opacity: 1;
+  }
+  .cl-cell:hover .cl-nome {
+    opacity: 0.6;
+    transform: none;
+  }
+}
+/* O nome entra com o logótipo: enquanto a parede está armada e ainda não
+   chegou ao ecrã (ver ClientLogoGrid), fica escondido como ele. */
+.cl-armed:not(.cl-in) .cl-nome {
+  opacity: 0;
+}
+
+/* Num ecrã de toque não há «passar o rato»: o nome fica sempre, discreto, e o
+   logótipo sobe o suficiente para lhe dar lugar. */
+@media (hover: none) {
+  .cl-nome {
+    opacity: 0.5;
+    transform: none;
+    bottom: 0.5rem;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+  }
+  .cl-logo {
+    transform: translateY(-6px);
   }
 }
 
@@ -5520,7 +5540,8 @@ body:has(.barra-consentimento) footer {
 
 @media (prefers-reduced-motion: reduce) {
   /* Final state, instantly — no rise, blur or crossfade motion. Hover still
-     recolors to moss (a state change, not motion), just without a transition. */
+     turns the logo black and shows the name (a state change, not motion),
+     just without a transition. */
   .cl-armed .cl-reveal,
   .cl-armed.cl-in .cl-reveal {
     opacity: 1;
@@ -5533,10 +5554,11 @@ body:has(.barra-consentimento) footer {
   .cl-cell::before,
   .cl-logo,
   .cl-black,
-  .cl-moss {
+  .cl-nome {
     transition: none;
   }
-  .cl-cell:hover .cl-logo {
+  .cl-cell:hover .cl-logo,
+  .cl-cell:hover .cl-nome {
     transform: none;
   }
 }

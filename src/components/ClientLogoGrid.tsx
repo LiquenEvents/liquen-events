@@ -15,21 +15,25 @@ interface Client {
 function ClientLogo({ client, index }: { client: Client; index: number }) {
   const [failed, setFailed] = useState(false);
   const refErro = useImageErrorRef(() => setFailed(true));
-  // Compact footprint: smaller target area + tighter height clamp than before,
-  // so the whole wall reads tighter (paired with shorter cells + more columns).
-  const h = logoHeight(client.logo, 3200, 30, 54);
+  // Mesmo peso à vista para todos (ela, 17/10): a altura vem da área E da tinta
+  // de cada logótipo (ver logoHeight). Limites largos — 22 a 72 px — porque é
+  // a tinta, e não um tecto, que deve igualar o José de Mello e a Deloitte.
+  const h = logoHeight(client.logo, 3000, 22, 72);
   const d = logoDimsFor(client.logo);
 
   return (
     <div
-      className="cl-cell relative overflow-hidden h-24 sm:h-28 bg-surface flex items-center justify-center px-4 sm:px-5 border-r border-b border-foreground/[0.07]"
+      className="cl-cell relative overflow-hidden h-28 sm:h-32 basis-1/2 sm:basis-1/3 lg:basis-1/4 xl:basis-1/5 flex items-center justify-center px-4 sm:px-5"
       // Diagonal-ish wave: each logo's reveal is offset by its index, so the
       // block resolves in as one staggered sweep (top-left → bottom-right).
       style={{ ["--cl-delay" as string]: `${index * 42}ms` }}
     >
       <div className="cl-reveal relative z-10 flex items-center justify-center w-full">
+        {/* O tecto de 68% vive na CAIXA do logótipo e não na imagem: na imagem,
+            a caixa ficava com a largura natural e a imagem encolhia lá dentro
+            encostada à esquerda — o logótipo saía do centro. */}
         {!failed && client.logo ? (
-          <span className="cl-logo">
+          <span className="cl-logo max-w-[68%]">
             <Image
               src={client.logo}
               alt={client.name}
@@ -46,7 +50,7 @@ function ClientLogo({ client, index }: { client: Client; index: number }) {
               // imperceptible, so 50 trims the bytes of ~20 logos on /clientes.
               quality={50}
               style={{ height: `${h}px` }}
-              className="cl-black object-contain w-auto max-w-[68%] brightness-0"
+              className="cl-black object-contain w-auto max-w-full brightness-0"
               // O erro é ouvido pela `ref` e NÃO pelo `onError` do next/image.
               // Passar `onError` faz o next/image reatribuir `img.src = img.src` na
               // montagem (image-component.js:140) para ressuscitar um erro anterior à
@@ -56,17 +60,6 @@ function ClientLogo({ client, index }: { client: Client; index: number }) {
               // `useImageErrorRef` cobre o mesmo caso lendo o estado do elemento.
               ref={refErro}
             />
-            {/* Moss recolor on hover: a moss-filled layer masked by the logo's
-                own alpha, crossfaded over the black silhouette. aria-hidden — the
-                real <Image> above carries the alt text. */}
-            <span
-              aria-hidden
-              className="cl-moss"
-              style={{
-                WebkitMaskImage: `url(${client.logo})`,
-                maskImage: `url(${client.logo})`,
-              }}
-            />
           </span>
         ) : (
           <span className="text-foreground text-[10px] sm:text-[11px] font-medium tracking-[0.15em] uppercase text-center leading-snug">
@@ -74,13 +67,24 @@ function ClientLogo({ client, index }: { client: Client; index: number }) {
           </span>
         )}
       </div>
+      {/* O nome por baixo (ela, 17/10: «perceber-se quais são as marcas»).
+          Ao passar o rato aparece; num ecrã de toque, onde não há rato, fica
+          sempre à vista, discreto. aria-hidden: o `alt` da imagem já o diz. */}
+      {!failed && client.logo ? (
+        <span aria-hidden className="cl-nome">
+          {client.name}
+        </span>
+      ) : null}
     </div>
   );
 }
 
 /**
- * Bordered grid (cell borders, not gap-px) so a partial final row ends in clean
- * whitespace instead of an empty grey cell — robust at every column count.
+ * Sem quadrados: as células não têm traços (ela, 17/10, «tira os quadrados à
+ * volta dos logos»). Os logótipos ficam soltos sobre o fundo da página. As
+ * colunas são as mesmas de antes (2/3/4/5), mas em `flex-wrap` centrado: sem
+ * traços a desenhar a grelha, uma última fila incompleta encostada à esquerda
+ * parecia um engano — assim fica ao centro.
  *
  * Entrance animation: one IntersectionObserver on the grid (fire once, then
  * disconnect — no scroll listeners, no per-frame JS) adds `.cl-in`; the CSS in
@@ -126,10 +130,7 @@ export default function ClientLogoGrid({ clients }: { clients: Client[] }) {
   }, []);
 
   return (
-    <div
-      ref={gridRef}
-      className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 border-t border-l border-foreground/[0.07]"
-    >
+    <div ref={gridRef} className="flex flex-wrap justify-center">
       {clients.map((client, i) => (
         <ClientLogo key={client.name} client={client} index={i} />
       ))}
