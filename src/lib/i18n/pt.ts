@@ -140,7 +140,7 @@ export const pt = {
       "Galeria de fotografias de eventos decorados pela Líquen Events: casamentos, eventos corporativos, conferências e celebrações.",
     clientesTitle: "Empresas e Instituições que Confiam em Nós",
     clientesDescription:
-      "Empresas e instituições que confiam na Líquen Events: universidades, câmaras municipais, José de Mello, Aernnova, Mainova e muitas mais.",
+      "Empresas e instituições que confiam na Líquen Events: universidades, câmaras municipais, José de Mello, Deloitte, Aernnova, Mainova e muitas mais.",
     contactoTitle: "Contacto: Peça o Seu Orçamento de Evento",
     contactoDescription:
       "Contacte a Líquen Events para decorar o seu evento, onde quer que aconteça. Receba uma proposta à medida.",

@@ -24,6 +24,7 @@ export interface ClientLogo {
 
 export const clientLogos: ClientLogo[] = [
   { name: "José de Mello", logo: "/logos/clientes/jose-de-mello.png" },
+  { name: "Deloitte", logo: "/logos/clientes/deloitte.png" },
   { name: "Aernnova", logo: "/logos/clientes/aernnova.avif" },
   { name: "Mainova", logo: "/logos/clientes/mainova.avif" },
   { name: "Palácio Duques de Cadaval", logo: "/logos/clientes/palacio-cadaval.avif" },
