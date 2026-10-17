@@ -138,8 +138,14 @@ export async function melhorFormato(
   podeTocar: (tipo: string) => string,
   perguntar: PerguntarAoAparelho | null,
   variante: Variante,
+  webkit = false,
 ): Promise<Formato | null> {
   const base = formatoQueToca(podeTocar);
+  // No WebKit (iPhone, Safari, o Instagram) é o HEVC, sem perguntar: é o
+  // formato da casa da Apple, descodificado no chip em todos os iPhones; o
+  // AV1 no WebKit é recente. O registo do iPhone dela (17/10) mostrou que a
+  // pergunta deixava passar o AV1 — e as imagens presas apareceram com ele.
+  if (webkit && podeTocar(tipoDoFormato("hevc", variante))) return "hevc";
   if (!perguntar) return base;
   for (const f of ["av1", "hevc"] as const) {
     if (!podeTocar(tipoDoFormato(f, variante))) continue;
@@ -362,6 +368,30 @@ export const SALTAR_SEM_DADOS_MS = 400;
  * cada milissegundo daqui é um fotograma parado à vista.
  */
 export const PASSAGEM_PRESA_MS = 400;
+
+/**
+ * ── A IMAGEM PRESA (O RELÓGIO ANDA, AS IMAGENS NÃO) ──────────────────────
+ * Ela (17/10, iPhone): «o vídeo está a andar e depois no meio pára». O registo
+ * anónimo mostrou-o em TODOS os iPhones (Safari, Instagram, Chrome): ~1,1 s
+ * depois de uma passagem, o vídeo à vista deixa de pintar imagens durante 8 a
+ * 10 s — até ao fim do take —, com o relógio a andar, sem pausa e com o
+ * ficheiro inteiro na memória. O vigia só olhava para o relógio, que andava, e
+ * não fazia nada. Agora conta também os fotogramas pintados
+ * (`requestVideoFrameCallback`): sem nenhum durante este tempo, a imagem está
+ * presa e o motor destrava-a (ver `criarMotor`). A 25 imagens por segundo são
+ * 15 fotogramas seguidos sem nada — nunca acontece num vídeo que anda.
+ */
+export const IMAGEM_PRESA_MS = 600;
+
+/** O salto para a frente do 1.º degrau do destravar (ver `IMAGEM_PRESA_MS`): 2 fotogramas a 25 por segundo. */
+export const SALTO_DE_DESTRAVAR_S = 0.08;
+
+/**
+ * Depois de uma passagem, o que saiu acaba sozinho, escondido, se lhe faltar
+ * até isto — em vez de o pausar e de lhe pôr o tempo a 0 (o registo do iPhone
+ * dela, 17/10: era aí que a imagem do que está à vista prendia).
+ */
+export const DEIXAR_ACABAR_S = 1.5;
 
 /** Com o aparelho a recusar (poupança de energia), de quanto em quanto se volta a tentar, em silêncio. */
 export const TENTAR_DE_NOVO_MS = 3000;

@@ -112,6 +112,20 @@ describe("os vídeos da entrada — as regras", () => {
       expect(await melhorFormato(tudo, async () => r(true, true, true), "paisagem")).toBe("av1");
     });
 
+    it("no WebKit (iPhone, Safari, Instagram) é o HEVC, sem perguntar ao aparelho", async () => {
+      const perguntas: string[] = [];
+      const soAv1 = async (f: string) => {
+        perguntas.push(f);
+        return r(true, true, f === "av1");
+      };
+      // O registo do iPhone dela (17/10): a pergunta deixava passar o AV1.
+      expect(await melhorFormato(tudo, soAv1, "paisagem", true)).toBe("hevc");
+      expect(perguntas).toEqual([]);
+      // Um WebKit que não toca HEVC: a pergunta, como nos outros.
+      const semHevc = (t: string) => (t.includes("hvc1") ? "" : "probably");
+      expect(await melhorFormato(semHevc, soAv1, "paisagem", true)).toBe("av1");
+    });
+
     it("AV1 no processador (sem chip) ou a perder fotogramas não serve: HEVC", async () => {
       const p = async (f: string) => (f === "av1" ? r(true, true, false) : r(true, true, true));
       expect(await melhorFormato(tudo, p, "paisagem")).toBe("hevc");

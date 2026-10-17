@@ -9,6 +9,9 @@ import {
   ENCRAVADO_MS,
   MEDIR_REDE_MS,
   NUMERO_DE_VIDEOS,
+  DEIXAR_ACABAR_S,
+  IMAGEM_PRESA_MS,
+  SALTO_DE_DESTRAVAR_S,
   PASSAGEM_MS,
   PASSAGEM_PRESA_MS,
   SALTAR_SEM_DADOS_MS,
@@ -1010,29 +1013,26 @@ function criarMotor(raiz: HTMLElement): Motor | null {
       const t = setTimeout(() => {
         if (!vivo) return;
         novo.style.transitionDuration = "";
-        pausar(velho);
         aTocar.delete(velho);
         velho.style.opacity = "0";
         velho.style.zIndex = "0";
-        velho.currentTime = 0;
-        const saiu = atual;
+        // ── O QUE SAIU NÃO LEVA PAUSA NEM SALTO PARA O 0 ─────────────────────
+        // O registo do iPhone dela (17/10, já com o destravar): a imagem do que
+        // está à vista prendia ~0,2 s depois de o motor pausar o que saiu e
+        // lhe pôr o tempo a 0 — os dois a pedir ao mesmo descodificador. Agora,
+        // perto do fim (o caso normal), o que saiu acaba sozinho, escondido; o
+        // `passar` põe-no no 0 antes de o voltar a tocar, na vez dele. Só uma
+        // passagem forçada a meio (o vigia) ainda o pausa — mas sem salto.
+        const falta = velho.duration - velho.currentTime;
+        if (!(Number.isFinite(falta) && falta <= DEIXAR_ACABAR_S)) pausar(velho);
         atual = seguinte;
         passagem = null;
         // O take de abertura tocava da rede; se a cópia na memória já
         // chegou, as voltas seguintes tocam-na (ver `guardarAbertura`).
         passarAberturaParaAMemoria();
-        // ── NO MÁXIMO DOIS VÍDEOS CARREGADOS ─────────────────────────────
-        // O que saiu larga o ficheiro (está na memória: volta a ser aquecido
-        // dela perto da sua vez). O iPhone tem poucos descodificadores e
-        // pouca memória para vídeo; três takes carregados ao mesmo tempo é a
-        // causa provável de o seguinte não arrancar (não verificado num
-        // iPhone — ver `PASSAGEM_PRESA_MS`).
-        if (daMemoria[saiu] && velho.getAttribute("src")) {
-          velho.removeAttribute("src");
-          velho.load();
-          aquecido[saiu] = false;
-          pronto[saiu] = false;
-        }
+        // O que saiu fica carregado (pausado no início). O #243 largava-lhe o
+        // ficheiro aqui — e é exactamente neste instante que, no iPhone, a
+        // imagem do que está à vista ficava presa 8 a 10 s (o registo, 17/10).
         fila.shift();
         encherFila();
         aPassar = false;
@@ -1245,7 +1245,12 @@ function criarMotor(raiz: HTMLElement): Motor | null {
     decidido = true;
     prepararOQueVem();
   };
-  melhorFormato(podeTocarTipo, perguntaDoNavegador(), varianteParaOEcra(ecraDeAgora(), 1))
+  melhorFormato(
+    podeTocarTipo,
+    perguntaDoNavegador(),
+    varianteParaOEcra(ecraDeAgora(), 1),
+    typeof navigator !== "undefined" && /Apple/.test(navigator.vendor || ""),
+  )
     .then(decidir)
     .catch(() => decidir(null));
   depois(1000, () => decidir(null));
@@ -1318,6 +1323,11 @@ function criarMotor(raiz: HTMLElement): Motor | null {
     if (el.networkState === el.NETWORK_LOADING && el.readyState < 3) return;
     // Recarrega este no mesmo ponto (o de entrada volta a tentar as suas
     // fontes; os outros a sua, da memória ou da rede).
+    recarregarNoMesmoPonto(el, t);
+  };
+
+  /** Recarrega o take à vista no instante `t` (o de entrada volta às suas fontes). */
+  function recarregarNoMesmoPonto(el: HTMLVideoElement, t: number) {
     marcar("recarregar", atual);
     if (el === primeiro && !fonte[atual]) el.load();
     else {
@@ -1327,7 +1337,7 @@ function criarMotor(raiz: HTMLElement): Motor | null {
     }
     ouvir(el, "loadedmetadata", () => void (el.currentTime = t), true);
     tocar(el);
-  };
+  }
   // ── O registo: os acontecimentos do vídeo, cada fotograma pintado do que
   // está à vista, e as paragens (de 250 em 250 ms). ─────────────────────────
   /** O estado do vídeo à vista, para a paragem que abre agora. */
@@ -1364,23 +1374,35 @@ function criarMotor(raiz: HTMLElement): Motor | null {
       aFrente,
     };
   };
+  /** O browser diz quando pinta cada fotograma (iPhone desde o iOS 15.4, Chrome). */
+  let comFotogramasFinos = false;
+  /** A hora do último fotograma pintado do vídeo à vista (`null`: ainda não conta). */
+  let ultimoFotograma: number | null = null;
+  for (const el of videos) {
+    const doVideoAVista = () => el === videos[atual] && el.style.opacity !== "0";
+    const comFotogramas = el as HTMLVideoElement & {
+      requestVideoFrameCallback?: (cb: () => void) => number;
+    };
+    if (typeof comFotogramas.requestVideoFrameCallback === "function") {
+      comFotogramasFinos = true;
+      const cb = () => {
+        if (!vivo) return;
+        if (doVideoAVista()) {
+          ultimoFotograma = performance.now();
+          registo?.fotograma();
+        }
+        comFotogramas.requestVideoFrameCallback?.(cb);
+      };
+      comFotogramas.requestVideoFrameCallback(cb);
+    }
+  }
   if (registo) {
     for (const el of videos) {
       for (const k of ["waiting", "stalled", "pause", "playing"] as const) {
         ouvir(el, k, () => marcar(k, videos.indexOf(el)));
       }
       const doVideoAVista = () => el === videos[atual] && el.style.opacity !== "0";
-      const comFotogramas = el as HTMLVideoElement & {
-        requestVideoFrameCallback?: (cb: () => void) => number;
-      };
-      if (typeof comFotogramas.requestVideoFrameCallback === "function") {
-        const cb = () => {
-          if (!vivo) return;
-          if (doVideoAVista()) registo.fotograma();
-          comFotogramas.requestVideoFrameCallback?.(cb);
-        };
-        comFotogramas.requestVideoFrameCallback(cb);
-      } else {
+      if (!comFotogramasFinos) {
         // Sem fotogramas finos: o tempo a avançar conta como fotograma.
         let ultimo = -1;
         ouvir(el, "timeupdate", () => {
@@ -1392,15 +1414,67 @@ function criarMotor(raiz: HTMLElement): Motor | null {
     }
   }
   let relogioDoRegisto = 0;
+  /** O vídeo à vista devia estar a pintar imagens. */
+  const deviaAndar = () =>
+    podeTocar() &&
+    !aEsperarGesto &&
+    mostrado &&
+    document.visibilityState === "visible" &&
+    !aEsperaDaCortina(videos[atual]);
   const verificarRegisto = () => {
-    if (!registo || !vivo) return;
-    const ativo =
-      podeTocar() &&
-      !aEsperarGesto &&
-      mostrado &&
-      document.visibilityState === "visible" &&
-      !aEsperaDaCortina(videos[atual]);
-    registo.verificar(ativo, estadoDoVideo);
+    if (!vivo) return;
+    verImagem();
+    registo?.verificar(deviaAndar(), estadoDoVideo);
+  };
+
+  // ── DESTRAVAR A IMAGEM PRESA (ver `IMAGEM_PRESA_MS`) ────────────────────
+  // Sem fotograma pintado há mais de `IMAGEM_PRESA_MS`, com o vídeo à vista a
+  // dever andar: (1) um salto ligeiro para a frente — obriga o descodificador
+  // a entregar de novo; (2) ~0,6 s depois, ainda presa: passa ao seguinte,
+  // se estiver pronto; (3) senão, recarrega no mesmo ponto.
+  let degrau = 0;
+  let ultimoDegrau = 0;
+  const verImagem = () => {
+    if (!comFotogramasFinos) return;
+    const el = videos[atual];
+    if (!deviaAndar() || aPassar || el.paused || el.ended) {
+      ultimoFotograma = null;
+      degrau = 0;
+      return;
+    }
+    const agora = performance.now();
+    if (ultimoFotograma === null) {
+      ultimoFotograma = agora; // começa a contar agora
+      return;
+    }
+    if (agora - ultimoFotograma < IMAGEM_PRESA_MS) {
+      degrau = 0;
+      return;
+    }
+    if (degrau && agora - ultimoDegrau < IMAGEM_PRESA_MS) return; // à espera do efeito do anterior
+    ultimoDegrau = agora;
+    degrau++;
+    if (degrau === 1) {
+      marcar("destravar", atual);
+      // Um salto ligeiro PARA A FRENTE: saltar para o mesmo instante, no
+      // WebKit, pode não fazer nada (o registo de 17/10: o 1.º degrau não
+      // destravou nenhuma das duas paragens).
+      try {
+        const fim = Number.isFinite(el.duration) ? el.duration - 0.1 : Infinity;
+        el.currentTime = Math.min(el.currentTime + SALTO_DE_DESTRAVAR_S, fim);
+      } catch {
+        // sem dados para saltar: o degrau seguinte trata
+      }
+      return;
+    }
+    degrau = 0;
+    ultimoFotograma = null;
+    if (seguintePronto()) {
+      marcar("destravar-passar", atual);
+      passar();
+      return;
+    }
+    recarregarNoMesmoPonto(el, el.currentTime);
   };
   /** Ao sair (página escondida, fechada, ou outra página do sítio): envia o resumo. */
   const enviarResumo = () => {
@@ -1469,8 +1543,8 @@ function criarMotor(raiz: HTMLElement): Motor | null {
       naTela = true;
       separadorVisivel = document.visibilityState !== "hidden";
       relogio = window.setInterval(vigiar, 1000);
+      relogioDoRegisto = window.setInterval(verificarRegisto, 250);
       if (registo) {
-        relogioDoRegisto = window.setInterval(verificarRegisto, 250);
         document.addEventListener("visibilitychange", aoEsconder);
         window.addEventListener("pagehide", enviarResumo);
       }

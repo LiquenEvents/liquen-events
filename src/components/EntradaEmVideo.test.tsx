@@ -26,6 +26,9 @@ beforeEach(() => {
   // testes do download inteiro põem-no de volta.
   vi.stubGlobal("fetch", undefined);
   tiposQueToca = ["mp4"];
+  // Fora do WebKit, salvo nos testes do iPhone: no WebKit o HEVC entra sem
+  // perguntar (`melhorFormato`), e o jsdom diz-se «Apple».
+  Object.defineProperty(navigator, "vendor", { configurable: true, value: "" });
   vista = null;
   play = vi.fn(() => Promise.resolve());
   pausa = vi.fn();
@@ -707,9 +710,27 @@ describe("EntradaEmVideo", () => {
       return b.getAttribute("src");
     }
 
-    it("AV1 quando o chip o descodifica e corre liso", async () => {
-      aparelho(SIM, SIM);
-      expect(await srcDoSegundo()).toMatch(/entrada-2-paisagem-av1\.mp4$/);
+    it("AV1 quando o chip o descodifica e corre liso (fora do Safari/iPhone)", async () => {
+      Object.defineProperty(navigator, "vendor", { configurable: true, value: "Google Inc." });
+      try {
+        aparelho(SIM, SIM);
+        expect(await srcDoSegundo()).toMatch(/entrada-2-paisagem-av1\.mp4$/);
+      } finally {
+        Reflect.deleteProperty(navigator, "vendor");
+      }
+    });
+
+    it("no iPhone/Safari é o HEVC, mesmo com o AV1 no chip (17/10, o registo)", async () => {
+      Object.defineProperty(navigator, "vendor", {
+        configurable: true,
+        value: "Apple Computer, Inc.",
+      });
+      try {
+        aparelho(SIM, SIM);
+        expect(await srcDoSegundo()).toMatch(/entrada-2-paisagem-hevc\.mp4$/);
+      } finally {
+        Reflect.deleteProperty(navigator, "vendor");
+      }
     });
 
     it("HEVC quando o AV1 seria no processador (travava) e o HEVC é no chip", async () => {
@@ -824,7 +845,7 @@ describe("EntradaEmVideo", () => {
       expect(b.getAttribute("src")).toBe("/videos/entrada/v4/entrada-2-paisagem.mp4");
     });
 
-    it("depois de cada passagem, o que saiu larga o ficheiro (no máximo dois carregados)", async () => {
+    it("depois de cada passagem, o que saiu FICA carregado (largá-lo prendia a imagem no iPhone)", async () => {
       const { container } = await montar();
       const [a, b, c] = videos(container);
       Object.defineProperty(a, "duration", { configurable: true, value: 18 });
@@ -846,6 +867,9 @@ describe("EntradaEmVideo", () => {
         act(() => void b.dispatchEvent(new Event("playing")));
         act(() => void vi.advanceTimersByTime(1000));
         expect(b.style.opacity).toBe("1");
+        // O que saiu, perto do fim, acaba sozinho: sem salto para o 0 (o
+        // registo do iPhone, 17/10: era aí que a imagem à vista prendia).
+        expect(a.currentTime).toBe(16.5);
         // 2 → 3: o 3 é aquecido da memória perto do fim do 2…
         Object.defineProperty(b, "duration", { configurable: true, value: 18 });
         Object.defineProperty(b, "currentTime", {
@@ -863,8 +887,10 @@ describe("EntradaEmVideo", () => {
         vi.useRealTimers();
       }
       expect(c.style.opacity).toBe("1");
-      // …e o 2, que saiu, larga o ficheiro (volta a ser aquecido na sua vez).
-      expect(b.getAttribute("src")).toBeNull();
+      // …e o 2, que saiu, continua com o seu ficheiro. O #243 largava-o aqui, e
+      // era nesse instante que, no iPhone, a imagem à vista ficava presa
+      // 8 a 10 s (o registo anónimo, 17/10).
+      expect(b.getAttribute("src")).toBe("blob:take-1");
     });
 
     it("se o download falhar, toca da rede como antes", async () => {
@@ -1283,6 +1309,84 @@ describe("EntradaEmVideo", () => {
         const corpo = JSON.parse(await beacons[beacons.length - 1].text());
         expect(corpo.motivo).toBe("saida");
         expect(corpo.paragens).toEqual([]);
+      });
+    });
+
+    describe("a imagem presa (17/10, iPhone): o relógio anda, as imagens não", () => {
+      let pendentes: Map<HTMLVideoElement, () => void>;
+      beforeEach(() => {
+        pendentes = new Map();
+        Object.defineProperty(HTMLVideoElement.prototype, "requestVideoFrameCallback", {
+          configurable: true,
+          value: function (this: HTMLVideoElement, cb: () => void) {
+            pendentes.set(this, cb);
+            return 1;
+          },
+        });
+      });
+      afterEach(() => {
+        Reflect.deleteProperty(HTMLVideoElement.prototype, "requestVideoFrameCallback");
+      });
+      /** O browser pintou um fotograma deste vídeo. */
+      const pintar = (el: HTMLVideoElement) => {
+        const cb = pendentes.get(el);
+        pendentes.delete(el);
+        act(() => cb?.());
+      };
+      /** O take à vista a andar, com os saltos espiados. */
+      async function aAndar() {
+        const r = await montar();
+        const [a, b] = videos(r.container);
+        comecar(a);
+        let t = 4;
+        const saltos: number[] = [];
+        Object.defineProperty(a, "currentTime", {
+          configurable: true,
+          get: () => t,
+          set: (v: number) => {
+            saltos.push(v);
+            t = v;
+          },
+        });
+        pintar(a);
+        return { a, b, saltos };
+      }
+
+      it("sem imagens novas há 0,6 s, com o vídeo à vista a andar: um salto ligeiro para a frente", async () => {
+        const { a, saltos } = await aAndar();
+        act(() => void vi.advanceTimersByTime(550));
+        expect(saltos).toEqual([]); // ainda dentro do normal
+        act(() => void vi.advanceTimersByTime(300));
+        // Para a frente, e não para o mesmo instante: no WebKit esse pode não
+        // fazer nada (o registo de 17/10).
+        expect(saltos).toHaveLength(1);
+        expect(saltos[0]).toBeCloseTo(4.08, 5);
+        expect(a.style.opacity).toBe("1");
+      });
+
+      it("se as imagens voltam, não faz mais nada", async () => {
+        const { a, saltos } = await aAndar();
+        for (let k = 0; k < 10; k++) {
+          act(() => void vi.advanceTimersByTime(300));
+          pintar(a);
+        }
+        expect(saltos).toEqual([]);
+      });
+
+      it("continua presa ~0,6 s depois: passa ao seguinte, se estiver pronto", async () => {
+        const { b } = await aAndar();
+        act(() => void b.dispatchEvent(new Event("canplaythrough")));
+        act(() => void vi.advanceTimersByTime(1600));
+        act(() => void b.dispatchEvent(new Event("playing")));
+        expect(b.style.opacity).toBe("1");
+      });
+
+      it("pausado (de propósito, ou fora do ecrã) não conta como imagem presa", async () => {
+        const { a, saltos } = await aAndar();
+        Object.defineProperty(a, "paused", { configurable: true, value: true });
+        act(() => vista?.([{ isIntersecting: false }]));
+        act(() => void vi.advanceTimersByTime(3000));
+        expect(saltos).toEqual([]);
       });
     });
 
