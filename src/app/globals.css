@@ -5432,9 +5432,9 @@ body:has(.barra-consentimento) footer {
    so without JS — and under reduced motion — the logos stay fully visible
    (they're client proof and must always render legibly). */
 
-/* Cells share borders, so nothing translates the cell itself (that would open
-   seams between neighbours). Instead a soft moss spotlight blooms behind the
-   logo and the cell picks up the faintest moss tint. */
+/* Sem quadrados (ela, 17/10: «tira os quadrados à volta dos logos»): as
+   células já não têm traços nem fundo próprio ao passar o rato — só a luz
+   musgo, redonda e esbatida, que não desenha nenhuma caixa. */
 .cl-cell::before {
   content: "";
   position: absolute;
@@ -5447,9 +5447,6 @@ body:has(.barra-consentimento) footer {
 }
 /* Gated to hover devices so the logo-wall recolor/lift doesn't stick on tap. */
 @media (hover: hover) {
-  .cl-cell:hover {
-    background-color: rgba(99, 122, 95, 0.045);
-  }
   .cl-cell:hover::before {
     opacity: 1;
   }
